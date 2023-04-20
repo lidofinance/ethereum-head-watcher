@@ -115,7 +115,6 @@ class Watcher:
         return head
 
     @unsync
-    @duration_meter()
     async def _update_validators(self):
         """
         If current time it's the end of epoch - new validators will be added to the active set
@@ -131,7 +130,6 @@ class Watcher:
             logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
 
     @unsync
-    @duration_meter()
     async def _update_lido_keys(self, block: BlockDetailsResponse) -> None:
         """Return dict with `publickey` as key and `LidoNamedKey` as value"""
         current_keys_status = self.keys_api.get_status()

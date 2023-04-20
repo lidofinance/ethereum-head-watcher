@@ -1,5 +1,7 @@
 import os
 
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+
 # - Providers-
 CONSENSUS_CLIENT_URI = os.getenv('CONSENSUS_CLIENT_URI', '').split(',')
 KEYS_API_URI = os.getenv('KEYS_API_URI', '').split(',')
