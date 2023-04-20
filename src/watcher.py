@@ -8,6 +8,8 @@ from unsync import unsync
 
 from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
+from src.metrics.prometheus.duration_meter import duration_meter
+from src.metrics.prometheus.watcher import SLOT_NUMBER, BLOCK_NUMBER, SLASHINGS
 from src.providers.consensus.client import ConsensusClient
 from src.providers.consensus.typings import BlockDetailsResponse
 from src.providers.keys.client import KeysAPIClient
@@ -57,26 +59,35 @@ class Watcher:
                 self.watch_on_end_of_epoch.result()
 
             logger.info({'msg': f'New head [{current_head.message.slot}]. Looking for slashings'})
+            SLOT_NUMBER.set(current_head.message.slot)
+            BLOCK_NUMBER.set(current_head.message.body['execution_payload']['block_number'])
             self.head = self._watch_on_head(current_head)
 
             time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
+    @duration_meter()
     def _watch_on_head(self, head: BlockDetailsResponse) -> BlockDetailsResponse:
         slashings = {
-            "proposer_lido": [],
-            "proposer_other": [],
-            "attester_lido": [],
-            "attester_other": [],
+            ("proposer", "lido"): [],
+            ("proposer", "other"): [],
+            ("attester", "lido"): [],
+            ("attester", "other"): [],
+            # It's possible when we have unsynced indexed validators
+            ("proposer", "unknown"): [],
+            ("attester", "unknown"): [],
         }
         any_slashing = False
         for proposer_slashing in head.message.body['proposer_slashings']:
             any_slashing = True
             signed_header_1 = proposer_slashing['signed_header_1']
             proposer_key = self.indexed_validators_keys.get(signed_header_1['message']['proposer_index'])
-            if lido_key := self.lido_keys.get(proposer_key):
-                slashings['proposer_lido'].append(lido_key)
+            if proposer_key is None:
+                slashings['proposer', 'unknown'].append(signed_header_1['message']['proposer_index'])
             else:
-                slashings['proposer_other'].append(proposer_key)
+                if lido_key := self.lido_keys.get(proposer_key):
+                    slashings['proposer', 'lido'].append(lido_key)
+                else:
+                    slashings['proposer', 'other'].append(proposer_key)
 
         for attester_slashing in head.message.body['attester_slashings']:
             any_slashing = True
@@ -85,21 +96,26 @@ class Watcher:
             attesters = set(attestation_1['attesting_indices']).intersection(attestation_2['attesting_indices'])
             for attester in attesters:
                 attester_key = self.indexed_validators_keys.get(attester)
-                if lido_key := self.lido_keys.get(attester_key):
-                    slashings['attester_lido'].append(lido_key)
+                if attester_key is None:
+                    slashings['attester', 'unknown'].append(attester)
                 else:
-                    slashings['attester_other'].append(attester_key)
+                    if lido_key := self.lido_keys.get(attester_key):
+                        slashings['attester', 'lido'].append(lido_key)
+                    else:
+                        slashings['attester', 'other'].append(attester_key)
 
         if not any_slashing:
             logger.info({'msg': f'No slashings in block [{head.message.slot}]'})
+            # todo: clear metrics ???
         else:
-            logger.info({'msg': 'Slashes', 'count': sum(len(value) for value in slashings.values())})
+            for key, value in slashings.items():
+                SLASHINGS.labels(*key).set(len(value))
+            logger.info({'msg': f'Slashings in block: {sum(len(value) for value in slashings.values())}'})
 
         return head
 
-        # todo: set metrics
-
     @unsync
+    @duration_meter()
     async def _update_validators(self):
         """
         If current time it's the end of epoch - new validators will be added to the active set
@@ -115,6 +131,7 @@ class Watcher:
             logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
 
     @unsync
+    @duration_meter()
     async def _update_lido_keys(self, block: BlockDetailsResponse) -> None:
         """Return dict with `publickey` as key and `LidoNamedKey` as value"""
         current_keys_status = self.keys_api.get_status()
@@ -148,6 +165,7 @@ class Watcher:
             for validator in self.consensus.get_validators(slot)
         }
 
+    @duration_meter()
     def _get_head_block(self):
         # todo: add handlers to change fallback:
         #  when head < current time significantly

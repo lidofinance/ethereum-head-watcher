@@ -16,24 +16,6 @@ BUILD_INFO = Info(
     namespace=PROMETHEUS_PREFIX,
 )
 
-GENESIS_TIME = Gauge(
-    'genesis_time',
-    'Genesis time',
-    namespace=PROMETHEUS_PREFIX,
-)
-
-WATCHER_SLOT_NUMBER = Gauge(
-    "slot_number",
-    "Watcher head slot number",
-    namespace=PROMETHEUS_PREFIX,
-)
-
-WATCHER_BLOCK_NUMBER = Gauge(
-    "block_number",
-    "Watcher head block number",
-    namespace=PROMETHEUS_PREFIX,
-)
-
 FUNCTIONS_DURATION = Histogram(
     'functions_duration',
     'Duration of watcher daemon tasks',
