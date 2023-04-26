@@ -9,9 +9,6 @@ alerting:
     - static_configs:
       - targets: ['alertmanager:9093']
 
-rule_files:
-  - "alerts_rules.yml"
-
 scrape_configs:
 
   - job_name: 'prometheus'
@@ -20,4 +17,4 @@ scrape_configs:
 
   - job_name: 'app'
     static_configs:
-      - targets: ['ethereum-slashing-watcher:9000']
+      - targets: ['ethereum-head-watcher:9000']

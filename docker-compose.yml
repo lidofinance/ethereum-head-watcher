@@ -1,8 +1,8 @@
 version: "3.7"
 services:
 
-  ethereum-slashing-watcher:
-    container_name: ethereum-slashing-watcher
+  ethereum-head-watcher:
+    container_name: ethereum-head-watcher
     build: .
     restart: unless-stopped
     deploy:
