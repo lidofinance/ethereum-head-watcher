@@ -1,13 +1,71 @@
 version: "3.7"
 services:
+
   ethereum-slashing-watcher:
-    build: .
     container_name: ethereum-slashing-watcher
+    build: .
+    restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 2g
-    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - alertmanager
+      - alertmanager-discord
+    ports:
+      - "9000:9000"
     environment:
       - CONSENSUS_CLIENT_URI=${CONSENSUS_CLIENT_URI}
       - KEYS_API_URI=${KEYS_API_URI}
+      - ALERTMANAGER_URI=${ALERTMANAGER_URI}
+      - LOG_LEVEL=${LOG_LEVEL}
+
+  prometheus:
+    image: prom/prometheus:latest
+    sysctls:
+      - net.ipv6.conf.lo.disable_ipv6=0
+      - net.ipv6.conf.all.disable_ipv6=0
+    container_name: prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    volumes:
+      - ./.volumes/prometheus/:/prometheus
+      - ./docker/prometheus/:/etc/prometheus/
+    expose:
+      - 9090
+    ports:
+      - "0.0.0.0:9090:9090/tcp"
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+    volumes:
+      - ./.volumes/alertmanager/:/alertmanager
+      - ./docker/alertmanager/:/etc/alertmanager/
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    expose:
+      - 9093
+    ports:
+      - "0.0.0.0:9093:9093/tcp"
+
+  alertmanager-discord:
+    image: vgorkavenko/alertmanager-discord-balval:1.4.0
+    container_name: alertmanager-discord
+    restart: unless-stopped
+    expose:
+      - 9094
+    ports:
+      - "0.0.0.0:9094:9094/tcp"
+    environment:
+      - "PORT=9094"
+      - "DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}"

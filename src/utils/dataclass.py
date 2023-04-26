@@ -14,16 +14,20 @@ class Nested:
     Base class for dataclasses that converts all inner dicts into dataclasses
     Also works with lists of dataclasses
     """
+
     def __post_init__(self):
         for field in fields(self):
             if isinstance(field.type, GenericAlias):
                 field_type = field.type.__args__[0]
                 if is_dataclass(field_type):
                     factory = self.__get_dataclass_factory(field_type)
-                    setattr(self, field.name,
-                            field.type.__origin__(map(
-                                lambda x: factory(**x) if not is_dataclass(x) else x,
-                                getattr(self, field.name))))
+                    setattr(
+                        self,
+                        field.name,
+                        field.type.__origin__(
+                            map(lambda x: factory(**x) if not is_dataclass(x) else x, getattr(self, field.name))
+                        ),
+                    )
             elif is_dataclass(field.type) and not is_dataclass(getattr(self, field.name)):
                 factory = self.__get_dataclass_factory(field.type)
                 setattr(self, field.name, factory(**getattr(self, field.name)))
@@ -54,6 +58,7 @@ def list_of_dataclasses(
     _dataclass_factory: Callable[..., T]
 ) -> Callable[[Callable[..., Sequence]], Callable[..., list[T]]]:
     """Decorator to transform list of dicts from func response to list of dataclasses"""
+
     def decorator(func: Callable[..., Sequence]) -> Callable[..., list[T]]:
         @functools.wraps(func)
         def wrapper_decorator(*args, **kwargs):
@@ -63,6 +68,7 @@ def list_of_dataclasses(
                 return list(map(lambda x: _dataclass_factory(**x), list_of_elements))
 
             raise DecodeToDataclassException(f'Type {type(list_of_elements[0])} is not supported.')
+
         return wrapper_decorator
 
     return decorator

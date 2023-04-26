@@ -3,7 +3,7 @@ from typing import Optional, cast
 
 from src.metrics.prometheus.basic import KEYS_API_REQUESTS_DURATION, KEYS_API_LATEST_BLOCKNUMBER
 from src.providers.http_provider import HTTPProvider
-from src.providers.keys.typings import LidoKey, KeysApiStatus, LidoModuleOperators
+from src.providers.keys.typings import LidoKey, KeysApiStatus, LidoModuleOperators, LidoModule
 from src import variables
 from src.typings import BlockNumber
 from src.utils.dataclass import list_of_dataclasses
@@ -23,6 +23,7 @@ class KeysAPIClient(HTTPProvider):
 
     Keys API specification can be found here https://keys-api.lido.fi/api/static/index.html
     """
+
     PROMETHEUS_HISTOGRAM = KEYS_API_REQUESTS_DURATION
 
     USED_KEYS = 'v1/keys?used=true'
@@ -35,7 +36,10 @@ class KeysAPIClient(HTTPProvider):
         """
         for i in range(variables.HTTP_REQUEST_RETRY_COUNT):
             data, meta = self._get(url, query_params=params)
-            blocknumber_meta = meta['meta']['elBlockSnapshot']['blockNumber']
+            if meta.get('meta'):
+                blocknumber_meta = meta['meta']['elBlockSnapshot']['blockNumber']
+            else:
+                blocknumber_meta = meta['elBlockSnapshot']['blockNumber']
             KEYS_API_LATEST_BLOCKNUMBER.set(blocknumber_meta)
             if blocknumber_meta >= block_number:
                 return data
@@ -43,7 +47,9 @@ class KeysAPIClient(HTTPProvider):
             if i != variables.HTTP_REQUEST_RETRY_COUNT - 1:
                 sleep(variables.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS)
 
-        raise KeysOutdatedException(f'Keys API Service stuck, no updates for {variables.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS * variables.HTTP_REQUEST_RETRY_COUNT} seconds.')
+        raise KeysOutdatedException(
+            f'Keys API Service stuck, no updates for {variables.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS * variables.HTTP_REQUEST_RETRY_COUNT} seconds.'
+        )
 
     @list_of_dataclasses(LidoKey.from_response)
     def get_used_lido_keys(self, block_number: BlockNumber) -> list[dict]:
@@ -53,6 +59,11 @@ class KeysAPIClient(HTTPProvider):
     @list_of_dataclasses(LidoModuleOperators.from_response)
     def get_operators(self, block_number: BlockNumber) -> list[dict]:
         return cast(list[dict], self._get_with_blockstamp(self.OPERATORS, block_number))
+
+    @list_of_dataclasses(LidoModule.from_response)
+    def get_modules(self, block_number: BlockNumber) -> list[dict]:
+        """Docs: https://keys-api.lido.fi/api/static/index.html#/modules/SRModulesController_getModules"""
+        return cast(list[dict], self._get_with_blockstamp('v1/modules', block_number))
 
     def get_status(self) -> KeysApiStatus:
         """Docs: https://keys-api.lido.fi/api/static/index.html#/status/StatusController_get"""

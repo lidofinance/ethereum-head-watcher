@@ -30,8 +30,7 @@ def duration_meter():
                     logger.debug(
                         {
                             "msg": f"Function '{full_name}' finished",
-                            "duration (sec)": stop
-                            - t._start,  # pylint: disable=protected-access
+                            "duration (sec)": stop - t._start,  # pylint: disable=protected-access
                         }
                     )
 

@@ -20,9 +20,14 @@ BLOCK_NUMBER = Gauge(
     namespace=PROMETHEUS_PREFIX,
 )
 
-SLASHINGS = Gauge(
-    "slashings",
-    "Slashings by duty and validator owner",
-    ["duty", "owner"],
+KEYS_API_BLOCK_NUMBER = Gauge(
+    "keys_api_block_number",
+    "Keys API block number from status",
+    namespace=PROMETHEUS_PREFIX,
+)
+
+VALIDATORS_INDEX_SLOT_NUMBER = Gauge(
+    "validators_index_slot_number",
+    "Validators index last updated slot number",
     namespace=PROMETHEUS_PREFIX,
 )

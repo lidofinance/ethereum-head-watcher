@@ -5,9 +5,10 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 # - Providers-
 CONSENSUS_CLIENT_URI = os.getenv('CONSENSUS_CLIENT_URI', '').split(',')
 KEYS_API_URI = os.getenv('KEYS_API_URI', '').split(',')
+ALERTMANAGER_URI = os.getenv('ALERTMANAGER_URI', '').split(',')
 
 
-CYCLE_SLEEP_IN_SECONDS = int(os.getenv('CYCLE_SLEEP_IN_SECONDS', 5))
+CYCLE_SLEEP_IN_SECONDS = int(os.getenv('CYCLE_SLEEP_IN_SECONDS', 1))
 
 HTTP_REQUEST_RETRY_COUNT = int(os.getenv('HTTP_REQUEST_RETRY_COUNT', 5))
 HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = int(os.getenv('HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS', 5))
@@ -28,6 +29,8 @@ def check_uri_required_variables():
         errors.append('CONSENSUS_CLIENT_URI')
     if '' in KEYS_API_URI:
         errors.append('KEYS_API_URI')
+    if '' in ALERTMANAGER_URI:
+        errors.append('ALERTMANAGER_URI')
     return errors
 
 

@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "ethereum-slashing-watcher"
+name = "ethereum-head-watcher"
 version = "0.1.0"
-description = "Bot that watches for slashing events on Ethereum"
+description = "Bot that watches for important events on Ethereum head"
 authors = ["vladimir.g@lido.fi"]
 license = "MIT License"
 readme = "README.md"
@@ -17,3 +17,42 @@ unsync = "^1.4.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "7.3.1"
+pylint = "^2.16.2"
+black = "^23.3.0"
+
+[tool.pylint."messages control"]
+disable = [
+    # Disabled by default
+    "raw-checker-failed",
+    "bad-inline-option",
+    "locally-disabled",
+    "file-ignored",
+    "suppressed-message",
+    "useless-suppression",
+    "deprecated-pragma",
+    "use-symbolic-message-instead",
+    # Disabled by us
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "too-few-public-methods",
+    "invalid-name",
+    "unused-argument",
+    "wrong-import-order",
+    "ungrouped-imports",
+    "line-too-long",
+    "too-many-instance-attributes",
+    "too-many-arguments",
+    "too-many-locals",
+    "unspecified-encoding",
+    "bare-except",
+    "fixme",
+    "cell-var-from-loop",
+    "invalid-envvar-default",
+    "global-statement",
+    "redefined-outer-name",
+]
+
+[tool.black]
+line-length = 120
+skip-string-normalization = true
