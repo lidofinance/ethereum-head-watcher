@@ -7,6 +7,9 @@ CONSENSUS_CLIENT_URI = os.getenv('CONSENSUS_CLIENT_URI', '').split(',')
 KEYS_API_URI = os.getenv('KEYS_API_URI', '').split(',')
 ALERTMANAGER_URI = os.getenv('ALERTMANAGER_URI', '').split(',')
 
+NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
+
+SLOTS_RANGE = os.getenv('SLOTS_RANGE')
 
 CYCLE_SLEEP_IN_SECONDS = int(os.getenv('CYCLE_SLEEP_IN_SECONDS', 1))
 

@@ -15,6 +15,10 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'app'
+  - job_name: 'app-mainnet'
     static_configs:
-      - targets: ['ethereum-head-watcher:9000']
+      - targets: ['ethereum-head-watcher-mainnet:9000']
+
+  - job_name: 'app-goerli'
+    static_configs:
+      - targets: ['ethereum-head-watcher-goerli:19000']

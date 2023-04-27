@@ -21,7 +21,7 @@ from src.providers.consensus.typings import BlockDetailsResponse
 from src.providers.keys.client import KeysAPIClient
 from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
 from src.typings import BlockNumber, SlotNumber
-from src.variables import CYCLE_SLEEP_IN_SECONDS
+from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 
 logger = logging.getLogger()
 
@@ -58,14 +58,13 @@ class Watcher:
 
     def run(self):
         logger.info({'msg': f'Watcher started. Handlers: {[handler.__class__.__name__ for handler in self.handlers]}'})
-        # goeli: 5486325
-        # mainnet: 6213852 - 6213857
-        while True:
-            current_head = self._get_head_block()
+
+        def wrapped(slot_to_handle='head'):
+            current_head = self._get_head_block(slot_to_handle)
             if self.head is not None and current_head.message.slot == self.head.message.slot:
                 logger.info({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
                 time.sleep(CYCLE_SLEEP_IN_SECONDS)
-                continue
+                return
 
             if self.keys_updater is not None and self.keys_updater.done():
                 self.keys_updater.result()
@@ -89,6 +88,14 @@ class Watcher:
             self.head = current_head
 
             time.sleep(CYCLE_SLEEP_IN_SECONDS)
+
+        if SLOTS_RANGE:
+            start, end = SLOTS_RANGE.split('-')
+            for slot in range(int(start), int(end) + 1):
+                wrapped(str(slot))
+        else:
+            while True:
+                wrapped()
 
     @duration_meter()
     def _handle_head(self, head: BlockDetailsResponse):
@@ -129,6 +136,8 @@ class Watcher:
     @duration_meter()
     def _update_lido_keys(self, block: BlockDetailsResponse) -> None:
         """Return dict with `publickey` as key and `LidoNamedKey` as value"""
+
+        # todo: reforge to streams
 
         current_keys_status = self.keys_api.get_status()
         if self.keys_api_status is not None and (

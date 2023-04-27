@@ -4,56 +4,28 @@ route:
   group_by: ['alertname']
   receiver: empty
   routes:
-    - receiver: discord_webhook_send_resolved
-      group_wait: 25s
-      group_interval: 35s
-      repeat_interval: 1h
-      matchers:
-        - alertname =~ "DataActuality"
-#      continue: true
-
-#    - receiver: telegram_resolved
-#      matchers:
-#        - alertname =~ "DataActuality"
-
-#    - receiver: telegram
-#      continue: true
-
-    - receiver: discord_webhook_default
+    - receiver: discord_webhook_mainnet
       group_wait: 100ms
       group_interval: 100ms
       repeat_interval: 1h
+      matchers:
+        - network="mainnet"
+
+    - receiver: discord_webhook_goerli
+      group_wait: 100ms
+      group_interval: 100ms
+      repeat_interval: 1h
+      matchers:
+        - network="goerli"
+
 
 receivers:
   - name: 'empty'
-  - name: 'discord_webhook_default'
+  - name: 'discord_webhook_mainnet'
     webhook_configs:
-      - url: 'http://alertmanager-discord:9094/'
+      - url: 'http://alertmanager-discord:5001/hook/slashing-watcher-mainnet'
         send_resolved: false
-
-  - name: 'discord_webhook_send_resolved'
+  - name: 'discord_webhook_goerli'
     webhook_configs:
-      - url: 'http://alertmanager-discord:9094/'
-        send_resolved: true
-
-#  - name: 'telegram'
-#    telegram_configs:
-#      - send_resolved: false
-#        disable_notifications: false
-#        parse_mode: "HTML"
-#        api_url: 'https://api.telegram.org'
-#        message: '{{ template "telegram.custom.message" . }}'
-#        bot_token: 'YOUR_TOKEN'
-#        chat_id: 0
-#
-#  - name: 'telegram_resolved'
-#    telegram_configs:
-#      - send_resolved: true
-#        disable_notifications: false
-#        parse_mode: "HTML"
-#        api_url: 'https://api.telegram.org'
-#        message: '{{ template "telegram.custom.message" . }}'
-#        bot_token: 'YOUR_TOKEN'
-#        chat_id: 0
-#
-#templates: ['/etc/alertmanager/templates/telegram.tmpl']
+      - url: 'http://alertmanager-discord:5001/hook/slashing-watcher-goerli'
+        send_resolved: false

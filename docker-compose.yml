@@ -1,10 +1,16 @@
 version: "3.7"
+
+networks:
+  head-watcher: {}
+
 services:
 
-  ethereum-head-watcher:
-    container_name: ethereum-head-watcher
+  app-mainnet:
+    container_name: ethereum-head-watcher-mainnet
     build: .
     restart: unless-stopped
+    networks:
+      - head-watcher
     deploy:
       resources:
         limits:
@@ -13,13 +19,39 @@ services:
       - prometheus
       - alertmanager
       - alertmanager-discord
-    ports:
-      - "9000:9000"
+    expose:
+      - 9000
     environment:
       - CONSENSUS_CLIENT_URI=${CONSENSUS_CLIENT_URI}
       - KEYS_API_URI=${KEYS_API_URI}
       - ALERTMANAGER_URI=${ALERTMANAGER_URI}
       - LOG_LEVEL=${LOG_LEVEL}
+      - SLOTS_RANGE=${SLOTS_RANGE}
+
+  app-goerli:
+    container_name: ethereum-head-watcher-goerli
+    build: .
+    restart: unless-stopped
+    networks:
+      - head-watcher
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    depends_on:
+      - prometheus
+      - alertmanager
+      - alertmanager-discord
+    expose:
+      - 19000
+    environment:
+      - HTTP_PORT=19000
+      - CONSENSUS_CLIENT_URI=${CONSENSUS_CLIENT_URI_GOERLI}
+      - KEYS_API_URI=${KEYS_API_URI_GOERLI}
+      - ALERTMANAGER_URI=${ALERTMANAGER_URI}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - SLOTS_RANGE=${SLOTS_RANGE_GOERLI}
+      - NETWORK_NAME=goerli
 
   prometheus:
     image: prom/prometheus:latest
@@ -27,6 +59,8 @@ services:
       - net.ipv6.conf.lo.disable_ipv6=0
       - net.ipv6.conf.all.disable_ipv6=0
     container_name: prometheus
+    networks:
+      - head-watcher
     restart: unless-stopped
     deploy:
       resources:
@@ -37,13 +71,13 @@ services:
       - ./docker/prometheus/:/etc/prometheus/
     expose:
       - 9090
-    ports:
-      - "0.0.0.0:9090:9090/tcp"
 
   alertmanager:
     image: prom/alertmanager:latest
     container_name: alertmanager
     restart: unless-stopped
+    networks:
+      - head-watcher
     deploy:
       resources:
         limits:
@@ -55,17 +89,15 @@ services:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
     expose:
       - 9093
-    ports:
-      - "0.0.0.0:9093:9093/tcp"
 
   alertmanager-discord:
-    image: vgorkavenko/alertmanager-discord-balval:1.4.0
+    image: lidofinance/alertmanager-discord:2.3.0
+    platform: linux/x86_64
     container_name: alertmanager-discord
     restart: unless-stopped
+    networks:
+      - head-watcher
     expose:
-      - 9094
-    ports:
-      - "0.0.0.0:9094:9094/tcp"
-    environment:
-      - "PORT=9094"
-      - "DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}"
+      - 5001
+    volumes:
+      - ./docker/alertmanager-discord/alertmanager-discord.yml:/etc/alertmanager-discord.yml
