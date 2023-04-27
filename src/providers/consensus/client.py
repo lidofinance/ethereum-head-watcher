@@ -1,5 +1,7 @@
 from http import HTTPStatus
-from typing import Literal, Union, Optional
+from typing import Literal, Union
+
+from requests import Response
 
 from src.metrics.logging import logging
 from src.metrics.prometheus.basic import CL_REQUESTS_DURATION
@@ -10,11 +12,9 @@ from src.providers.consensus.typings import (
     BlockRootResponse,
     BeaconSpecResponse,
     GenesisResponse,
-    Validator,
 )
 from src.providers.http_provider import HTTPProvider, NotOkResponse
 from src.typings import SlotNumber, BlockRoot
-from src.utils.dataclass import list_of_dataclasses
 
 logger = logging.getLogger(__name__)
 
@@ -94,17 +94,13 @@ class ConsensusClient(HTTPProvider):
             raise ValueError("Expected mapping response from getBlockV2")
         return BlockDetailsResponse.from_response(**data)
 
-    @list_of_dataclasses(Validator.from_response)
-    def get_validators(self, slot_number: SlotNumber, pub_keys: Optional[str | tuple] = None) -> list[dict]:
+    def get_validators_stream(self, slot_number: SlotNumber) -> Response:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidators"""
-        data, _ = self._get(
+        stream = self._get_stream(
             self.API_GET_VALIDATORS,
             path_params=(slot_number,),
-            query_params={'id': pub_keys},
         )
-        if not isinstance(data, list):
-            raise ValueError("Expected list response from getStateValidators")
-        return data
+        return stream
 
     def __raise_last_missed_slot_error(self, errors: list[Exception]) -> Exception | None:
         """

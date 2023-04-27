@@ -51,7 +51,6 @@ class KeysAPIClient(HTTPProvider):
             f'Keys API Service stuck, no updates for {variables.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS * variables.HTTP_REQUEST_RETRY_COUNT} seconds.'
         )
 
-    @list_of_dataclasses(LidoKey.from_response)
     def get_used_lido_keys(self, block_number: BlockNumber) -> list[dict]:
         """Docs: https://keys-api.lido.fi/api/static/index.html#/keys/KeysController_get"""
         return cast(list[dict], self._get_with_blockstamp(self.USED_KEYS, block_number))

@@ -18,7 +18,6 @@ def main():
     logger.info({'msg': f'Start http server with prometheus metrics on port {variables.PROMETHEUS_PORT}'})
     start_http_server(variables.PROMETHEUS_PORT)
 
-    logger.info({'msg': 'Start watching for slashing events.'})
     handlers = [
         SlashingHandler(),
         # ExitsHandler(), ???

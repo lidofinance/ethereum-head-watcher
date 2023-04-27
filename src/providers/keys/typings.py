@@ -4,12 +4,8 @@ from src.utils.dataclass import FromResponse
 
 
 @dataclass
-class LidoKey(FromResponse):
+class LidoKey:
     key: str
-    depositSignature: str
-    operatorIndex: int
-    used: bool
-    moduleAddress: str
 
 
 @dataclass

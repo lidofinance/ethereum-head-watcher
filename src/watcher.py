@@ -1,7 +1,7 @@
+import json_stream.requests
+
 import logging
 import time
-
-from dataclasses import asdict
 
 from unsync import unsync, Unfuture
 
@@ -20,7 +20,7 @@ from src.providers.consensus.client import ConsensusClient
 from src.providers.consensus.typings import BlockDetailsResponse
 from src.providers.keys.client import KeysAPIClient
 from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
-from src.typings import BlockNumber
+from src.typings import BlockNumber, SlotNumber
 from src.variables import CYCLE_SLEEP_IN_SECONDS
 
 logger = logging.getLogger()
@@ -42,8 +42,8 @@ class Watcher:
     keys_api_status: KeysApiStatus = None
     keys_api_nonce: int = 0
 
-    lido_keys: dict[str, LidoNamedKey] = None
-    indexed_validators_keys: dict[str, str] = None
+    lido_keys: dict[str, LidoNamedKey] = {}
+    indexed_validators_keys: dict[str, str] = {}
 
     head: BlockDetailsResponse = None
 
@@ -78,8 +78,6 @@ class Watcher:
             if self.keys_updater is None or self.validators_updater is None:
                 self.keys_updater = self._update_lido_keys(current_head)
                 self.validators_updater = self._update_validators()
-                self.keys_updater.result()
-                self.validators_updater.result()
 
             logger.info({'msg': f'New head [{current_head.message.slot}]. Run handlers'})
             SLOT_NUMBER.set(current_head.message.slot)
@@ -108,11 +106,22 @@ class Watcher:
         now = time.time()
         diff = now - self.genesis_time
         slot = int(diff / SECONDS_PER_SLOT)
-        if self.indexed_validators_keys is None or slot % SLOTS_PER_EPOCH == 0:
+        if not self.indexed_validators_keys or slot % SLOTS_PER_EPOCH == 0:
             logger.info({'msg': 'Updating indexed validators keys'})
-            self.indexed_validators_keys = {
-                validator.index: validator.validator.pubkey for validator in self.consensus.get_validators(slot)
-            }
+            stream = self.consensus.get_validators_stream(SlotNumber(slot))
+            for validator in json_stream.requests.load(stream)['data']:
+                index = ""
+                pubkey = ""
+                for key, value in validator.items():
+                    if key == "index":
+                        if value in self.indexed_validators_keys:
+                            continue
+                        index = value
+                    if index != "" and key == "validator":
+                        for k, v in value.items():
+                            if k == "pubkey":
+                                pubkey = v
+                self.indexed_validators_keys[index] = pubkey
             logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
             VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
 
@@ -133,6 +142,7 @@ class Watcher:
         # If nonce is not changed - we don't need to update keys
         modules = self.keys_api.get_modules(block_number)
         current_nonce = sum([module.nonce for module in modules])
+        del modules
         if self.keys_api_nonce >= current_nonce:
             return
         self.keys_api_nonce = current_nonce
@@ -144,16 +154,17 @@ class Watcher:
         for mo in modules_operators:
             for operator in mo.operators:
                 modules_operators_dict[(mo.module['stakingModuleAddress'], operator['index'])] = operator['name']
-        named_keys = {}
         for key in fetched_lido_keys:
-            named_keys[key.key] = LidoNamedKey(
-                **asdict(key), operatorName=modules_operators_dict[(key.moduleAddress, key.operatorIndex)]
-            )
+            if key['key'] not in self.lido_keys:
+                operator_name = modules_operators_dict[(key['moduleAddress'], key['operatorIndex'])]
+                self.lido_keys[key['key']] = LidoNamedKey(key=key['key'], operatorName=operator_name)
 
         self.keys_api_status = current_keys_status
-        self.lido_keys = named_keys
+        del fetched_lido_keys
+        del modules_operators
+        del modules_operators_dict
 
-        logger.warning({'msg': f'Lido keys updated: [{len(named_keys)}]'})
+        logger.warning({'msg': f'Lido keys updated: [{len(self.lido_keys)}]'})
         KEYS_API_BLOCK_NUMBER.set(block_number)
 
     @duration_meter()

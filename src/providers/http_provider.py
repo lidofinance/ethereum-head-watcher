@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Sequence, Callable
 from urllib.parse import urljoin, urlparse
 
 from prometheus_client import Histogram
-from requests import Session, JSONDecodeError
+from requests import Session, JSONDecodeError, Response
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
@@ -95,6 +95,43 @@ class HTTPProvider(ABC):
         # Raise error from last provider.
         raise errors[-1]
 
+    def _get_stream(
+        self,
+        endpoint: str,
+        path_params: Optional[Sequence[str | int]] = None,
+        query_params: Optional[dict] = None,
+        force_raise: Callable[..., Exception | None] = lambda _: None,
+    ) -> Response:
+        """
+        Get request with fallbacks
+        Returns stream or raises exception
+
+        force_raise - function that returns an Exception if it should be thrown immediately.
+        Sometimes NotOk response from first provider is the response that we are expecting.
+        """
+        errors: list[Exception] = []
+
+        for host in self.hosts:
+            try:
+                return self._get_stream_without_fallbacks(host, endpoint, path_params, query_params)
+            except Exception as e:  # pylint: disable=W0703
+                errors.append(e)
+
+                # Check if exception should be raised immediately
+                if to_force_raise := force_raise(errors):
+                    raise to_force_raise from e
+
+                logger.warning(
+                    {
+                        'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
+                        'error': str(e),
+                        'provider': urlparse(host).netloc,
+                    }
+                )
+
+        # Raise error from last provider.
+        raise errors[-1]
+
     def _post(
         self,
         endpoint: str,
@@ -132,6 +169,49 @@ class HTTPProvider(ABC):
         # Raise error from last provider.
         raise errors[-1]
 
+    def _get_stream_without_fallbacks(
+        self,
+        host: str,
+        endpoint: str,
+        path_params: Optional[Sequence[str | int]] = None,
+        query_params: Optional[dict] = None,
+    ) -> Response:
+        """
+        Simple get request without fallbacks
+        Returns data stream or raises exception
+        """
+        complete_endpoint = endpoint.format(*path_params) if path_params else endpoint
+
+        with self.PROMETHEUS_HISTOGRAM.time() as t:
+            try:
+                response = self.session.get(
+                    self._urljoin(host, complete_endpoint if path_params else endpoint),
+                    params=query_params,
+                    timeout=HTTP_REQUEST_TIMEOUT,
+                    stream=True,
+                )
+            except Exception as error:
+                logger.debug({'msg': str(error)})
+                t.labels(
+                    endpoint=endpoint,
+                    code=0,
+                    domain=urlparse(host).netloc,
+                )
+                raise error
+
+            t.labels(
+                endpoint=endpoint,
+                code=response.status_code,
+                domain=urlparse(host).netloc,
+            )
+
+            if response.status_code != HTTPStatus.OK:
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                logger.debug({'msg': response_fail_msg})
+                raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
+
+        return response
+
     def _get_without_fallbacks(
         self,
         host: str,
@@ -167,21 +247,20 @@ class HTTPProvider(ABC):
                 domain=urlparse(host).netloc,
             )
 
-            response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
-
             if response.status_code != HTTPStatus.OK:
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
 
             try:
                 json_response = response.json()
             except JSONDecodeError as error:
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise error
 
         if 'data' in json_response:
             data = json_response['data']
-            del json_response['data']
             meta = json_response
         else:
             data = json_response
