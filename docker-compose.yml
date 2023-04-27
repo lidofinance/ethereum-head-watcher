@@ -43,9 +43,8 @@ services:
       - alertmanager
       - alertmanager-discord
     expose:
-      - 19000
+      - 9000
     environment:
-      - HTTP_PORT=19000
       - CONSENSUS_CLIENT_URI=${CONSENSUS_CLIENT_URI_GOERLI}
       - KEYS_API_URI=${KEYS_API_URI_GOERLI}
       - ALERTMANAGER_URI=${ALERTMANAGER_URI}

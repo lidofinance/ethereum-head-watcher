@@ -21,4 +21,4 @@ scrape_configs:
 
   - job_name: 'app-goerli'
     static_configs:
-      - targets: ['ethereum-head-watcher-goerli:19000']
+      - targets: ['ethereum-head-watcher-goerli:9000']
