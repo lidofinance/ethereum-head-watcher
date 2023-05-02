@@ -112,7 +112,7 @@ class SlashingHandler(WatcherHandler):
             summary = f'🚨 {len(list(unknown_slashings))} unknown validators were slashed!'
             description = ''
             by_duty = {}
-            for slashing in other_slashings:
+            for slashing in unknown_slashings:
                 by_duty.setdefault(slashing.duty, []).append(slashing)
             for duty, duty_group in by_duty.items():
                 description += f' Violated duty: {duty} | Validators: '
