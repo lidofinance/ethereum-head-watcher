@@ -1,7 +1,5 @@
 import logging
 from dataclasses import dataclass
-from enum import Enum
-from itertools import groupby
 from typing import Optional, Literal
 
 from unsync import unsync
@@ -10,6 +8,7 @@ from src.alerts.slashing import SlashingAlert
 from src.handlers.handler import WatcherHandler
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse
+from src.variables import NETWORK_NAME, ADDITIONAL_ALERTMANAGER_LABELS
 
 logger = logging.getLogger()
 
@@ -82,7 +81,7 @@ class SlashingHandler(WatcherHandler):
         unknown_slashings = [s for s in slashings if s.owner == 'unknown']
         other_slashings = [s for s in slashings if s.owner == 'other']
         if lido_slashings:
-            summary = f'🚨🚨🚨 Lido {len(list(lido_slashings))} validators slashed! 🚨🚨🚨'
+            summary = f'🚨🚨🚨 {len(list(lido_slashings))} Lido validators were slashed! 🚨🚨🚨'
             description = ''
             by_operator = {}
             for slashing in lido_slashings:
@@ -93,59 +92,65 @@ class SlashingHandler(WatcherHandler):
                 for slashing in operator_slashing:
                     by_duty.setdefault(slashing.duty, []).append(slashing)
                 for duty, duty_group in by_duty.items():
-                    description += f' {duty.capitalize()}s: '
+                    description += f' Violated duty: {duty} | Validators: '
                     description += (
                         "["
                         + ', '.join(
                             [
-                                f'[{slashing.index}](http://beaconcha.in/validator/{slashing.index})'
+                                f'[{slashing.index}](http://{NETWORK_NAME}.beaconcha.in/validator/{slashing.index})'
                                 for slashing in duty_group
                             ]
                         )
                         + "]"
                     )
-            description += f'\n\nslot: [{head.message.slot}](https://beaconcha.in/slot/{head.message.slot})'
+            description += (
+                f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
+            )
             alert = SlashingAlert(name="HeadWatcherLidoSlashing", severity="critical")
             watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
         if unknown_slashings:
-            summary = f'🚨 Unknown {len(list(unknown_slashings))} validators slashed!'
+            summary = f'🚨 {len(list(unknown_slashings))} unknown validators were slashed!'
             description = ''
             by_duty = {}
             for slashing in other_slashings:
                 by_duty.setdefault(slashing.duty, []).append(slashing)
             for duty, duty_group in by_duty.items():
-                description += f' {duty.capitalize()}s: '
+                description += f' Violated duty: {duty} | Validators: '
                 description += (
                     "["
                     + ', '.join(
                         [
-                            f'[{slashing.index}](http://beaconcha.in/validator/{slashing.index})'
+                            f'[{slashing.index}](http://{NETWORK_NAME}.beaconcha.in/validator/{slashing.index})'
                             for slashing in duty_group
                         ]
                     )
                     + "]"
                 )
-            description += f'\n\nslot: [{head.message.slot}](https://beaconcha.in/slot/{head.message.slot})'
+            description += (
+                f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
+            )
             alert = SlashingAlert(name="HeadWatcherUnknownSlashing", severity="critical")
             watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
         if other_slashings:
-            summary = f'ℹ️ Other {len(list(other_slashings))} validators slashed'
+            summary = f'ℹ️ {len(list(other_slashings))} other validators were slashed'
             description = ''
             by_duty = {}
             for slashing in other_slashings:
                 by_duty.setdefault(slashing.duty, []).append(slashing)
             for duty, duty_group in by_duty.items():
-                description += f' {duty.capitalize()}s: '
+                description += f' Violated duty: {duty} | Validators: '
                 description += (
                     "["
                     + ', '.join(
                         [
-                            f'[{slashing.index}](http://beaconcha.in/validator/{slashing.index})'
+                            f'[{slashing.index}](http://{NETWORK_NAME}.beaconcha.in/validator/{slashing.index})'
                             for slashing in duty_group
                         ]
                     )
                     + "]"
                 )
-            description += f'\n\nslot: [{head.message.slot}](https://beaconcha.in/slot/{head.message.slot})'
+            description += (
+                f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
+            )
             alert = SlashingAlert(name="HeadWatcherOtherSlashing", severity="info")
             watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
