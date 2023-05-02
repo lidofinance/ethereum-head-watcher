@@ -9,7 +9,7 @@ class SlashingAlert(Alert):
         self.name = name
         self.severity = severity
 
-    def build_body(self, summary: str, description: str) -> AlertBody:
+    def build_body(self, summary: str, description: str, additional_labels=None) -> AlertBody:
         now = datetime.now(timezone(timedelta(hours=0)))  # Must be always in UTC
         starts_at = now.isoformat()
         ends_at = (now + timedelta(seconds=5)).isoformat()
@@ -20,6 +20,7 @@ class SlashingAlert(Alert):
             labels=Labels(
                 alertname=self.name + str(now.timestamp() * 1000),
                 severity=self.severity,
+                **(additional_labels or {}),  # type: ignore
             ),
             annotations=Annotations(
                 summary=summary,

@@ -107,7 +107,7 @@ class SlashingHandler(WatcherHandler):
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
             alert = SlashingAlert(name="HeadWatcherLidoSlashing", severity="critical")
-            watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
+            watcher.alertmanager.send_alerts([alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS)])
         if unknown_slashings:
             summary = f'🚨 {len(list(unknown_slashings))} unknown validators were slashed!'
             description = ''

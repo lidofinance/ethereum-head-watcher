@@ -1,3 +1,4 @@
+import json
 import os
 
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
@@ -8,6 +9,10 @@ KEYS_API_URI = os.getenv('KEYS_API_URI', '').split(',')
 ALERTMANAGER_URI = os.getenv('ALERTMANAGER_URI', '').split(',')
 
 NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
+
+# Additional labels for alerts. Must be in JSON string format.
+# For example - '{"a":"valueA","b":"valueB"}'
+ADDITIONAL_ALERTMANAGER_LABELS = json.loads(os.getenv('ADDITIONAL_ALERTMANAGER_LABELS', '{}'))
 
 SLOTS_RANGE = os.getenv('SLOTS_RANGE')
 
