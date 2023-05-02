@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import NewType
+from typing import NewType, Optional
 
 from src.utils.dataclass import Nested
 
@@ -10,6 +10,7 @@ ISODateString = NewType('ISODateString', str)
 class Labels:
     alertname: str
     severity: str
+    mentions: Optional[str] = None
 
 
 @dataclass

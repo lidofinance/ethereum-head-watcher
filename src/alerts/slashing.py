@@ -13,14 +13,13 @@ class SlashingAlert(Alert):
         now = datetime.now(timezone(timedelta(hours=0)))  # Must be always in UTC
         starts_at = now.isoformat()
         ends_at = (now + timedelta(seconds=5)).isoformat()
-
         return AlertBody(
             startsAt=ISODateString(starts_at.replace("+00:00", "") + "Z"),
             endsAt=ISODateString(ends_at.replace("+00:00", "") + "Z"),
             labels=Labels(
                 alertname=self.name + str(now.timestamp() * 1000),
                 severity=self.severity,
-                **(additional_labels or {}),  # type: ignore
+                **(additional_labels or {}),
             ),
             annotations=Annotations(
                 summary=summary,
