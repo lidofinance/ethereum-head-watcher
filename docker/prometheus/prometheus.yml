@@ -9,6 +9,9 @@ alerting:
     - static_configs:
       - targets: ['alertmanager:9093']
 
+rule_files:
+  - "rules/common.yml"
+
 scrape_configs:
 
   - job_name: 'prometheus'

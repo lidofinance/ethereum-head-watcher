@@ -1,0 +1,49 @@
+groups:
+  - name: CommonAlerts
+    rules:
+
+      - alert: HeadBlockIsNotChanging
+        expr: absent(ethereum_slashing_watcher_slot_number) 
+          OR changes(ethereum_slashing_watcher_slot_number[15m]) = 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          emoji: ⏳🐦
+          summary: "Head block doesn't change for more than 15 minutes"
+          resolved_summary: "Head block was changed"
+          description: "It's not OK. Please, check app health"
+          resolved_description: "It's OK"
+          footer_text: 'Slot • {{ with query "ethereum_slashing_watcher_slot_number" }}{{ . | first | value | printf "%.0f" }}{{ end }}'
+          footer_icon_url: "https://cryptologos.cc/logos/steth-steth-logo.png"
+
+      - alert: ValidatorsIndexSlotIsNotChanging
+        expr: absent(ethereum_slashing_watcher_validators_index_slot_number) 
+          OR changes(ethereum_slashing_watcher_validators_index_slot_number[1h]) = 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          emoji: ⏳👥
+          summary: "Validators index slot doesn't change for more than 1 hour"
+          resolved_summary: "Validators index slot was changed"
+          description: "It's not OK. Please, check app health"
+          resolved_description: "It's OK"
+          footer_text: 'Slot • {{ with query "ethereum_slashing_watcher_slot_number" }}{{ . | first | value | printf "%.0f" }}{{ end }}'
+          footer_icon_url: "https://cryptologos.cc/logos/steth-steth-logo.png"
+
+
+      - alert: KeysAPIBlockIsNotChanging
+        expr: absent(ethereum_slashing_watcher_keys_api_block_number) 
+          OR changes(ethereum_slashing_watcher_keys_api_block_number[1h]) = 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          emoji: ⏳🔑
+          summary: "KeysAPI index block doesn't change for more than 1 hour"
+          resolved_summary: "KeysAPI index block was changed"
+          description: "It's not OK. Please, check app health"
+          resolved_description: "It's OK"
+          footer_text: 'Slot • {{ with query "ethereum_slashing_watcher_slot_number" }}{{ . | first | value | printf "%.0f" }}{{ end }}'
+          footer_icon_url: "https://cryptologos.cc/logos/steth-steth-logo.png"

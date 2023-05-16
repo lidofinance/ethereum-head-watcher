@@ -43,9 +43,3 @@ ALERTMANAGER_REQUESTS_DURATION = Histogram(
     ['endpoint', 'code', 'domain'],
     namespace=PROMETHEUS_PREFIX,
 )
-
-KEYS_API_LATEST_BLOCKNUMBER = Gauge(
-    'keys_api_latest_blocknumber',
-    'Latest blocknumber from Keys API metadata',
-    namespace=PROMETHEUS_PREFIX,
-)

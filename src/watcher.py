@@ -8,7 +8,6 @@ from unsync import unsync, Unfuture
 from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
 from src.handlers.handler import WatcherHandler
-from src.metrics.prometheus.basic import KEYS_API_LATEST_BLOCKNUMBER
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
     SLOT_NUMBER,
@@ -153,9 +152,6 @@ class Watcher:
         ):
             return
 
-        block_number = BlockNumber(int(block.message.body['execution_payload']['block_number']))
-        KEYS_API_LATEST_BLOCKNUMBER.set(block_number)
-
         # Get modules and calculate current nonce
         # If nonce is not changed - we don't need to update keys
         try:
@@ -221,6 +217,7 @@ class Watcher:
         del modules_operators_dict
 
         logger.warning({'msg': f'Lido keys updated: [{len(self.lido_keys)}]'})
+        block_number = BlockNumber(int(block.message.body['execution_payload']['block_number']))
         KEYS_API_BLOCK_NUMBER.set(block_number)
 
     @duration_meter()
