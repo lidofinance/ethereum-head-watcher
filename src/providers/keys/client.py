@@ -1,12 +1,15 @@
-from time import sleep
-from typing import Optional, cast
+from typing import cast
 
-from src.metrics.prometheus.basic import KEYS_API_REQUESTS_DURATION, KEYS_API_LATEST_BLOCKNUMBER
+from requests import Response
+
+from src.metrics.prometheus.basic import KEYS_API_REQUESTS_DURATION
 from src.providers.http_provider import HTTPProvider
-from src.providers.keys.typings import LidoKey, KeysApiStatus, LidoModuleOperators, LidoModule
-from src import variables
-from src.typings import BlockNumber
-from src.utils.dataclass import list_of_dataclasses
+from src.providers.keys.typings import KeysApiStatus
+from src.variables import (
+    KEYS_API_REQUEST_TIMEOUT,
+    KEYS_API_REQUEST_RETRY_COUNT,
+    KEYS_API_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,
+)
 
 
 class KeysOutdatedException(Exception):
@@ -26,43 +29,25 @@ class KeysAPIClient(HTTPProvider):
 
     PROMETHEUS_HISTOGRAM = KEYS_API_REQUESTS_DURATION
 
+    HTTP_REQUEST_TIMEOUT = KEYS_API_REQUEST_TIMEOUT
+    HTTP_REQUEST_RETRY_COUNT = KEYS_API_REQUEST_RETRY_COUNT
+    HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = KEYS_API_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS
+
     USED_KEYS = 'v1/keys?used=true'
     OPERATORS = 'v1/operators'
+    MODULES = 'v1/modules'
     STATUS = 'v1/status'
 
-    def _get_with_blockstamp(self, url: str, block_number: BlockNumber, params: Optional[dict] = None) -> dict | list:
-        """
-        Returns response if blockstamp < blockNumber from response
-        """
-        for i in range(variables.HTTP_REQUEST_RETRY_COUNT):
-            data, meta = self._get(url, query_params=params)
-            if meta.get('meta'):
-                blocknumber_meta = meta['meta']['elBlockSnapshot']['blockNumber']
-            else:
-                blocknumber_meta = meta['elBlockSnapshot']['blockNumber']
-            KEYS_API_LATEST_BLOCKNUMBER.set(blocknumber_meta)
-            if blocknumber_meta >= block_number:
-                return data
-
-            if i != variables.HTTP_REQUEST_RETRY_COUNT - 1:
-                sleep(variables.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS)
-
-        raise KeysOutdatedException(
-            f'Keys API Service stuck, no updates for {variables.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS * variables.HTTP_REQUEST_RETRY_COUNT} seconds.'
-        )
-
-    def get_used_lido_keys(self, block_number: BlockNumber) -> list[dict]:
+    def get_used_lido_keys_stream(self) -> Response:
         """Docs: https://keys-api.lido.fi/api/static/index.html#/keys/KeysController_get"""
-        return cast(list[dict], self._get_with_blockstamp(self.USED_KEYS, block_number))
+        return self._get_stream(self.USED_KEYS)
 
-    @list_of_dataclasses(LidoModuleOperators.from_response)
-    def get_operators(self, block_number: BlockNumber) -> list[dict]:
-        return cast(list[dict], self._get_with_blockstamp(self.OPERATORS, block_number))
+    def get_operators_stream(self) -> Response:
+        return self._get_stream(self.OPERATORS)
 
-    @list_of_dataclasses(LidoModule.from_response)
-    def get_modules(self, block_number: BlockNumber) -> list[dict]:
+    def get_modules(self) -> list[dict]:
         """Docs: https://keys-api.lido.fi/api/static/index.html#/modules/SRModulesController_getModules"""
-        return cast(list[dict], self._get_with_blockstamp('v1/modules', block_number))
+        return cast(list[dict], self._get(self.MODULES))
 
     def get_status(self) -> KeysApiStatus:
         """Docs: https://keys-api.lido.fi/api/static/index.html#/status/StatusController_get"""

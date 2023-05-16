@@ -1,5 +1,6 @@
+from copy import copy
 from http import HTTPStatus
-from typing import Literal, Union
+from typing import Literal, Union, Callable
 
 from requests import Response
 
@@ -15,6 +16,7 @@ from src.providers.consensus.typings import (
 )
 from src.providers.http_provider import HTTPProvider, NotOkResponse
 from src.typings import SlotNumber, BlockRoot
+from src.variables import CL_REQUEST_TIMEOUT, CL_REQUEST_RETRY_COUNT, CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,10 @@ class ConsensusClient(HTTPProvider):
     """
 
     PROMETHEUS_HISTOGRAM = CL_REQUESTS_DURATION
+
+    HTTP_REQUEST_TIMEOUT = CL_REQUEST_TIMEOUT
+    HTTP_REQUEST_RETRY_COUNT = CL_REQUEST_RETRY_COUNT
+    HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS
 
     API_GET_BLOCK_ROOT = 'eth/v1/beacon/blocks/{}/root'
     API_GET_BLOCK_HEADER = 'eth/v1/beacon/headers/{}'
@@ -83,12 +89,21 @@ class ConsensusClient(HTTPProvider):
         resp = BlockHeaderFullResponse.from_response(data=BlockHeaderResponseData.from_response(**data), **meta_data)
         return resp
 
-    def get_block_details(self, state_id: Union[SlotNumber, BlockRoot, LiteralState]) -> BlockDetailsResponse:
+    def get_block_details(
+        self, state_id: Union[SlotNumber, BlockRoot, LiteralState], force_use_fallback_callback: Callable[..., bool]
+    ) -> BlockDetailsResponse:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2"""
-        data, _ = self._get(
+        # Set special timeout and retry params for this method.
+        # It is used for `head` request
+        special_client = copy(self)
+        special_client.HTTP_REQUEST_TIMEOUT = 2
+        special_client.HTTP_REQUEST_RETRY_COUNT = 1
+        special_client.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = 0.5
+        data, _ = special_client._get(
             self.API_GET_BLOCK_DETAILS,
             path_params=(state_id,),
             force_raise=self.__raise_last_missed_slot_error,
+            force_use_fallback=force_use_fallback_callback,
         )
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getBlockV2")

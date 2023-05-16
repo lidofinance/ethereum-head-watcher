@@ -5,11 +5,9 @@ from typing import Optional, Tuple, Sequence, Callable
 from urllib.parse import urljoin, urlparse
 
 from prometheus_client import Histogram
-from requests import Session, JSONDecodeError, Response
+from requests import Session, Response
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
-
-from src.variables import HTTP_REQUEST_RETRY_COUNT, HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS, HTTP_REQUEST_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +32,9 @@ class HTTPProvider(ABC):
     """
 
     PROMETHEUS_HISTOGRAM: Histogram
+    HTTP_REQUEST_TIMEOUT: int
+    HTTP_REQUEST_RETRY_COUNT: int
+    HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS: int
 
     def __init__(self, hosts: list[str]):
         if not hosts:
@@ -42,9 +43,9 @@ class HTTPProvider(ABC):
         self.hosts = hosts
 
         retry_strategy = Retry(
-            total=HTTP_REQUEST_RETRY_COUNT,
+            total=self.HTTP_REQUEST_RETRY_COUNT,
             status_forcelist=[418, 429, 500, 502, 503, 504],
-            backoff_factor=HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,
+            backoff_factor=self.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,
         )
 
         adapter = HTTPAdapter(max_retries=retry_strategy)
@@ -64,6 +65,7 @@ class HTTPProvider(ABC):
         path_params: Optional[Sequence[str | int]] = None,
         query_params: Optional[dict] = None,
         force_raise: Callable[..., Exception | None] = lambda _: None,
+        force_use_fallback: Callable[..., bool] = lambda _: False,
     ) -> Tuple[dict | list, dict]:
         """
         Get request with fallbacks
@@ -76,7 +78,15 @@ class HTTPProvider(ABC):
 
         for host in self.hosts:
             try:
-                return self._get_without_fallbacks(host, endpoint, path_params, query_params)
+                result = self._get_without_fallbacks(host, endpoint, path_params, query_params)
+                if force_use_fallback(result):
+                    raise Exception(
+                        'Forced to use fallback. '
+                        f'endpoint: [{endpoint}], '
+                        f'path_params: [{path_params}], '
+                        f'params: [{query_params}]'
+                    )
+                return result
             except Exception as e:  # pylint: disable=W0703
                 errors.append(e)
 
@@ -187,7 +197,7 @@ class HTTPProvider(ABC):
                 response = self.session.get(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
                     params=query_params,
-                    timeout=HTTP_REQUEST_TIMEOUT,
+                    timeout=self.HTTP_REQUEST_TIMEOUT,
                     stream=True,
                 )
             except Exception as error:
@@ -230,7 +240,7 @@ class HTTPProvider(ABC):
                 response = self.session.get(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
                     params=query_params,
-                    timeout=HTTP_REQUEST_TIMEOUT,
+                    timeout=self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
                 logger.debug({'msg': str(error)})
@@ -254,7 +264,7 @@ class HTTPProvider(ABC):
 
             try:
                 json_response = response.json()
-            except JSONDecodeError as error:
+            except Exception as error:
                 response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise error
@@ -286,7 +296,7 @@ class HTTPProvider(ABC):
                 response = self.session.post(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
                     json=query_body,
-                    timeout=HTTP_REQUEST_TIMEOUT,
+                    timeout=self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
                 logger.debug({'msg': str(error)})
@@ -303,15 +313,15 @@ class HTTPProvider(ABC):
                 domain=urlparse(host).netloc,
             )
 
-            response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
-
             if response.status_code != HTTPStatus.OK:
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
 
             try:
                 json_response = response.json()
-            except JSONDecodeError as error:
+            except Exception as error:
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise error
 
