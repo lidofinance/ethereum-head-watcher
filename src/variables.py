@@ -14,6 +14,8 @@ NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
 # For example - '{"a":"valueA","b":"valueB"}'
 ADDITIONAL_ALERTMANAGER_LABELS = json.loads(os.getenv('ADDITIONAL_ALERTMANAGER_LABELS', '{}'))
 
+DRY_RUN = os.getenv('DRY_RUN', 'false').lower() == 'true'
+
 SLOTS_RANGE = os.getenv('SLOTS_RANGE')
 
 CYCLE_SLEEP_IN_SECONDS = int(os.getenv('CYCLE_SLEEP_IN_SECONDS', 1))

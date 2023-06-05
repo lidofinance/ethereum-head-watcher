@@ -18,6 +18,9 @@ def main():
     logger.info({'msg': f'Start http server with prometheus metrics on port {variables.PROMETHEUS_PORT}'})
     start_http_server(variables.PROMETHEUS_PORT)
 
+    if variables.DRY_RUN:
+        logger.warning({'msg': 'Dry run mode enabled! No alerts will be sent.'})
+
     handlers = [
         SlashingHandler(),
         # ExitsHandler(), ???

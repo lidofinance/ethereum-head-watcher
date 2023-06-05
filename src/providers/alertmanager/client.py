@@ -1,6 +1,7 @@
 import logging
 from dataclasses import asdict
 
+from src import variables
 from src.metrics.prometheus.basic import ALERTMANAGER_REQUESTS_DURATION
 from src.providers.alertmanager.typings import AlertBody
 from src.providers.http_provider import HTTPProvider
@@ -27,5 +28,9 @@ class AlertmanagerClient(HTTPProvider):
         to_sent = [asdict(alert) for alert in alerts]
         for alert in to_sent:
             alert['labels']['network'] = NETWORK_NAME
-        logger.debug({'msg': f'Sending {len(alerts)} alerts', 'alerts': to_sent})
-        self._post(self.ALERTS, query_body=to_sent)
+        if not variables.DRY_RUN:
+            logger.info({'msg': f'Sending {len(alerts)} alerts', 'alerts': to_sent})
+            self._post(self.ALERTS, query_body=to_sent)
+        else:
+            logger.info({'msg': 'Dry run mode enabled. No alerts will be sent', 'alerts': to_sent})
+            return

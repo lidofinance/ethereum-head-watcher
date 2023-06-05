@@ -39,13 +39,13 @@ class Watcher:
     keys_updater: Unfuture = None
 
     # Last state
-    keys_api_status: KeysApiStatus
+    keys_api_status: KeysApiStatus | None = None
     keys_api_nonce: int = 0
 
     lido_keys: dict[str, LidoNamedKey] = {}
     indexed_validators_keys: dict[str, str] = {}
 
-    head: BlockDetailsResponse
+    head: BlockDetailsResponse | None = None
 
     def __init__(self, handlers: list[WatcherHandler]):
         self.consensus = ConsensusClient(variables.CONSENSUS_CLIENT_URI)
@@ -72,18 +72,17 @@ class Watcher:
                     self.keys_updater = self._update_lido_keys(current_head)
                 except Exception as e:  # pylint: disable=broad-except
                     logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
-                    return
 
             if self.validators_updater is not None and self.validators_updater.done():
                 self.validators_updater.result()
                 self.validators_updater = self._update_validators()
 
-            if self.keys_updater is None or self.validators_updater is None:
+            if self.keys_updater is None:
                 try:
                     self.keys_updater = self._update_lido_keys(current_head)
                 except Exception as e:  # pylint: disable=broad-except
                     logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
-                    return
+            if self.validators_updater is None:
                 self.validators_updater = self._update_validators()
 
             logger.info({'msg': f'New head [{current_head.message.slot}]. Run handlers'})
@@ -101,6 +100,8 @@ class Watcher:
             start, end = SLOTS_RANGE.split('-')
             for slot in range(int(start), int(end) + 1):
                 wrapped(str(slot))
+                self.keys_updater.result()
+                self.validators_updater.result()
         else:
             while True:
                 wrapped()

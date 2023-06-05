@@ -80,7 +80,9 @@ class KeysAPIClient(HTTPProvider):
         return module_operator_name
 
     @staticmethod
-    def parse_keys(data: list[dict[str, str]], modules_operators_dict: dict[tuple[str, str], str]) -> dict[str, LidoNamedKey]:
+    def parse_keys(
+        data: list[dict[str, str]], modules_operators_dict: dict[tuple[str, str], str]
+    ) -> dict[str, LidoNamedKey]:
         keys = {}
         for lido_key in data:
             module_address = ""
