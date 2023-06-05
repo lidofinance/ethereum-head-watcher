@@ -24,8 +24,8 @@ class AlertmanagerClient(HTTPProvider):
     ALERTS = "api/v1/alerts"
 
     def send_alerts(self, alerts: list[AlertBody]):
-        alerts = [asdict(alert) for alert in alerts]
-        for alert in alerts:
+        to_sent = [asdict(alert) for alert in alerts]
+        for alert in to_sent:
             alert['labels']['network'] = NETWORK_NAME
-        logger.debug({'msg': f'Sending {len(alerts)} alerts', 'alerts': alerts})
-        self._post(self.ALERTS, query_body=alerts)
+        logger.debug({'msg': f'Sending {len(alerts)} alerts', 'alerts': to_sent})
+        self._post(self.ALERTS, query_body=to_sent)

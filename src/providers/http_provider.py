@@ -16,6 +16,10 @@ class NoHostsProvided(Exception):
     pass
 
 
+class ForceUseFallback(Exception):
+    pass
+
+
 class NotOkResponse(Exception):
     status: int
     text: str
@@ -34,7 +38,7 @@ class HTTPProvider(ABC):
     PROMETHEUS_HISTOGRAM: Histogram
     HTTP_REQUEST_TIMEOUT: int
     HTTP_REQUEST_RETRY_COUNT: int
-    HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS: int
+    HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS: float
 
     def __init__(self, hosts: list[str]):
         if not hosts:
@@ -80,7 +84,7 @@ class HTTPProvider(ABC):
             try:
                 result = self._get_without_fallbacks(host, endpoint, path_params, query_params)
                 if force_use_fallback(result):
-                    raise Exception(
+                    raise ForceUseFallback(
                         'Forced to use fallback. '
                         f'endpoint: [{endpoint}], '
                         f'path_params: [{path_params}], '
@@ -283,7 +287,7 @@ class HTTPProvider(ABC):
         host: str,
         endpoint: str,
         path_params: Optional[Sequence[str | int]] = None,
-        query_body: Optional[dict] = None,
+        query_body: Optional[dict | list] = None,
     ) -> Tuple[dict | list, dict]:
         """
         Simple post request without fallbacks

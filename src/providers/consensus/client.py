@@ -99,7 +99,7 @@ class ConsensusClient(HTTPProvider):
         special_client.HTTP_REQUEST_TIMEOUT = 2
         special_client.HTTP_REQUEST_RETRY_COUNT = 1
         special_client.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = 0.5
-        data, _ = special_client._get(
+        data, _ = special_client._get(  # pylint: disable=protected-access
             self.API_GET_BLOCK_DETAILS,
             path_params=(state_id,),
             force_raise=self.__raise_last_missed_slot_error,

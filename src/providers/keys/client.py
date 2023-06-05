@@ -4,7 +4,7 @@ from requests import Response
 
 from src.metrics.prometheus.basic import KEYS_API_REQUESTS_DURATION
 from src.providers.http_provider import HTTPProvider
-from src.providers.keys.typings import KeysApiStatus
+from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
 from src.variables import (
     KEYS_API_REQUEST_TIMEOUT,
     KEYS_API_REQUEST_RETRY_COUNT,
@@ -53,3 +53,46 @@ class KeysAPIClient(HTTPProvider):
         """Docs: https://keys-api.lido.fi/api/static/index.html#/status/StatusController_get"""
         data, _ = self._get(self.STATUS)
         return KeysApiStatus.from_response(**cast(dict, data))
+
+    @staticmethod
+    def parse_modules(data: list[dict[str, dict]]) -> dict[tuple[str, str], str]:
+        module_operator_name = {}
+        for mo in data:  # pylint: disable=too-many-nested-blocks
+            staking_module_address = ""
+            staking_module_operators = []
+            for key, value in mo.items():
+                if key == "operators":
+                    for operator in value:
+                        oi = ""
+                        on = ""
+                        for k, v in operator.items():
+                            if k == "index":
+                                oi = v
+                            if k == "name":
+                                on = v
+                        staking_module_operators.append((oi, on))
+                elif key == "module":
+                    for k, v in value.items():
+                        if k == "stakingModuleAddress":
+                            staking_module_address = v
+            for oi, on in staking_module_operators:
+                module_operator_name[(staking_module_address, oi)] = on
+        return module_operator_name
+
+    @staticmethod
+    def parse_keys(data: list[dict[str, str]], modules_operators_dict: dict[tuple[str, str], str]) -> dict[str, LidoNamedKey]:
+        keys = {}
+        for lido_key in data:
+            module_address = ""
+            operator_index = ""
+            pubkey = ""
+            for key, value in lido_key.items():
+                if key == "moduleAddress":
+                    module_address = value
+                elif key == "operatorIndex":
+                    operator_index = value
+                elif key == "key":
+                    pubkey = value
+            operator_name = modules_operators_dict[(module_address, operator_index)]
+            keys[pubkey] = LidoNamedKey(key=pubkey, operatorName=operator_name)
+        return keys

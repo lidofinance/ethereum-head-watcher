@@ -1,6 +1,6 @@
 from enum import Enum
 
-from prometheus_client import Gauge, Histogram, Info
+from prometheus_client import Histogram, Info
 
 from src.variables import PROMETHEUS_PREFIX
 

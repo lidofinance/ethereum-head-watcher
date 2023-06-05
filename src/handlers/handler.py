@@ -13,4 +13,4 @@ class WatcherHandler(ABC):
         Implement this method to handle new head.
         It will be called async and return BlockDetailsResponse.
         """
-        pass
+        pass  # pylint: disable=unnecessary-pass

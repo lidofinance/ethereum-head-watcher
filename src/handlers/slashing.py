@@ -83,12 +83,12 @@ class SlashingHandler(WatcherHandler):
         if lido_slashings:
             summary = f'🚨🚨🚨 {len(list(lido_slashings))} Lido validators were slashed! 🚨🚨🚨'
             description = ''
-            by_operator = {}
+            by_operator: dict[str, list] = {}
             for slashing in lido_slashings:
-                by_operator.setdefault(slashing.operator, []).append(slashing)
+                by_operator.setdefault(str(slashing.operator), []).append(slashing)
             for operator, operator_slashing in by_operator.items():
                 description += f'\n{operator} -'
-                by_duty = {}
+                by_duty: dict[str, list] = {}
                 for slashing in operator_slashing:
                     by_duty.setdefault(slashing.duty, []).append(slashing)
                 for duty, duty_group in by_duty.items():

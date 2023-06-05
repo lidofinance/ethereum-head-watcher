@@ -39,13 +39,13 @@ class Watcher:
     keys_updater: Unfuture = None
 
     # Last state
-    keys_api_status: KeysApiStatus = None
+    keys_api_status: KeysApiStatus
     keys_api_nonce: int = 0
 
     lido_keys: dict[str, LidoNamedKey] = {}
     indexed_validators_keys: dict[str, str] = {}
 
-    head: BlockDetailsResponse = None
+    head: BlockDetailsResponse
 
     def __init__(self, handlers: list[WatcherHandler]):
         self.consensus = ConsensusClient(variables.CONSENSUS_CLIENT_URI)
@@ -68,14 +68,22 @@ class Watcher:
 
             if self.keys_updater is not None and self.keys_updater.done():
                 self.keys_updater.result()
-                self.keys_updater = self._update_lido_keys(current_head)
+                try:
+                    self.keys_updater = self._update_lido_keys(current_head)
+                except Exception as e:  # pylint: disable=broad-except
+                    logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
+                    return
 
             if self.validators_updater is not None and self.validators_updater.done():
                 self.validators_updater.result()
                 self.validators_updater = self._update_validators()
 
             if self.keys_updater is None or self.validators_updater is None:
-                self.keys_updater = self._update_lido_keys(current_head)
+                try:
+                    self.keys_updater = self._update_lido_keys(current_head)
+                except Exception as e:  # pylint: disable=broad-except
+                    logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
+                    return
                 self.validators_updater = self._update_validators()
 
             logger.info({'msg': f'New head [{current_head.message.slot}]. Run handlers'})
@@ -100,7 +108,8 @@ class Watcher:
     @duration_meter()
     def _handle_head(self, head: BlockDetailsResponse):
         tasks = [h.handle(self, head) for h in self.handlers]
-        [t.result() for t in tasks]
+        for t in tasks:
+            t.result()
 
     @unsync
     @duration_meter()
@@ -113,40 +122,37 @@ class Watcher:
         now = time.time()
         diff = now - self.genesis_time
         slot = int(diff / SECONDS_PER_SLOT)
-        if not self.indexed_validators_keys or slot % SLOTS_PER_EPOCH == 0:
-            logger.info({'msg': 'Updating indexed validators keys'})
-            try:
-                stream = self.consensus.get_validators_stream(SlotNumber(slot))
-            except Exception as e:
-                logger.error({'msg': f'Error while getting validators: {e}'})
-                return
+        if self.indexed_validators_keys and SLOTS_PER_EPOCH != 0:
+            return
+        logger.info({'msg': 'Updating indexed validators keys'})
+        try:
+            stream = self.consensus.get_validators_stream(SlotNumber(slot))
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error({'msg': f'Error while getting validators: {e}'})
+            return
 
-            for validator in json_stream.requests.load(stream)['data']:
-                index = ""
-                pubkey = ""
-                for key, value in validator.items():
-                    if key == "index":
-                        if value in self.indexed_validators_keys:
-                            continue
-                        index = value
-                    elif index != "" and key == "validator":
-                        for k, v in value.items():
-                            if k == "pubkey":
-                                pubkey = v
-                self.indexed_validators_keys[index] = pubkey
-            logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
-            VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
+        for validator in json_stream.requests.load(stream)['data']:
+            index = ""
+            pubkey = ""
+            for key, value in validator.items():
+                if key == "index":
+                    if value in self.indexed_validators_keys:
+                        continue
+                    index = value
+                elif index != "" and key == "validator":
+                    for k, v in value.items():
+                        if k == "pubkey":
+                            pubkey = v
+            self.indexed_validators_keys[index] = pubkey
+        logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
+        VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
 
     @unsync
     @duration_meter()
     def _update_lido_keys(self, block: BlockDetailsResponse) -> None:
         """Return dict with `publickey` as key and `LidoNamedKey` as value"""
-        try:
-            current_keys_status = self.keys_api.get_status()
-        except Exception as e:
-            logger.error({'msg': 'Can not get keys api status', 'exception': str(e)})
-            return
 
+        current_keys_status = self.keys_api.get_status()
         if self.keys_api_status is not None and (
             current_keys_status.elBlockSnapshot['timestamp'] >= self.keys_api_status.elBlockSnapshot['timestamp']
         ):
@@ -154,64 +160,24 @@ class Watcher:
 
         # Get modules and calculate current nonce
         # If nonce is not changed - we don't need to update keys
-        try:
-            modules = self.keys_api.get_modules()[0]
-        except Exception as e:
-            logger.error({'msg': 'Can not get modules', 'exception': str(e)})
-            return
+        modules = self.keys_api.get_modules()[0]
 
-        current_nonce = sum([module['nonce'] for module in modules])
+        current_nonce = sum(module['nonce'] for module in modules)
         del modules
         if self.keys_api_nonce >= current_nonce:
             return
         self.keys_api_nonce = current_nonce
 
         logger.info({'msg': 'Updating Lido keys'})
-        try:
-            modules_operators_stream = self.keys_api.get_operators_stream()
-        except Exception as e:
-            logger.error({'msg': 'Can not get modules operators', 'exception': str(e)})
-            return
-        modules_operators_dict = {}
-        for mo in json_stream.requests.load(modules_operators_stream)['data']:
-            staking_module_address = ""
-            staking_module_operators = []
-            for key, value in mo.items():
-                if key == "operators":
-                    for operator in value:
-                        operator_index = ""
-                        operator_name = ""
-                        for k, v in operator.items():
-                            if k == "index":
-                                operator_index = v
-                            if k == "name":
-                                operator_name = v
-                        staking_module_operators.append((operator_index, operator_name))
-                elif key == "module":
-                    for k, v in value.items():
-                        if k == "stakingModuleAddress":
-                            staking_module_address = v
-            for operator_index, operator_name in staking_module_operators:
-                modules_operators_dict[(staking_module_address, operator_index)] = operator_name
+        modules_operators_stream = self.keys_api.get_operators_stream()
+        modules_operators_dict = KeysAPIClient.parse_modules(
+            json_stream.requests.load(modules_operators_stream)['data']
+        )
 
-        try:
-            fetched_lido_keys_stream = self.keys_api.get_used_lido_keys_stream()
-        except Exception as e:
-            logger.error({'msg': 'Can not get used lido keys', 'exception': str(e)})
-            return
-        for lido_key in json_stream.requests.load(fetched_lido_keys_stream)['data']:
-            module_address = ""
-            operator_index = ""
-            pubkey = ""
-            for key, value in lido_key.items():
-                if key == "moduleAddress":
-                    module_address = value
-                elif key == "operatorIndex":
-                    operator_index = value
-                elif key == "key":
-                    pubkey = value
-            operator_name = modules_operators_dict[(module_address, operator_index)]
-            self.lido_keys[pubkey] = LidoNamedKey(key=pubkey, operatorName=operator_name)
+        fetched_lido_keys_stream = self.keys_api.get_used_lido_keys_stream()
+        self.lido_keys = KeysAPIClient.parse_keys(
+            json_stream.requests.load(fetched_lido_keys_stream)['data'], modules_operators_dict
+        )
 
         self.keys_api_status = current_keys_status
         del modules_operators_dict
@@ -236,5 +202,5 @@ class Watcher:
             slot, force_use_fallback_callback if slot == 'head' else lambda _: False
         )
         if self.head is not None and int(current_head.message.slot) == int(self.head.message.slot):
-            return
+            return None
         return current_head
