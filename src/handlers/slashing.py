@@ -4,7 +4,7 @@ from typing import Optional, Literal
 
 from unsync import unsync
 
-from src.alerts.slashing import SlashingAlert
+from src.alerts.slashing import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse
@@ -106,7 +106,7 @@ class SlashingHandler(WatcherHandler):
             description += (
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
-            alert = SlashingAlert(name="HeadWatcherLidoSlashing", severity="critical")
+            alert = CommonAlert(name="HeadWatcherLidoSlashing", severity="critical")
             watcher.alertmanager.send_alerts([alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS)])
         if unknown_slashings:
             summary = f'🚨 {len(list(unknown_slashings))} unknown validators were slashed!'
@@ -129,7 +129,7 @@ class SlashingHandler(WatcherHandler):
             description += (
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
-            alert = SlashingAlert(name="HeadWatcherUnknownSlashing", severity="critical")
+            alert = CommonAlert(name="HeadWatcherUnknownSlashing", severity="critical")
             watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
         if other_slashings:
             summary = f'ℹ️ {len(list(other_slashings))} other validators were slashed'
@@ -152,5 +152,5 @@ class SlashingHandler(WatcherHandler):
             description += (
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
-            alert = SlashingAlert(name="HeadWatcherOtherSlashing", severity="info")
+            alert = CommonAlert(name="HeadWatcherOtherSlashing", severity="info")
             watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
