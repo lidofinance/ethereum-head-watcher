@@ -118,7 +118,7 @@ class ConsensusClient(HTTPProvider):
         return stream
 
     @staticmethod
-    def parse_validators(data: list[dict[str, str | dict]], current_indexes: dict[str, str]) -> dict[str, str]:
+    def parse_validators(data: list[dict], current_indexes: dict[str, str]) -> dict[str, str]:
         indexed_validators_keys = {}
         for validator in data:
             index = ""
