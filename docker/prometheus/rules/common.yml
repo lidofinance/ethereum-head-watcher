@@ -3,8 +3,7 @@ groups:
     rules:
 
       - alert: HeadBlockIsNotChanging
-        expr: absent(ethereum_slashing_watcher_slot_number) 
-          OR changes(ethereum_slashing_watcher_slot_number[15m]) = 0
+        expr: absent(ethereum_slashing_watcher_slot_number) OR changes(ethereum_slashing_watcher_slot_number[15m]) == 0
         for: 1m
         labels:
           severity: critical
@@ -18,8 +17,7 @@ groups:
           footer_icon_url: "https://cryptologos.cc/logos/steth-steth-logo.png"
 
       - alert: ValidatorsIndexSlotIsNotChanging
-        expr: absent(ethereum_slashing_watcher_validators_index_slot_number) 
-          OR changes(ethereum_slashing_watcher_validators_index_slot_number[1h]) = 0
+        expr: absent(ethereum_slashing_watcher_validators_index_slot_number) OR changes(ethereum_slashing_watcher_validators_index_slot_number[1h]) == 0
         for: 1m
         labels:
           severity: critical
@@ -34,8 +32,7 @@ groups:
 
 
       - alert: KeysAPIBlockIsNotChanging
-        expr: absent(ethereum_slashing_watcher_keys_api_block_number) 
-          OR changes(ethereum_slashing_watcher_keys_api_block_number[1h]) = 0
+        expr: absent(ethereum_slashing_watcher_keys_api_block_number) OR changes(ethereum_slashing_watcher_keys_api_block_number[1h]) == 0
         for: 1m
         labels:
           severity: critical

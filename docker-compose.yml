@@ -26,7 +26,6 @@ services:
       - KEYS_API_URI=${KEYS_API_URI}
       - ALERTMANAGER_URI=${ALERTMANAGER_URI}
       - LOG_LEVEL=${LOG_LEVEL}
-      - SLOTS_RANGE=${SLOTS_RANGE}
 
   app-goerli:
     container_name: ethereum-head-watcher-goerli
@@ -49,7 +48,6 @@ services:
       - KEYS_API_URI=${KEYS_API_URI_GOERLI}
       - ALERTMANAGER_URI=${ALERTMANAGER_URI}
       - LOG_LEVEL=${LOG_LEVEL}
-      - SLOTS_RANGE=${SLOTS_RANGE_GOERLI}
       - NETWORK_NAME=goerli
 
   prometheus:
