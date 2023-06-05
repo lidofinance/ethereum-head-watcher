@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - master
     paths-ignore:
       - ".github/**"
 
@@ -25,5 +25,5 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
           TARGET_REPO: "lidofinance/infra-mainnet"
-          TARGET_WORKFLOW: "!! PUT CORRECT REFERENCE TO DEPLOY WF IN lidofinance/infra-mainnet HERE. EX. my_awesome_app.yml !!"
-          TARGET: "main"
+          TARGET_WORKFLOW: "deploy_staging_mainnet_lido_oracle.yaml"
+          TARGET: "master"
