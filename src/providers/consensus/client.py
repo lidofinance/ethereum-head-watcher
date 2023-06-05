@@ -8,7 +8,6 @@ from src.metrics.logging import logging
 from src.metrics.prometheus.basic import CL_REQUESTS_DURATION
 from src.providers.consensus.typings import (
     BlockDetailsResponse,
-    BlockHeaderFullResponse,
     BlockHeaderResponseData,
     BlockRootResponse,
     BeaconSpecResponse,
@@ -35,7 +34,7 @@ class ConsensusClient(HTTPProvider):
 
     PROMETHEUS_HISTOGRAM = CL_REQUESTS_DURATION
 
-    HTTP_REQUEST_TIMEOUT = CL_REQUEST_TIMEOUT
+    HTTP_REQUEST_TIMEOUT: int | None = CL_REQUEST_TIMEOUT
     HTTP_REQUEST_RETRY_COUNT = CL_REQUEST_RETRY_COUNT
     HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS
 
@@ -45,6 +44,7 @@ class ConsensusClient(HTTPProvider):
     API_GET_VALIDATORS = 'eth/v1/beacon/states/{}/validators'
     API_GET_SPEC = 'eth/v1/config/spec'
     API_GET_GENESIS = 'eth/v1/beacon/genesis'
+    API_GET_EVENTS = 'eth/v1/events'
 
     def get_config_spec(self):
         """Spec: https://ethereum.github.io/beacon-APIs/#/Config/getSpec"""
@@ -77,33 +77,41 @@ class ConsensusClient(HTTPProvider):
             raise ValueError("Expected mapping response from getBlockRoot")
         return BlockRootResponse.from_response(**data)
 
-    def get_block_header(self, state_id: Union[SlotNumber, BlockRoot, LiteralState]) -> BlockHeaderFullResponse:
+    def get_block_header(
+        self,
+        state_id: Union[SlotNumber, BlockRoot, LiteralState],
+        force_use_fallback_callback: Callable[..., bool] = lambda _: False
+    ) -> BlockHeaderResponseData:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockHeader"""
-        data, meta_data = self._get(
+        # Set special timeout and retry params for this method.
+        # It is used for `head` request
+        special_client = copy(self)
+        special_client.HTTP_REQUEST_TIMEOUT = 2
+        special_client.HTTP_REQUEST_RETRY_COUNT = 2
+        special_client.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = 0.5
+        data, _ = special_client._get(  # pylint: disable=protected-access
             self.API_GET_BLOCK_HEADER,
             path_params=(state_id,),
             force_raise=self.__raise_last_missed_slot_error,
+            force_use_fallback=force_use_fallback_callback,
         )
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getBlockHeader")
-        resp = BlockHeaderFullResponse.from_response(data=BlockHeaderResponseData.from_response(**data), **meta_data)
+        resp = BlockHeaderResponseData.from_response(**data)
         return resp
 
-    def get_block_details(
-        self, state_id: Union[SlotNumber, BlockRoot, LiteralState], force_use_fallback_callback: Callable[..., bool]
-    ) -> BlockDetailsResponse:
+    def get_block_details(self, state_id: Union[SlotNumber, BlockRoot, LiteralState]) -> BlockDetailsResponse:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2"""
         # Set special timeout and retry params for this method.
         # It is used for `head` request
         special_client = copy(self)
         special_client.HTTP_REQUEST_TIMEOUT = 2
-        special_client.HTTP_REQUEST_RETRY_COUNT = 1
+        special_client.HTTP_REQUEST_RETRY_COUNT = 2
         special_client.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = 0.5
         data, _ = special_client._get(  # pylint: disable=protected-access
             self.API_GET_BLOCK_DETAILS,
             path_params=(state_id,),
             force_raise=self.__raise_last_missed_slot_error,
-            force_use_fallback=force_use_fallback_callback,
         )
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getBlockV2")
@@ -114,6 +122,16 @@ class ConsensusClient(HTTPProvider):
         stream = self._get_stream(
             self.API_GET_VALIDATORS,
             path_params=(slot_number,),
+        )
+        return stream
+
+    def get_chain_reorg_stream(self) -> Response:
+        """Spec: https://consensys.github.io/teku/#tag/Events/operation/getEvents"""
+        special_client = copy(self)
+        special_client.HTTP_REQUEST_TIMEOUT = None
+        stream = special_client._get_stream(  # pylint: disable=protected-access
+            self.API_GET_EVENTS,
+            query_params={"topics": "chain_reorg"},
         )
         return stream
 
