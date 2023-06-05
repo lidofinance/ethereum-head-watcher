@@ -117,6 +117,24 @@ class ConsensusClient(HTTPProvider):
         )
         return stream
 
+    @staticmethod
+    def parse_validators(data: list[dict[str, str | dict]], current_indexes: dict[str, str]) -> dict[str, str]:
+        indexed_validators_keys = {}
+        for validator in data:
+            index = ""
+            pubkey = ""
+            for key, value in validator.items():
+                if key == "index":
+                    if value in current_indexes:
+                        continue
+                    index = value
+                elif index != "" and key == "validator":
+                    for k, v in value.items():
+                        if k == "pubkey":
+                            pubkey = v
+            indexed_validators_keys[index] = pubkey
+        return indexed_validators_keys
+
     def __raise_last_missed_slot_error(self, errors: list[Exception]) -> Exception | None:
         """
         Prioritize NotOkResponse before other exceptions (ConnectionError, TimeoutError).

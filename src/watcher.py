@@ -132,19 +132,10 @@ class Watcher:
             logger.error({'msg': f'Error while getting validators: {e}'})
             return
 
-        for validator in json_stream.requests.load(stream)['data']:
-            index = ""
-            pubkey = ""
-            for key, value in validator.items():
-                if key == "index":
-                    if value in self.indexed_validators_keys:
-                        continue
-                    index = value
-                elif index != "" and key == "validator":
-                    for k, v in value.items():
-                        if k == "pubkey":
-                            pubkey = v
-            self.indexed_validators_keys[index] = pubkey
+        self.indexed_validators_keys = ConsensusClient.parse_validators(
+            json_stream.requests.load(stream)['data'], self.indexed_validators_keys
+        )
+
         logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
         VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
 
