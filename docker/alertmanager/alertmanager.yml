@@ -1,0 +1,31 @@
+global:
+  resolve_timeout: 60m
+route:
+  group_by: ['alertname']
+  receiver: empty
+  routes:
+    - receiver: discord_webhook_mainnet
+      group_wait: 100ms
+      group_interval: 100ms
+      repeat_interval: 1h
+      matchers:
+        - network="mainnet"
+
+    - receiver: discord_webhook_goerli
+      group_wait: 100ms
+      group_interval: 100ms
+      repeat_interval: 1h
+      matchers:
+        - network="goerli"
+
+
+receivers:
+  - name: 'empty'
+  - name: 'discord_webhook_mainnet'
+    webhook_configs:
+      - url: 'http://alertmanager-discord:5001/hook/slashing-watcher-mainnet'
+        send_resolved: false
+  - name: 'discord_webhook_goerli'
+    webhook_configs:
+      - url: 'http://alertmanager-discord:5001/hook/slashing-watcher-goerli'
+        send_resolved: false
