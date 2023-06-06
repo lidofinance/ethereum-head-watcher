@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+  external_labels:
+    monitor: 'my-project'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+      - targets: ['alertmanager:9093']
+
+rule_files:
+  - "rules/common.yml"
+
+scrape_configs:
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'app-mainnet'
+    static_configs:
+      - targets: ['ethereum-head-watcher-mainnet:9000']
+
+  - job_name: 'app-goerli'
+    static_configs:
+      - targets: ['ethereum-head-watcher-goerli:9000']

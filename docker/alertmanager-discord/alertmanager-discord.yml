@@ -1,0 +1,5 @@
+hooks:
+  - slug: slashing-watcher-mainnet
+    hook: https://discord.com/api/webhooks/1
+  - slug: slashing-watcher-goerli
+    hook: https://discord.com/api/webhooks/2
