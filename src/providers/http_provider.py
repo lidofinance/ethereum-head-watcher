@@ -36,7 +36,7 @@ class HTTPProvider(ABC):
     """
 
     PROMETHEUS_HISTOGRAM: Histogram
-    HTTP_REQUEST_TIMEOUT: int | None
+    HTTP_REQUEST_TIMEOUT: float | None
     HTTP_REQUEST_RETRY_COUNT: int
     HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS: float
 

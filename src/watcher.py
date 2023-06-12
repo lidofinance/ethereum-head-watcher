@@ -134,13 +134,12 @@ class Watcher:
         logger.info({'msg': 'Updating indexed validators keys'})
         try:
             stream = self.consensus.get_validators_stream(SlotNumber(slot))
+            self.indexed_validators_keys = ConsensusClient.parse_validators(
+                json_stream.requests.load(stream)['data'], self.indexed_validators_keys
+            )
         except Exception as e:  # pylint: disable=broad-except
             logger.error({'msg': f'Error while getting validators: {e}'})
             return
-
-        self.indexed_validators_keys = ConsensusClient.parse_validators(
-            json_stream.requests.load(stream)['data'], self.indexed_validators_keys
-        )
 
         logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
         VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
