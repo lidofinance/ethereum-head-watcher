@@ -45,15 +45,13 @@ class ForkHandler(WatcherHandler):
 
     def _send_unhandled_head_alert(self, watcher, head: BlockHeaderResponseData):
         alert = CommonAlert(name="UnhandledHead", severity="info")
-        links = "\n".join(
-            [
-                f"[{s}](https://{NETWORK_NAME}.beaconcha.in/slot/{s})"
-                for s in range(
-                    int(head.header.message.slot) - int(watcher.handled_headers[-1].header.message.slot),
-                    int(head.header.message.slot),
-                )
-            ]
+        summary = "🫳🐦Unhandled chain slot"
+        additional_msg = ""
+        diff = int(head.header.message.slot) - int(watcher.handled_headers[-1].header.message.slot) - 1
+        if diff >= 1:
+            additional_msg = f"\nAnd {diff} slots before it"
+        root = head.header.message.parent_root
+        description = (
+            f"Please, check unhandled slot: [{root}](https://{NETWORK_NAME}.beaconcha.in/slot/{root}){additional_msg}"
         )
-        summary = "🫳🐦Unhandled chain heads"
-        description = f"Parent slot hasn't been processed\nPlease, check possible unhandled slots: {links}"
         watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
