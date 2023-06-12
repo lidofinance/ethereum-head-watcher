@@ -80,7 +80,7 @@ class ConsensusClient(HTTPProvider):
     def get_block_header(
         self,
         state_id: Union[SlotNumber, BlockRoot, LiteralState],
-        force_use_fallback_callback: Callable[..., bool] = lambda _: False
+        force_use_fallback_callback: Callable[..., bool] = lambda _: False,
     ) -> BlockHeaderResponseData:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockHeader"""
         # Set special timeout and retry params for this method.
