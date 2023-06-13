@@ -77,11 +77,10 @@ class BlockDetailsResponse(Nested, FromResponse):
 @dataclass
 class ChainReorgEvent(FromResponse):
     # https://ethereum.github.io/beacon-APIs/#/Beacon/getChainReorgEvents
-    block_root: BlockRoot
     depth: str
     slot: str
-    old_head_block_root: BlockRoot
-    new_head_block_root: BlockRoot
+    old_head_block: BlockRoot
+    new_head_block: BlockRoot
 
 
 class ValidatorStatus(Enum):
