@@ -27,6 +27,8 @@ from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 
 logger = logging.getLogger()
 
+MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
+
 
 class Watcher:
     # Init
@@ -48,7 +50,7 @@ class Watcher:
     indexed_validators_keys: dict[str, str] = {}
 
     chain_reorgs: dict[str, ChainReorgEvent] = {}
-    # last 96 slots
+
     handled_headers: list[BlockHeaderResponseData] = []
 
     def __init__(self, handlers: list[WatcherHandler]):
@@ -90,9 +92,9 @@ class Watcher:
 
             # ATTENTION! While we handle current head, new head could be happened
             # We should keep eye on handler execution time
-            self._handle_head(current_head)  # todo: should we use asyncio here?
+            self._handle_head(current_head)
             self.handled_headers.append(current_head)
-            if len(self.handled_headers) > 96:
+            if len(self.handled_headers) > MAX_HANDLED_HEADERS_COUNT:
                 self.handled_headers.pop(0)
 
             logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
@@ -204,7 +206,8 @@ class Watcher:
         return current_head
 
     @unsync
-    async def listen_chain_reorg_event(self):
+    def listen_chain_reorg_event(self):
+        logger.info({'msg': 'Listening chain reorg events'})
         response = self.consensus.get_chain_reorg_stream()
         client = sseclient.SSEClient(response)
         for event in client.events():

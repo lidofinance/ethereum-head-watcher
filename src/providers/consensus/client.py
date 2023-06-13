@@ -1,8 +1,8 @@
-from copy import copy
 from http import HTTPStatus
 from typing import Literal, Union, Callable
 
 from requests import Response
+from urllib3 import Retry
 
 from src.metrics.logging import logging
 from src.metrics.prometheus.basic import CL_REQUESTS_DURATION
@@ -14,7 +14,7 @@ from src.providers.consensus.typings import (
     GenesisResponse,
 )
 from src.providers.http_provider import HTTPProvider, NotOkResponse
-from src.typings import SlotNumber, BlockRoot
+from src.typings import SlotNumber, BlockRoot, Infinity
 from src.variables import CL_REQUEST_TIMEOUT, CL_REQUEST_RETRY_COUNT, CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class ConsensusClient(HTTPProvider):
 
     PROMETHEUS_HISTOGRAM = CL_REQUESTS_DURATION
 
-    HTTP_REQUEST_TIMEOUT: float | None = CL_REQUEST_TIMEOUT
+    HTTP_REQUEST_TIMEOUT: float = CL_REQUEST_TIMEOUT
     HTTP_REQUEST_RETRY_COUNT = CL_REQUEST_RETRY_COUNT
     HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS
 
@@ -48,7 +48,7 @@ class ConsensusClient(HTTPProvider):
 
     def get_config_spec(self):
         """Spec: https://ethereum.github.io/beacon-APIs/#/Config/getSpec"""
-        data, _ = self._get(self.API_GET_SPEC)
+        data, _ = self.get(self.API_GET_SPEC)
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getSpec")
         return BeaconSpecResponse.from_response(**data)
@@ -57,7 +57,7 @@ class ConsensusClient(HTTPProvider):
         """
         Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getGenesis
         """
-        data, _ = self._get(self.API_GET_GENESIS)
+        data, _ = self.get(self.API_GET_GENESIS)
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getGenesis")
         return GenesisResponse.from_response(**data)
@@ -68,7 +68,7 @@ class ConsensusClient(HTTPProvider):
 
         There is no cache because this method is used to get finalized and head blocks.
         """
-        data, _ = self._get(
+        data, _ = self.get(
             self.API_GET_BLOCK_ROOT,
             path_params=(state_id,),
             force_raise=self.__raise_last_missed_slot_error,
@@ -84,16 +84,16 @@ class ConsensusClient(HTTPProvider):
     ) -> BlockHeaderResponseData:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockHeader"""
         # Set special timeout and retry params for this method.
-        # It is used for `head` request
-        special_client = copy(self)
-        special_client.HTTP_REQUEST_TIMEOUT = 1.5
-        special_client.HTTP_REQUEST_RETRY_COUNT = 1
-        special_client.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = 0.5
-        data, _ = special_client._get(  # pylint: disable=protected-access
+        # It is used for `slashings` handler
+        data, _ = self.get(
             self.API_GET_BLOCK_HEADER,
             path_params=(state_id,),
             force_raise=self.__raise_last_missed_slot_error,
             force_use_fallback=force_use_fallback_callback,
+            timeout=1.5,
+            retry_strategy=Retry(
+                total=1, backoff_factor=0.5, status_forcelist=self.HTTP_REQUEST_RETRY_STATUS_FORCELIST
+            ),
         )
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getBlockHeader")
@@ -104,14 +104,14 @@ class ConsensusClient(HTTPProvider):
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2"""
         # Set special timeout and retry params for this method.
         # It is used for `head` request
-        special_client = copy(self)
-        special_client.HTTP_REQUEST_TIMEOUT = 1.5
-        special_client.HTTP_REQUEST_RETRY_COUNT = 1
-        special_client.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = 0.5
-        data, _ = special_client._get(  # pylint: disable=protected-access
+        data, _ = self.get(
             self.API_GET_BLOCK_DETAILS,
             path_params=(state_id,),
             force_raise=self.__raise_last_missed_slot_error,
+            timeout=1.5,
+            retry_strategy=Retry(
+                total=1, backoff_factor=0.5, status_forcelist=self.HTTP_REQUEST_RETRY_STATUS_FORCELIST
+            ),
         )
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getBlockV2")
@@ -119,7 +119,7 @@ class ConsensusClient(HTTPProvider):
 
     def get_validators_stream(self, slot_number: SlotNumber) -> Response:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidators"""
-        stream = self._get_stream(
+        stream = self.get_stream(
             self.API_GET_VALIDATORS,
             path_params=(slot_number,),
         )
@@ -127,11 +127,10 @@ class ConsensusClient(HTTPProvider):
 
     def get_chain_reorg_stream(self) -> Response:
         """Spec: https://consensys.github.io/teku/#tag/Events/operation/getEvents"""
-        special_client = copy(self)
-        special_client.HTTP_REQUEST_TIMEOUT = None
-        stream = special_client._get_stream(  # pylint: disable=protected-access
+        stream = self.get_stream(
             self.API_GET_EVENTS,
             query_params={"topics": "chain_reorg"},
+            timeout=Infinity,
         )
         return stream
 

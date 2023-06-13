@@ -6,6 +6,8 @@ from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockHeaderResponseData, ChainReorgEvent
 from src.variables import NETWORK_NAME
 
+BEACONCHAIN_URL_TEMPLATE = "[{0}](https://{1}.beaconcha.in/slot/{0})"
+
 
 class ForkHandler(WatcherHandler):
     @unsync
@@ -17,7 +19,9 @@ class ForkHandler(WatcherHandler):
 
         head_parent_is_alerted = False
 
-        for chain_reorg in watcher.chain_reorgs.values():
+        chain_reorgs = [*watcher.chain_reorgs.values()]
+
+        for chain_reorg in chain_reorgs:
             known_header = _known_header(chain_reorg.new_head_block)
             known_parent = _known_header(known_header.header.message.parent_root) if known_header else None
             if not known_header or not known_parent:
@@ -35,7 +39,7 @@ class ForkHandler(WatcherHandler):
         alert = CommonAlert(name="UnhandledChainReorg", severity="info")
         links = "\n".join(
             [
-                f"[{s}](https://{NETWORK_NAME}.beaconcha.in/slot/{s})"
+                BEACONCHAIN_URL_TEMPLATE.format(s, NETWORK_NAME)
                 for s in range(int(chain_reorg.slot) - int(chain_reorg.depth), int(chain_reorg.slot) + 1)
             ]
         )
@@ -52,6 +56,6 @@ class ForkHandler(WatcherHandler):
             additional_msg = f"\nAnd {diff} slots before it"
         root = head.header.message.parent_root
         description = (
-            f"Please, check unhandled slot: [{root}](https://{NETWORK_NAME}.beaconcha.in/slot/{root}){additional_msg}"
+            f"Please, check unhandled slot: {BEACONCHAIN_URL_TEMPLATE.format(root, NETWORK_NAME)}{additional_msg}"
         )
         watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
