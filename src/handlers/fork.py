@@ -1,3 +1,5 @@
+import threading
+
 from unsync import unsync
 
 from src.alerts.slashing import CommonAlert
@@ -28,7 +30,9 @@ class ForkHandler(WatcherHandler):
                 self._send_reorg_alert(watcher, chain_reorg)
                 if chain_reorg.new_head_block == head.header.message.parent_root:
                     head_parent_is_alerted = True
-            del watcher.chain_reorgs[chain_reorg.slot]
+            lock = threading.Lock()
+            with lock:
+                del watcher.chain_reorgs[chain_reorg.slot]
 
         if watcher.handled_headers and not head_parent_is_alerted:
             known_parent = _known_header(head.header.message.parent_root)

@@ -1,4 +1,5 @@
 import json
+import threading
 
 import json_stream.requests
 
@@ -213,4 +214,6 @@ class Watcher:
         for event in client.events():
             logger.warning({'msg': f'Chain reorg event: {event.data}'})
             event = ChainReorgEvent.from_response(**json.loads(event.data))
-            self.chain_reorgs[event.slot] = event
+            lock = threading.Lock()
+            with lock:
+                self.chain_reorgs[event.slot] = event
