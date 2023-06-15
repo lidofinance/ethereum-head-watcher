@@ -1,8 +1,12 @@
+import json
+import threading
+
 import json_stream.requests
 
 import logging
 import time
 
+import sseclient
 from unsync import unsync, Unfuture
 
 from src import variables
@@ -11,19 +15,20 @@ from src.handlers.handler import WatcherHandler
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
     SLOT_NUMBER,
-    BLOCK_NUMBER,
-    KEYS_API_BLOCK_NUMBER,
+    KEYS_API_SLOT_NUMBER,
     VALIDATORS_INDEX_SLOT_NUMBER,
 )
 from src.providers.alertmanager.client import AlertmanagerClient
 from src.providers.consensus.client import ConsensusClient
-from src.providers.consensus.typings import BlockDetailsResponse
+from src.providers.consensus.typings import ChainReorgEvent, BlockHeaderResponseData
 from src.providers.keys.client import KeysAPIClient
 from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
-from src.typings import BlockNumber, SlotNumber
+from src.typings import SlotNumber
 from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 
 logger = logging.getLogger()
+
+MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
 
 
 class Watcher:
@@ -45,7 +50,9 @@ class Watcher:
     lido_keys: dict[str, LidoNamedKey] = {}
     indexed_validators_keys: dict[str, str] = {}
 
-    head: BlockDetailsResponse | None = None
+    chain_reorgs: dict[str, ChainReorgEvent] = {}
+
+    handled_headers: list[BlockHeaderResponseData] = []
 
     def __init__(self, handlers: list[WatcherHandler]):
         self.consensus = ConsensusClient(variables.CONSENSUS_CLIENT_URI)
@@ -54,15 +61,11 @@ class Watcher:
         self.genesis_time = int(self.consensus.get_genesis().genesis_time)
         self.handlers = handlers
 
-        # todo: add chain org event watcher. If we see that we was on not right fork, we should send alert about it
-
     def run(self):
-        logger.info({'msg': f'Watcher started. Handlers: {[handler.__class__.__name__ for handler in self.handlers]}'})
-
-        def wrapped(slot_to_handle='head'):
-            current_head = self._get_head_block(slot_to_handle)
+        def _run(slot_to_handle='head'):
+            current_head = self._get_header(slot_to_handle)
             if not current_head:
-                logger.info({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
+                logger.debug({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
                 time.sleep(CYCLE_SLEEP_IN_SECONDS)
                 return
 
@@ -85,29 +88,35 @@ class Watcher:
             if self.validators_updater is None:
                 self.validators_updater = self._update_validators()
 
-            logger.info({'msg': f'New head [{current_head.message.slot}]. Run handlers'})
-            SLOT_NUMBER.set(current_head.message.slot)
-            BLOCK_NUMBER.set(current_head.message.body['execution_payload']['block_number'])
+            logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
+            SLOT_NUMBER.set(current_head.header.message.slot)
 
             # ATTENTION! While we handle current head, new head could be happened
             # We should keep eye on handler execution time
             self._handle_head(current_head)
-            self.head = current_head
+            self.handled_headers.append(current_head)
+            if len(self.handled_headers) > MAX_HANDLED_HEADERS_COUNT:
+                self.handled_headers.pop(0)
 
+            logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
             time.sleep(CYCLE_SLEEP_IN_SECONDS)
+
+        logger.info({'msg': f'Watcher started. Handlers: {[handler.__class__.__name__ for handler in self.handlers]}'})
+
+        self.listen_chain_reorg_event()
 
         if SLOTS_RANGE:
             start, end = SLOTS_RANGE.split('-')
             for slot in range(int(start), int(end) + 1):
-                wrapped(str(slot))
+                _run(str(slot))
                 self.keys_updater.result()
                 self.validators_updater.result()
         else:
             while True:
-                wrapped()
+                _run()
 
     @duration_meter()
-    def _handle_head(self, head: BlockDetailsResponse):
+    def _handle_head(self, head: BlockHeaderResponseData):
         tasks = [h.handle(self, head) for h in self.handlers]
         for t in tasks:
             t.result()
@@ -128,20 +137,19 @@ class Watcher:
         logger.info({'msg': 'Updating indexed validators keys'})
         try:
             stream = self.consensus.get_validators_stream(SlotNumber(slot))
+            self.indexed_validators_keys = ConsensusClient.parse_validators(
+                json_stream.requests.load(stream)['data'], self.indexed_validators_keys
+            )
         except Exception as e:  # pylint: disable=broad-except
             logger.error({'msg': f'Error while getting validators: {e}'})
             return
-
-        self.indexed_validators_keys = ConsensusClient.parse_validators(
-            json_stream.requests.load(stream)['data'], self.indexed_validators_keys
-        )
 
         logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
         VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
 
     @unsync
     @duration_meter()
-    def _update_lido_keys(self, block: BlockDetailsResponse) -> None:
+    def _update_lido_keys(self, header: BlockHeaderResponseData) -> None:
         """Return dict with `publickey` as key and `LidoNamedKey` as value"""
 
         current_keys_status = self.keys_api.get_status()
@@ -175,24 +183,37 @@ class Watcher:
         del modules_operators_dict
 
         logger.warning({'msg': f'Lido keys updated: [{len(self.lido_keys)}]'})
-        block_number = BlockNumber(int(block.message.body['execution_payload']['block_number']))
-        KEYS_API_BLOCK_NUMBER.set(block_number)
+        KEYS_API_SLOT_NUMBER.set(int(header.header.message.slot))
 
     @duration_meter()
-    def _get_head_block(self, slot=None) -> BlockDetailsResponse | None:
+    def _get_header(self, slot=None) -> BlockHeaderResponseData | None:
         def force_use_fallback_callback(result) -> bool:
             """Callback that will be called if we can't get valid head block from beacon node"""
             data, _ = result
-            diff = time.time() - ((int(data['message']['slot']) * SECONDS_PER_SLOT) + self.genesis_time)
-            if self.head is not None and diff > SECONDS_PER_SLOT * 4:
+            diff = time.time() - ((int(data['header']['message']['slot']) * SECONDS_PER_SLOT) + self.genesis_time)
+            if len(self.handled_headers) > 0 and diff > SECONDS_PER_SLOT * 4:
                 # head didn't change for more than 4 slots (1/8 of epoch)
                 return True
             return False
 
         slot = slot or 'head'
-        current_head = self.consensus.get_block_details(
+        current_head = self.consensus.get_block_header(
             slot, force_use_fallback_callback if slot == 'head' else lambda _: False
         )
-        if self.head is not None and int(current_head.message.slot) == int(self.head.message.slot):
+        if len(self.handled_headers) > 0 and int(current_head.header.message.slot) == int(
+            self.handled_headers[-1].header.message.slot
+        ):
             return None
         return current_head
+
+    @unsync
+    def listen_chain_reorg_event(self):
+        logger.info({'msg': 'Listening chain reorg events'})
+        response = self.consensus.get_chain_reorg_stream()
+        client = sseclient.SSEClient(response)
+        for event in client.events():
+            logger.warning({'msg': f'Chain reorg event: {event.data}'})
+            event = ChainReorgEvent.from_response(**json.loads(event.data))
+            lock = threading.Lock()
+            with lock:
+                self.chain_reorgs[event.slot] = event

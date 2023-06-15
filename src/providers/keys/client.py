@@ -40,18 +40,18 @@ class KeysAPIClient(HTTPProvider):
 
     def get_used_lido_keys_stream(self) -> Response:
         """Docs: https://keys-api.lido.fi/api/static/index.html#/keys/KeysController_get"""
-        return self._get_stream(self.USED_KEYS)
+        return self.get_stream(self.USED_KEYS)
 
     def get_operators_stream(self) -> Response:
-        return self._get_stream(self.OPERATORS)
+        return self.get_stream(self.OPERATORS)
 
     def get_modules(self) -> list[dict]:
         """Docs: https://keys-api.lido.fi/api/static/index.html#/modules/SRModulesController_getModules"""
-        return cast(list[dict], self._get(self.MODULES))
+        return cast(list[dict], self.get(self.MODULES))
 
     def get_status(self) -> KeysApiStatus:
         """Docs: https://keys-api.lido.fi/api/static/index.html#/status/StatusController_get"""
-        data, _ = self._get(self.STATUS)
+        data, _ = self.get(self.STATUS)
         return KeysApiStatus.from_response(**cast(dict, data))
 
     @staticmethod

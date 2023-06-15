@@ -14,15 +14,9 @@ SLOT_NUMBER = Gauge(
     namespace=PROMETHEUS_PREFIX,
 )
 
-BLOCK_NUMBER = Gauge(
-    "block_number",
-    "Watcher head block number",
-    namespace=PROMETHEUS_PREFIX,
-)
-
-KEYS_API_BLOCK_NUMBER = Gauge(
-    "keys_api_block_number",
-    "Keys API block number from status",
+KEYS_API_SLOT_NUMBER = Gauge(
+    "keys_api_slot_number",
+    "Keys API last updated slot number",
     namespace=PROMETHEUS_PREFIX,
 )
 

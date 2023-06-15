@@ -74,6 +74,15 @@ class BlockDetailsResponse(Nested, FromResponse):
     signature: str
 
 
+@dataclass
+class ChainReorgEvent(FromResponse):
+    # https://ethereum.github.io/beacon-APIs/#/Beacon/getChainReorgEvents
+    depth: str
+    slot: str
+    old_head_block: BlockRoot
+    new_head_block: BlockRoot
+
+
 class ValidatorStatus(Enum):
     PENDING_INITIALIZED = 'pending_initialized'
     PENDING_QUEUED = 'pending_queued'

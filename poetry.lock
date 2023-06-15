@@ -594,6 +594,18 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
+name = "sseclient-py"
+version = "1.7.2"
+description = "SSE client for Python"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "sseclient-py-1.7.2.tar.gz", hash = "sha256:ba3197d314766eccb72a1dda80b5fa14a0fbba07d796a287654c07edde88fe0f"},
+    {file = "sseclient_py-1.7.2-py2.py3-none-any.whl", hash = "sha256:a758653b13b78df42cdb696740635a26cb72ad433b75efb68dbbb163d099b6a9"},
+]
+
+[[package]]
 name = "tomlkit"
 version = "0.11.8"
 description = "Style preserving TOML library"
@@ -761,4 +773,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "e5d82677cb59bd83755741149405e3bc9f1bd5c34831267147fce81b59192c70"
+content-hash = "64c21f2ee594adf1983eb82624bcc7f6fe78cc7277173f70049cf7b1519a0025"

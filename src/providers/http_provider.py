@@ -9,6 +9,8 @@ from requests import Session, Response
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
+from src.typings import InfinityType
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,9 +38,10 @@ class HTTPProvider(ABC):
     """
 
     PROMETHEUS_HISTOGRAM: Histogram
-    HTTP_REQUEST_TIMEOUT: int
+    HTTP_REQUEST_TIMEOUT: float
     HTTP_REQUEST_RETRY_COUNT: int
     HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS: float
+    HTTP_REQUEST_RETRY_STATUS_FORCELIST = [418, 429, 500, 502, 503, 504]
 
     def __init__(self, hosts: list[str]):
         if not hosts:
@@ -46,16 +49,11 @@ class HTTPProvider(ABC):
 
         self.hosts = hosts
 
-        retry_strategy = Retry(
+        self.default_retry_strategy = Retry(
             total=self.HTTP_REQUEST_RETRY_COUNT,
-            status_forcelist=[418, 429, 500, 502, 503, 504],
+            status_forcelist=self.HTTP_REQUEST_RETRY_STATUS_FORCELIST,
             backoff_factor=self.HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,
         )
-
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session = Session()
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
 
     @staticmethod
     def _urljoin(host, url):
@@ -63,14 +61,23 @@ class HTTPProvider(ABC):
             host += '/'
         return urljoin(host, url)
 
-    def _get(
+    def _prepare_session(self, custom_retry_strategy: Retry | None) -> Session:
+        adapter = HTTPAdapter(max_retries=custom_retry_strategy or self.default_retry_strategy)
+        session = Session()
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session
+
+    def get(
         self,
         endpoint: str,
         path_params: Optional[Sequence[str | int]] = None,
         query_params: Optional[dict] = None,
         force_raise: Callable[..., Exception | None] = lambda _: None,
         force_use_fallback: Callable[..., bool] = lambda _: False,
-    ) -> Tuple[dict | list, dict]:
+        timeout: Optional[float | InfinityType] = None,
+        retry_strategy: Retry | None = None,
+    ) -> tuple[dict | list, dict]:
         """
         Get request with fallbacks
         Returns (data, meta) or raises exception
@@ -82,7 +89,9 @@ class HTTPProvider(ABC):
 
         for host in self.hosts:
             try:
-                result = self._get_without_fallbacks(host, endpoint, path_params, query_params)
+                result: tuple[dict | list, dict] = self._get_without_fallbacks(
+                    host, endpoint, path_params, query_params, timeout, retry_strategy
+                )
                 if force_use_fallback(result):
                     raise ForceUseFallback(
                         'Forced to use fallback. '
@@ -109,25 +118,26 @@ class HTTPProvider(ABC):
         # Raise error from last provider.
         raise errors[-1]
 
-    def _get_stream(
+    def get_stream(
         self,
         endpoint: str,
         path_params: Optional[Sequence[str | int]] = None,
         query_params: Optional[dict] = None,
         force_raise: Callable[..., Exception | None] = lambda _: None,
+        timeout: Optional[float | InfinityType] = None,
+        retry_strategy: Retry | None = None,
     ) -> Response:
         """
         Get request with fallbacks
-        Returns stream or raises exception
-
-        force_raise - function that returns an Exception if it should be thrown immediately.
-        Sometimes NotOk response from first provider is the response that we are expecting.
+        Returns stream
         """
         errors: list[Exception] = []
 
         for host in self.hosts:
             try:
-                return self._get_stream_without_fallbacks(host, endpoint, path_params, query_params)
+                return self._get_stream_without_fallbacks(
+                    host, endpoint, path_params, query_params, timeout, retry_strategy
+                )
             except Exception as e:  # pylint: disable=W0703
                 errors.append(e)
 
@@ -146,12 +156,14 @@ class HTTPProvider(ABC):
         # Raise error from last provider.
         raise errors[-1]
 
-    def _post(
+    def post(
         self,
         endpoint: str,
         path_params: Optional[Sequence[str | int]] = None,
         query_body: Optional[dict | list[dict]] = None,
         force_raise: Callable[..., Exception | None] = lambda _: None,
+        timeout: Optional[float | InfinityType] = None,
+        retry_strategy: Retry | None = None,
     ) -> Tuple[dict | list, dict]:
         """
         Post request with fallbacks
@@ -164,7 +176,7 @@ class HTTPProvider(ABC):
 
         for host in self.hosts:
             try:
-                return self._post_without_fallbacks(host, endpoint, path_params, query_body)
+                return self._post_without_fallbacks(host, endpoint, path_params, query_body, timeout, retry_strategy)
             except Exception as e:  # pylint: disable=W0703
                 errors.append(e)
 
@@ -189,6 +201,8 @@ class HTTPProvider(ABC):
         endpoint: str,
         path_params: Optional[Sequence[str | int]] = None,
         query_params: Optional[dict] = None,
+        timeout: Optional[float | InfinityType] = None,
+        retry_strategy: Retry | None = None,
     ) -> Response:
         """
         Simple get request without fallbacks
@@ -198,11 +212,11 @@ class HTTPProvider(ABC):
 
         with self.PROMETHEUS_HISTOGRAM.time() as t:
             try:
-                response = self.session.get(
+                response = self._prepare_session(retry_strategy).get(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
                     params=query_params,
-                    timeout=self.HTTP_REQUEST_TIMEOUT,
                     stream=True,
+                    timeout=None if isinstance(timeout, InfinityType) else timeout or self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
                 logger.debug({'msg': str(error)})
@@ -232,7 +246,9 @@ class HTTPProvider(ABC):
         endpoint: str,
         path_params: Optional[Sequence[str | int]] = None,
         query_params: Optional[dict] = None,
-    ) -> Tuple[dict | list, dict]:
+        timeout: Optional[float | InfinityType] = None,
+        retry_strategy: Retry | None = None,
+    ) -> tuple[dict | list, dict]:
         """
         Simple get request without fallbacks
         Returns (data, meta) or raises exception
@@ -241,10 +257,10 @@ class HTTPProvider(ABC):
 
         with self.PROMETHEUS_HISTOGRAM.time() as t:
             try:
-                response = self.session.get(
+                response = self._prepare_session(retry_strategy).get(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
                     params=query_params,
-                    timeout=self.HTTP_REQUEST_TIMEOUT,
+                    timeout=None if isinstance(timeout, InfinityType) else timeout or self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
                 logger.debug({'msg': str(error)})
@@ -288,6 +304,8 @@ class HTTPProvider(ABC):
         endpoint: str,
         path_params: Optional[Sequence[str | int]] = None,
         query_body: Optional[dict | list] = None,
+        timeout: Optional[float | InfinityType] = None,
+        retry_strategy: Retry | None = None,
     ) -> Tuple[dict | list, dict]:
         """
         Simple post request without fallbacks
@@ -297,10 +315,10 @@ class HTTPProvider(ABC):
 
         with self.PROMETHEUS_HISTOGRAM.time() as t:
             try:
-                response = self.session.post(
+                response = self._prepare_session(retry_strategy).post(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
                     json=query_body,
-                    timeout=self.HTTP_REQUEST_TIMEOUT,
+                    timeout=None if isinstance(timeout, InfinityType) else timeout or self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
                 logger.debug({'msg': str(error)})

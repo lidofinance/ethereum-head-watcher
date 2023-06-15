@@ -30,7 +30,7 @@ class AlertmanagerClient(HTTPProvider):
             alert['labels']['network'] = NETWORK_NAME
         if not variables.DRY_RUN:
             logger.info({'msg': f'Sending {len(alerts)} alerts', 'alerts': to_sent})
-            self._post(self.ALERTS, query_body=to_sent)
+            self.post(self.ALERTS, query_body=to_sent)
         else:
             logger.info({'msg': 'Dry run mode enabled. No alerts will be sent', 'alerts': to_sent})
             return
