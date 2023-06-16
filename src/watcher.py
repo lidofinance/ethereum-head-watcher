@@ -168,7 +168,6 @@ class Watcher:
             modules = self.keys_api.get_modules()[0]
 
             current_nonce = sum(module['nonce'] for module in modules)
-            del modules
             if self.keys_api_nonce >= current_nonce:
                 return
             self.keys_api_nonce = current_nonce
@@ -185,7 +184,6 @@ class Watcher:
             )
 
             self.keys_api_status = current_keys_status
-            del modules_operators_dict
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
