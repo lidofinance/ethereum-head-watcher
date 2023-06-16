@@ -42,6 +42,7 @@ class Watcher:
     # Tasks
     validators_updater: Unfuture = None
     keys_updater: Unfuture = None
+    chain_reorg_event_listener: Unfuture = None
 
     # Last state
     keys_api_status: KeysApiStatus | None = None
@@ -71,25 +72,26 @@ class Watcher:
 
             if self.keys_updater is not None and self.keys_updater.done():
                 self.keys_updater.result()
-                try:
-                    self.keys_updater = self._update_lido_keys(current_head)
-                except Exception as e:  # pylint: disable=broad-except
-                    logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
+                self.keys_updater = None
 
             if self.validators_updater is not None and self.validators_updater.done():
                 self.validators_updater.result()
-                self.validators_updater = self._update_validators()
+                self.validators_updater = None
 
             if self.keys_updater is None:
-                try:
-                    self.keys_updater = self._update_lido_keys(current_head)
-                except Exception as e:  # pylint: disable=broad-except
-                    logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
+                self.keys_updater = self._update_lido_keys(current_head)
             if self.validators_updater is None:
                 self.validators_updater = self._update_validators()
 
+            # Event listener task can be done only if error happened
+            if self.chain_reorg_event_listener is not None and self.chain_reorg_event_listener.done():
+                self.chain_reorg_event_listener.result()
+                self.chain_reorg_event_listener = None
+            # Run event listener task very first time or re-run after error
+            if self.chain_reorg_event_listener is None:
+                self.chain_reorg_event_listener = self.listen_chain_reorg_event()
+
             logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
-            SLOT_NUMBER.set(current_head.header.message.slot)
 
             # ATTENTION! While we handle current head, new head could be happened
             # We should keep eye on handler execution time
@@ -98,12 +100,11 @@ class Watcher:
             if len(self.handled_headers) > MAX_HANDLED_HEADERS_COUNT:
                 self.handled_headers.pop(0)
 
+            SLOT_NUMBER.set(current_head.header.message.slot)
             logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
             time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
         logger.info({'msg': f'Watcher started. Handlers: {[handler.__class__.__name__ for handler in self.handlers]}'})
-
-        self.listen_chain_reorg_event()
 
         if SLOTS_RANGE:
             start, end = SLOTS_RANGE.split('-')
@@ -113,7 +114,11 @@ class Watcher:
                 self.validators_updater.result()
         else:
             while True:
-                _run()
+                try:
+                    _run()
+                except Exception as e:  # pylint: disable=broad-except
+                    logger.error({'msg': 'Error while handling head', 'exception': str(e)})
+                    time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
     @duration_meter()
     def _handle_head(self, head: BlockHeaderResponseData):
@@ -151,36 +156,39 @@ class Watcher:
     @duration_meter()
     def _update_lido_keys(self, header: BlockHeaderResponseData) -> None:
         """Return dict with `publickey` as key and `LidoNamedKey` as value"""
+        try:
+            current_keys_status = self.keys_api.get_status()
+            if self.keys_api_status is not None and (
+                current_keys_status.elBlockSnapshot['timestamp'] >= self.keys_api_status.elBlockSnapshot['timestamp']
+            ):
+                return
 
-        current_keys_status = self.keys_api.get_status()
-        if self.keys_api_status is not None and (
-            current_keys_status.elBlockSnapshot['timestamp'] >= self.keys_api_status.elBlockSnapshot['timestamp']
-        ):
-            return
+            # Get modules and calculate current nonce
+            # If nonce is not changed - we don't need to update keys
+            modules = self.keys_api.get_modules()[0]
 
-        # Get modules and calculate current nonce
-        # If nonce is not changed - we don't need to update keys
-        modules = self.keys_api.get_modules()[0]
+            current_nonce = sum(module['nonce'] for module in modules)
+            del modules
+            if self.keys_api_nonce >= current_nonce:
+                return
+            self.keys_api_nonce = current_nonce
 
-        current_nonce = sum(module['nonce'] for module in modules)
-        del modules
-        if self.keys_api_nonce >= current_nonce:
-            return
-        self.keys_api_nonce = current_nonce
+            logger.info({'msg': 'Updating Lido keys'})
+            modules_operators_stream = self.keys_api.get_operators_stream()
+            modules_operators_dict = KeysAPIClient.parse_modules(
+                json_stream.requests.load(modules_operators_stream)['data']
+            )
 
-        logger.info({'msg': 'Updating Lido keys'})
-        modules_operators_stream = self.keys_api.get_operators_stream()
-        modules_operators_dict = KeysAPIClient.parse_modules(
-            json_stream.requests.load(modules_operators_stream)['data']
-        )
+            fetched_lido_keys_stream = self.keys_api.get_used_lido_keys_stream()
+            self.lido_keys = KeysAPIClient.parse_keys(
+                json_stream.requests.load(fetched_lido_keys_stream)['data'], modules_operators_dict
+            )
 
-        fetched_lido_keys_stream = self.keys_api.get_used_lido_keys_stream()
-        self.lido_keys = KeysAPIClient.parse_keys(
-            json_stream.requests.load(fetched_lido_keys_stream)['data'], modules_operators_dict
-        )
+            self.keys_api_status = current_keys_status
+            del modules_operators_dict
 
-        self.keys_api_status = current_keys_status
-        del modules_operators_dict
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
 
         logger.warning({'msg': f'Lido keys updated: [{len(self.lido_keys)}]'})
         KEYS_API_SLOT_NUMBER.set(int(header.header.message.slot))
@@ -208,12 +216,15 @@ class Watcher:
 
     @unsync
     def listen_chain_reorg_event(self):
-        logger.info({'msg': 'Listening chain reorg events'})
-        response = self.consensus.get_chain_reorg_stream()
-        client = sseclient.SSEClient(response)
-        for event in client.events():
-            logger.warning({'msg': f'Chain reorg event: {event.data}'})
-            event = ChainReorgEvent.from_response(**json.loads(event.data))
-            lock = threading.Lock()
-            with lock:
-                self.chain_reorgs[event.slot] = event
+        try:
+            logger.info({'msg': 'Listening chain reorg events'})
+            response = self.consensus.get_chain_reorg_stream()
+            client = sseclient.SSEClient(response)
+            for event in client.events():
+                logger.warning({'msg': f'Chain reorg event: {event.data}'})
+                event = ChainReorgEvent.from_response(**json.loads(event.data))
+                lock = threading.Lock()
+                with lock:
+                    self.chain_reorgs[event.slot] = event
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
