@@ -70,25 +70,12 @@ class Watcher:
                 time.sleep(CYCLE_SLEEP_IN_SECONDS)
                 return
 
-            if self.keys_updater is not None and self.keys_updater.done():
-                self.keys_updater.result()
-                self.keys_updater = None
-
-            if self.validators_updater is not None and self.validators_updater.done():
-                self.validators_updater.result()
-                self.validators_updater = None
-
-            if self.keys_updater is None:
+            if self.keys_updater is None or self.keys_updater.done():
                 self.keys_updater = self._update_lido_keys(current_head)
-            if self.validators_updater is None:
+            if self.validators_updater is None or self.validators_updater.done():
                 self.validators_updater = self._update_validators()
-
-            # Event listener task can be done only if error happened
-            if self.chain_reorg_event_listener is not None and self.chain_reorg_event_listener.done():
-                self.chain_reorg_event_listener.result()
-                self.chain_reorg_event_listener = None
             # Run event listener task very first time or re-run after error
-            if self.chain_reorg_event_listener is None:
+            if self.chain_reorg_event_listener is None or self.chain_reorg_event_listener.done():
                 self.chain_reorg_event_listener = self.listen_chain_reorg_event()
 
             logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
@@ -187,6 +174,7 @@ class Watcher:
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
+            return
 
         logger.warning({'msg': f'Lido keys updated: [{len(self.lido_keys)}]'})
         KEYS_API_SLOT_NUMBER.set(int(header.header.message.slot))
