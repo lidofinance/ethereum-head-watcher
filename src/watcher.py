@@ -124,7 +124,7 @@ class Watcher:
         now = time.time()
         diff = now - self.genesis_time
         slot = int(diff / SECONDS_PER_SLOT)
-        if self.indexed_validators_keys and SLOTS_PER_EPOCH != 0:
+        if self.indexed_validators_keys and slot % SLOTS_PER_EPOCH != 0:
             return
         logger.info({'msg': 'Updating indexed validators keys'})
         try:
@@ -155,7 +155,8 @@ class Watcher:
             modules = self.keys_api.get_modules()[0]
 
             current_nonce = sum(module['nonce'] for module in modules)
-            if self.keys_api_nonce >= current_nonce:
+            if self.keys_api_nonce == current_nonce:
+                KEYS_API_SLOT_NUMBER.set(int(header.header.message.slot))
                 return
             self.keys_api_nonce = current_nonce
 
