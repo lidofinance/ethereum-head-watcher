@@ -136,7 +136,6 @@ class ConsensusClient(HTTPProvider):
 
     @staticmethod
     def parse_validators(data: list[dict], current_indexes: dict[str, str]) -> dict[str, str]:
-        indexed_validators_keys = {}
         for validator in data:
             index = ""
             pubkey = ""
@@ -149,8 +148,9 @@ class ConsensusClient(HTTPProvider):
                     for k, v in value.items():
                         if k == "pubkey":
                             pubkey = v
-            indexed_validators_keys[index] = pubkey
-        return indexed_validators_keys
+            if index != "" and pubkey != "":
+                current_indexes[index] = pubkey
+        return current_indexes
 
     def __raise_last_missed_slot_error(self, errors: list[Exception]) -> Exception | None:
         """
