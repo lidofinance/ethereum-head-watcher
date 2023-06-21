@@ -1,28 +1,27 @@
 import json
-import threading
-
-import json_stream.requests
-
 import logging
+import threading
 import time
 
+import json_stream.requests
 import sseclient
-from unsync import unsync, Unfuture
+from unsync import Unfuture, unsync
 
 from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
 from src.handlers.handler import WatcherHandler
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
-    SLOT_NUMBER,
     KEYS_API_SLOT_NUMBER,
+    SLOT_NUMBER,
     VALIDATORS_INDEX_SLOT_NUMBER,
 )
 from src.providers.alertmanager.client import AlertmanagerClient
 from src.providers.consensus.client import ConsensusClient
-from src.providers.consensus.typings import ChainReorgEvent, BlockHeaderResponseData
+from src.providers.consensus.typings import BlockHeaderResponseData, ChainReorgEvent
 from src.providers.keys.client import KeysAPIClient
 from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
+from src.utils.decorators import thread_as_daemon
 from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 
 logger = logging.getLogger()
@@ -200,23 +199,17 @@ class Watcher:
             return None
         return current_head
 
-    def listen_chain_reorg_event(self) -> threading.Thread:
-        def wrap():
-            try:
-                logger.info({'msg': 'Listening chain reorg events'})
-                response = self.consensus.get_chain_reorg_stream()
-                client = sseclient.SSEClient(response)
-                for event in client.events():
-                    logger.warning({'msg': f'Chain reorg event: {event.data}'})
-                    event = ChainReorgEvent.from_response(**json.loads(event.data))
-                    lock = threading.Lock()
-                    with lock:
-                        self.chain_reorgs[event.slot] = event
-            except Exception as e:  # pylint: disable=broad-except
-                logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
-
-        t = threading.Thread(target=wrap)
-        t.daemon = True
-        t.start()
-
-        return t
+    @thread_as_daemon
+    def listen_chain_reorg_event(self):
+        try:
+            logger.info({'msg': 'Listening chain reorg events'})
+            response = self.consensus.get_chain_reorg_stream()
+            client = sseclient.SSEClient(response)
+            for event in client.events():
+                logger.warning({'msg': f'Chain reorg event: {event.data}'})
+                event = ChainReorgEvent.from_response(**json.loads(event.data))
+                lock = threading.Lock()
+                with lock:
+                    self.chain_reorgs[event.slot] = event
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
