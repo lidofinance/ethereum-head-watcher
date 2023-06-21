@@ -23,7 +23,6 @@ from src.providers.consensus.client import ConsensusClient
 from src.providers.consensus.typings import ChainReorgEvent, BlockHeaderResponseData
 from src.providers.keys.client import KeysAPIClient
 from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
-from src.typings import SlotNumber
 from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 
 logger = logging.getLogger()
@@ -42,7 +41,7 @@ class Watcher:
     # Tasks
     validators_updater: Unfuture = None
     keys_updater: Unfuture = None
-    chain_reorg_event_listener: Unfuture = None
+    chain_reorg_event_listener: threading.Thread = None
 
     # Last state
     keys_api_status: KeysApiStatus | None = None
@@ -74,9 +73,6 @@ class Watcher:
                 self.keys_updater = self._update_lido_keys(current_head)
             if self.validators_updater is None or self.validators_updater.done():
                 self.validators_updater = self._update_validators()
-            # Run event listener task very first time or re-run after error
-            if self.chain_reorg_event_listener is None or self.chain_reorg_event_listener.done():
-                self.chain_reorg_event_listener = self.listen_chain_reorg_event()
 
             logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
 
@@ -102,6 +98,9 @@ class Watcher:
         else:
             while True:
                 try:
+                    # Run event listener task very first time or re-run after error
+                    if self.chain_reorg_event_listener is None or not self.chain_reorg_event_listener.is_alive():
+                        self.chain_reorg_event_listener = self.listen_chain_reorg_event()
                     _run()
                 except Exception as e:  # pylint: disable=broad-except
                     logger.error({'msg': 'Error while handling head', 'exception': str(e)})
@@ -128,7 +127,7 @@ class Watcher:
             return
         logger.info({'msg': 'Updating indexed validators keys'})
         try:
-            stream = self.consensus.get_validators_stream(SlotNumber(slot))
+            stream = self.consensus.get_validators_stream('head')
             self.indexed_validators_keys = ConsensusClient.parse_validators(
                 json_stream.requests.load(stream)['data'], self.indexed_validators_keys
             )
@@ -146,7 +145,7 @@ class Watcher:
         try:
             current_keys_status = self.keys_api.get_status()
             if self.keys_api_status is not None and (
-                current_keys_status.elBlockSnapshot['timestamp'] >= self.keys_api_status.elBlockSnapshot['timestamp']
+                self.keys_api_status.elBlockSnapshot['timestamp'] >= current_keys_status.elBlockSnapshot['timestamp']
             ):
                 return
 
@@ -201,17 +200,23 @@ class Watcher:
             return None
         return current_head
 
-    @unsync
-    def listen_chain_reorg_event(self):
-        try:
-            logger.info({'msg': 'Listening chain reorg events'})
-            response = self.consensus.get_chain_reorg_stream()
-            client = sseclient.SSEClient(response)
-            for event in client.events():
-                logger.warning({'msg': f'Chain reorg event: {event.data}'})
-                event = ChainReorgEvent.from_response(**json.loads(event.data))
-                lock = threading.Lock()
-                with lock:
-                    self.chain_reorgs[event.slot] = event
-        except Exception as e:  # pylint: disable=broad-except
-            logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
+    def listen_chain_reorg_event(self) -> threading.Thread:
+        def wrap():
+            try:
+                logger.info({'msg': 'Listening chain reorg events'})
+                response = self.consensus.get_chain_reorg_stream()
+                client = sseclient.SSEClient(response)
+                for event in client.events():
+                    logger.warning({'msg': f'Chain reorg event: {event.data}'})
+                    event = ChainReorgEvent.from_response(**json.loads(event.data))
+                    lock = threading.Lock()
+                    with lock:
+                        self.chain_reorgs[event.slot] = event
+            except Exception as e:  # pylint: disable=broad-except
+                logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
+
+        t = threading.Thread(target=wrap)
+        t.daemon = True
+        t.start()
+
+        return t

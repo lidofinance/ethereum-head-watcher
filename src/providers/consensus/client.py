@@ -117,7 +117,7 @@ class ConsensusClient(HTTPProvider):
             raise ValueError("Expected mapping response from getBlockV2")
         return BlockDetailsResponse.from_response(**data)
 
-    def get_validators_stream(self, slot_number: SlotNumber) -> Response:
+    def get_validators_stream(self, slot_number: SlotNumber | LiteralState) -> Response:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidators"""
         stream = self.get_stream(
             self.API_GET_VALIDATORS,
@@ -131,6 +131,7 @@ class ConsensusClient(HTTPProvider):
             self.API_GET_EVENTS,
             query_params={"topics": "chain_reorg"},
             timeout=Infinity,
+            headers={'Accept': 'text/event-stream'},
         )
         return stream
 
@@ -142,7 +143,7 @@ class ConsensusClient(HTTPProvider):
             for key, value in validator.items():
                 if key == "index":
                     if value in current_indexes:
-                        continue
+                        break
                     index = value
                 elif index != "" and key == "validator":
                     for k, v in value.items():

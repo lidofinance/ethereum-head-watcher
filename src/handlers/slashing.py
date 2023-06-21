@@ -4,7 +4,7 @@ from typing import Optional, Literal
 
 from unsync import unsync
 
-from src.alerts.slashing import CommonAlert
+from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse, BlockHeaderResponseData

@@ -2,7 +2,7 @@ import threading
 
 from unsync import unsync
 
-from src.alerts.slashing import CommonAlert
+from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockHeaderResponseData, ChainReorgEvent
@@ -47,19 +47,17 @@ class ForkHandler(WatcherHandler):
                 for s in range(int(chain_reorg.slot) - int(chain_reorg.depth), int(chain_reorg.slot) + 1)
             ]
         )
-        summary = "🔗‍🔀Unhandled slots after chain reorganization"
-        description = f"Reorg depth is ${chain_reorg.depth} slots.\nPlease, check possible unhandled slots: {links}"
+        summary = "🔗‍🔀 Unhandled slots after chain reorganization"
+        description = f"Reorg depth is {chain_reorg.depth} slots.\nPlease, check possible unhandled slots: {links}"
         watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
 
     def _send_unhandled_head_alert(self, watcher, head: BlockHeaderResponseData):
         alert = CommonAlert(name="UnhandledHead", severity="info")
-        summary = "🫳🐦Unhandled chain slot"
+        summary = "🫳🐦 Unhandled chain slot"
         additional_msg = ""
-        diff = int(head.header.message.slot) - int(watcher.handled_headers[-1].header.message.slot) - 1
-        if diff >= 1:
-            additional_msg = f"\nAnd {diff} slots before it"
-        root = head.header.message.parent_root
-        description = (
-            f"Please, check unhandled slot: {BEACONCHAIN_URL_TEMPLATE.format(root, NETWORK_NAME)}{additional_msg}"
-        )
+        diff = int(head.header.message.slot) - int(watcher.handled_headers[-1].header.message.slot) - 2
+        if diff > 0:
+            additional_msg = f"\nAnd {diff} slot(s) before it"
+        parent_root = head.header.message.parent_root
+        description = f"Please, check unhandled slot: {BEACONCHAIN_URL_TEMPLATE.format(parent_root, NETWORK_NAME)}{additional_msg}"
         watcher.alertmanager.send_alerts([alert.build_body(summary, description)])

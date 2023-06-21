@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
-from src.alerts.alert import Alert
 from src.providers.alertmanager.typings import AlertBody, Labels, Annotations, ISODateString
 
 
-class CommonAlert(Alert):
+class CommonAlert:
     def __init__(self, name: str, severity: str):
         self.name = name
         self.severity = severity
