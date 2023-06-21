@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Literal, Union, Callable
+from typing import Callable, Literal, Union
 
 from requests import Response
 from urllib3 import Retry
@@ -7,15 +7,19 @@ from urllib3 import Retry
 from src.metrics.logging import logging
 from src.metrics.prometheus.basic import CL_REQUESTS_DURATION
 from src.providers.consensus.typings import (
+    BeaconSpecResponse,
     BlockDetailsResponse,
     BlockHeaderResponseData,
     BlockRootResponse,
-    BeaconSpecResponse,
     GenesisResponse,
 )
 from src.providers.http_provider import HTTPProvider, NotOkResponse
-from src.typings import SlotNumber, BlockRoot, Infinity
-from src.variables import CL_REQUEST_TIMEOUT, CL_REQUEST_RETRY_COUNT, CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS
+from src.typings import BlockRoot, Infinity, SlotNumber
+from src.variables import (
+    CL_REQUEST_RETRY_COUNT,
+    CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,
+    CL_REQUEST_TIMEOUT,
+)
 
 logger = logging.getLogger(__name__)
 

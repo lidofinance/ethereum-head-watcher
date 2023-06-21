@@ -1,6 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
-from src.providers.alertmanager.typings import AlertBody, Labels, Annotations, ISODateString
+from src.providers.alertmanager.typings import (
+    AlertBody,
+    Annotations,
+    ISODateString,
+    Labels,
+)
 
 
 class CommonAlert:

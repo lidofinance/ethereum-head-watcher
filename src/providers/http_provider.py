@@ -1,11 +1,11 @@
 import logging
 from abc import ABC
 from http import HTTPStatus
-from typing import Optional, Tuple, Sequence, Callable
+from typing import Callable, Optional, Sequence, Tuple
 from urllib.parse import urljoin, urlparse
 
 from prometheus_client import Histogram
-from requests import Session, Response
+from requests import Response, Session
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 

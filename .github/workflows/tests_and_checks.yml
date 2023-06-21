@@ -70,6 +70,9 @@ jobs:
       - name: Lint mypy
         run: poetry run mypy src
 
+      - name: Lint isort
+        run: poetry run isort --check src
+
   security:
     uses: lidofinance/linters/.github/workflows/security.yml@master
     permissions:

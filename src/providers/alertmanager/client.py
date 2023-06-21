@@ -6,10 +6,10 @@ from src.metrics.prometheus.basic import ALERTMANAGER_REQUESTS_DURATION
 from src.providers.alertmanager.typings import AlertBody
 from src.providers.http_provider import HTTPProvider
 from src.variables import (
-    NETWORK_NAME,
-    ALERTMANAGER_REQUEST_TIMEOUT,
     ALERTMANAGER_REQUEST_RETRY_COUNT,
     ALERTMANAGER_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,
+    ALERTMANAGER_REQUEST_TIMEOUT,
+    NETWORK_NAME,
 )
 
 logger = logging.getLogger()
