@@ -31,7 +31,12 @@ jobs:
           poetry install --no-interaction --with=dev
 
       - name: Test with pytest
-        run: poetry run pytest -m "not integration and not e2e" tests
+        run: poetry run pytest tests
+        env:
+          CONSENSUS_CLIENT_URI: ${{ secrets.CL_API_URL }}
+          KEYS_API_URI: ${{ secrets.KEYS_API_URL }}
+          DRY_RUN: true
+
 
   linters:
     runs-on: ubuntu-latest
