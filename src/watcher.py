@@ -41,7 +41,7 @@ class Watcher:
     # Tasks
     validators_updater: Unfuture = None
     keys_updater: Unfuture = None
-    chain_reorg_event_listener: threading.Thread = None
+    chain_reorg_event_listener: threading.Thread | None = None
 
     # Last state
     keys_api_status: KeysApiStatus | None = None
