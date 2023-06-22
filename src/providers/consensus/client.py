@@ -1,6 +1,7 @@
 from http import HTTPStatus
 from typing import Callable, Literal, Union
 
+from json_stream.base import TransientStreamingJSONList
 from requests import Response
 from urllib3 import Retry
 
@@ -140,21 +141,11 @@ class ConsensusClient(HTTPProvider):
         return stream
 
     @staticmethod
-    def parse_validators(data: list[dict], current_indexes: dict[str, str]) -> dict[str, str]:
-        for validator in data:
-            index = ""
-            pubkey = ""
-            for key, value in validator.items():
-                if key == "index":
-                    if value in current_indexes:
-                        break
-                    index = value
-                elif index != "" and key == "validator":
-                    for k, v in value.items():
-                        if k == "pubkey":
-                            pubkey = v
-            if index != "" and pubkey != "":
-                current_indexes[index] = pubkey
+    def parse_validators(data: TransientStreamingJSONList, current_indexes: dict[str, str]) -> dict[str, str]:
+        for validator in data.persistent():
+            if (index := validator['index']) in current_indexes:
+                continue
+            current_indexes[index] = validator['validator']['pubkey']
         return current_indexes
 
     def __raise_last_missed_slot_error(self, errors: list[Exception]) -> Exception | None:
