@@ -1,14 +1,15 @@
 from typing import cast
 
+from json_stream.base import TransientStreamingJSONList
 from requests import Response
 
 from src.metrics.prometheus.basic import KEYS_API_REQUESTS_DURATION
 from src.providers.http_provider import HTTPProvider
 from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
 from src.variables import (
-    KEYS_API_REQUEST_TIMEOUT,
     KEYS_API_REQUEST_RETRY_COUNT,
     KEYS_API_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,
+    KEYS_API_REQUEST_TIMEOUT,
 )
 
 
@@ -55,46 +56,21 @@ class KeysAPIClient(HTTPProvider):
         return KeysApiStatus.from_response(**cast(dict, data))
 
     @staticmethod
-    def parse_modules(data: list[dict[str, dict]]) -> dict[tuple[str, str], str]:
+    def parse_modules(data: TransientStreamingJSONList) -> dict[tuple[str, str], str]:
         module_operator_name = {}
-        for mo in data:  # pylint: disable=too-many-nested-blocks
-            staking_module_address = ""
-            staking_module_operators = []
-            for key, value in mo.items():
-                if key == "operators":
-                    for operator in value:
-                        oi = ""
-                        on = ""
-                        for k, v in operator.items():
-                            if k == "index":
-                                oi = v
-                            if k == "name":
-                                on = v
-                        staking_module_operators.append((oi, on))
-                elif key == "module":
-                    for k, v in value.items():
-                        if k == "stakingModuleAddress":
-                            staking_module_address = v
-            for oi, on in staking_module_operators:
-                module_operator_name[(staking_module_address, oi)] = on
+        for module in data.persistent():
+            staking_module_address = module["module"]["stakingModuleAddress"]
+            for operator in module["operators"]:
+                module_operator_name[(staking_module_address, operator["index"])] = operator["name"]
         return module_operator_name
 
     @staticmethod
     def parse_keys(
-        data: list[dict[str, str]], modules_operators_dict: dict[tuple[str, str], str]
+        data: TransientStreamingJSONList, modules_operators_dict: dict[tuple[str, str], str]
     ) -> dict[str, LidoNamedKey]:
         keys = {}
-        for lido_key in data:
-            module_address = ""
-            operator_index = ""
-            pubkey = ""
-            for key, value in lido_key.items():
-                if key == "moduleAddress":
-                    module_address = value
-                elif key == "operatorIndex":
-                    operator_index = value
-                elif key == "key":
-                    pubkey = value
-            operator_name = modules_operators_dict[(module_address, operator_index)]
+        for lido_key in data.persistent():
+            pubkey = lido_key['key']
+            operator_name = modules_operators_dict[(lido_key['moduleAddress'], lido_key['operatorIndex'])]
             keys[pubkey] = LidoNamedKey(key=pubkey, operatorName=operator_name)
         return keys

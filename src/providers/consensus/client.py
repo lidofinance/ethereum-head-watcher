@@ -1,21 +1,26 @@
 from http import HTTPStatus
-from typing import Literal, Union, Callable
+from typing import Callable, Literal, Union
 
+from json_stream.base import TransientStreamingJSONList
 from requests import Response
 from urllib3 import Retry
 
 from src.metrics.logging import logging
 from src.metrics.prometheus.basic import CL_REQUESTS_DURATION
 from src.providers.consensus.typings import (
+    BeaconSpecResponse,
     BlockDetailsResponse,
     BlockHeaderResponseData,
     BlockRootResponse,
-    BeaconSpecResponse,
     GenesisResponse,
 )
 from src.providers.http_provider import HTTPProvider, NotOkResponse
-from src.typings import SlotNumber, BlockRoot, Infinity
-from src.variables import CL_REQUEST_TIMEOUT, CL_REQUEST_RETRY_COUNT, CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS
+from src.typings import BlockRoot, Infinity, SlotNumber
+from src.variables import (
+    CL_REQUEST_RETRY_COUNT,
+    CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,
+    CL_REQUEST_TIMEOUT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +122,7 @@ class ConsensusClient(HTTPProvider):
             raise ValueError("Expected mapping response from getBlockV2")
         return BlockDetailsResponse.from_response(**data)
 
-    def get_validators_stream(self, slot_number: SlotNumber) -> Response:
+    def get_validators_stream(self, slot_number: SlotNumber | LiteralState) -> Response:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidators"""
         stream = self.get_stream(
             self.API_GET_VALIDATORS,
@@ -131,25 +136,16 @@ class ConsensusClient(HTTPProvider):
             self.API_GET_EVENTS,
             query_params={"topics": "chain_reorg"},
             timeout=Infinity,
+            headers={'Accept': 'text/event-stream'},
         )
         return stream
 
     @staticmethod
-    def parse_validators(data: list[dict], current_indexes: dict[str, str]) -> dict[str, str]:
-        for validator in data:
-            index = ""
-            pubkey = ""
-            for key, value in validator.items():
-                if key == "index":
-                    if value in current_indexes:
-                        continue
-                    index = value
-                elif index != "" and key == "validator":
-                    for k, v in value.items():
-                        if k == "pubkey":
-                            pubkey = v
-            if index != "" and pubkey != "":
-                current_indexes[index] = pubkey
+    def parse_validators(data: TransientStreamingJSONList, current_indexes: dict[str, str]) -> dict[str, str]:
+        for validator in data.persistent():
+            if (index := validator['index']) in current_indexes:
+                continue
+            current_indexes[index] = validator['validator']['pubkey']
         return current_indexes
 
     def __raise_last_missed_slot_error(self, errors: list[Exception]) -> Exception | None:

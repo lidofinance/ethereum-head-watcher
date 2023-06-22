@@ -1,11 +1,11 @@
 import logging
 from abc import ABC
 from http import HTTPStatus
-from typing import Optional, Tuple, Sequence, Callable
+from typing import Callable, Optional, Sequence, Tuple
 from urllib.parse import urljoin, urlparse
 
 from prometheus_client import Histogram
-from requests import Session, Response
+from requests import Response, Session
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
@@ -126,6 +126,7 @@ class HTTPProvider(ABC):
         force_raise: Callable[..., Exception | None] = lambda _: None,
         timeout: Optional[float | InfinityType] = None,
         retry_strategy: Retry | None = None,
+        headers: Optional[dict] = None,
     ) -> Response:
         """
         Get request with fallbacks
@@ -136,7 +137,7 @@ class HTTPProvider(ABC):
         for host in self.hosts:
             try:
                 return self._get_stream_without_fallbacks(
-                    host, endpoint, path_params, query_params, timeout, retry_strategy
+                    host, endpoint, path_params, query_params, timeout, retry_strategy, headers
                 )
             except Exception as e:  # pylint: disable=W0703
                 errors.append(e)
@@ -203,6 +204,7 @@ class HTTPProvider(ABC):
         query_params: Optional[dict] = None,
         timeout: Optional[float | InfinityType] = None,
         retry_strategy: Retry | None = None,
+        headers: Optional[dict] = None,
     ) -> Response:
         """
         Simple get request without fallbacks
@@ -217,6 +219,7 @@ class HTTPProvider(ABC):
                     params=query_params,
                     stream=True,
                     timeout=None if isinstance(timeout, InfinityType) else timeout or self.HTTP_REQUEST_TIMEOUT,
+                    headers=headers,
                 )
             except Exception as error:
                 logger.debug({'msg': str(error)})

@@ -1,12 +1,11 @@
 import threading
 from datetime import datetime, timedelta
-from http.server import SimpleHTTPRequestHandler, HTTPServer
+from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 import requests
 
 from src import variables
 from src.variables import MAX_CYCLE_LIFETIME_IN_SECONDS
-
 
 _last_pulse = datetime.now()
 

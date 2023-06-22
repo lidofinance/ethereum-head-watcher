@@ -1,14 +1,17 @@
 import logging
 from dataclasses import dataclass
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 from unsync import unsync
 
-from src.alerts.slashing import CommonAlert
+from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.metrics.prometheus.duration_meter import duration_meter
-from src.providers.consensus.typings import BlockDetailsResponse, BlockHeaderResponseData
-from src.variables import NETWORK_NAME, ADDITIONAL_ALERTMANAGER_LABELS
+from src.providers.consensus.typings import (
+    BlockDetailsResponse,
+    BlockHeaderResponseData,
+)
+from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
 
 logger = logging.getLogger()
 
