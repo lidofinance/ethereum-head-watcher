@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional
 
 from src.typings import BlockRoot, StateRoot
-from src.utils.dataclass import Nested, FromResponse
+from src.utils.dataclass import FromResponse, Nested
 
 
 @dataclass
@@ -72,6 +72,15 @@ class BlockDetailsResponse(Nested, FromResponse):
     # https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2
     message: BlockMessage
     signature: str
+
+
+@dataclass
+class ChainReorgEvent(FromResponse):
+    # https://ethereum.github.io/beacon-APIs/#/Beacon/getChainReorgEvents
+    depth: str
+    slot: str
+    old_head_block: BlockRoot
+    new_head_block: BlockRoot
 
 
 class ValidatorStatus(Enum):

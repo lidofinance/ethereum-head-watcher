@@ -21,7 +21,13 @@ scrape_configs:
   - job_name: 'app-mainnet'
     static_configs:
       - targets: ['ethereum-head-watcher-mainnet:9000']
+    relabel_configs:
+      - target_label: network
+        replacement: mainnet
 
   - job_name: 'app-goerli'
     static_configs:
       - targets: ['ethereum-head-watcher-goerli:9000']
+    relabel_configs:
+      - target_label: network
+        replacement: goerli

@@ -1,6 +1,7 @@
 from prometheus_client import start_http_server
 
 from src import variables
+from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
 from src.metrics.healthcheck_server import start_pulse_server
 from src.metrics.logging import logging
@@ -23,6 +24,7 @@ def main():
 
     handlers = [
         SlashingHandler(),
+        ForkHandler(),
         # ExitsHandler(), ???
         # FinalityHandler(), ???
     ]

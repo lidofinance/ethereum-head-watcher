@@ -6,7 +6,7 @@ on:
   pull_request:
     branches:
       - develop
-      - master
+      - main
     paths-ignore:
       - ".github/**"
       - "README.md"
@@ -28,7 +28,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           tags: app:ci
           push: false
