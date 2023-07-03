@@ -11,7 +11,7 @@ KEEP_MAX_SENT_ALERTS = 10
 
 
 class WatcherHandler(ABC):
-    sent_alerts = []
+    sent_alerts: list[AlertBody] = []
 
     def alert_is_sent(self, current: AlertBody):
         return str(current.annotations) in [str(s.annotations) for s in self.sent_alerts]
