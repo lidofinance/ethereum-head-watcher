@@ -5,7 +5,6 @@ from unsync import unsync
 from src.providers.alertmanager.typings import AlertBody
 from src.providers.consensus.typings import BlockHeaderFullResponse
 
-
 # Enough count for different handlers to store in memory
 KEEP_MAX_SENT_ALERTS = 10
 
