@@ -3,12 +3,12 @@ groups:
     rules:
 
       - alert: HeadBlockIsNotChanging
-        expr: absent(ethereum_head_watcher_slot_number) OR changes(ethereum_head_watcher_slot_number[1h]) == 0
+        expr: absent(ethereum_head_watcher_slot_number) OR changes(ethereum_head_watcher_slot_number[25m]) == 0
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "⏳🐦 Head block doesn't change for more than 1 hour"
+          summary: "⏳🐦 Head block doesn't change for more than 30 minutes"
           description: "It's not OK. Please, check app health"
 
       - alert: ValidatorsIndexSlotIsNotChanging
