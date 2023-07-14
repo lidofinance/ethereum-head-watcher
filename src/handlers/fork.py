@@ -49,7 +49,7 @@ class ForkHandler(WatcherHandler):
         )
         summary = "🔗‍🔀 Unhandled slots after chain reorganization"
         description = f"Reorg depth is {chain_reorg.depth} slots.\nPlease, check possible unhandled slots: {links}"
-        watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
+        self.send_alert(watcher, alert.build_body(summary, description))
 
     def _send_unhandled_head_alert(self, watcher, head: BlockHeaderResponseData):
         alert = CommonAlert(name="UnhandledHead", severity="info")
@@ -60,4 +60,4 @@ class ForkHandler(WatcherHandler):
             additional_msg = f"\nAnd {diff} slot(s) before it"
         parent_root = head.header.message.parent_root
         description = f"Please, check unhandled slot: {BEACONCHAIN_URL_TEMPLATE.format(parent_root, NETWORK_NAME)}{additional_msg}"
-        watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
+        self.send_alert(watcher, alert.build_body(summary, description))

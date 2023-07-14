@@ -26,7 +26,7 @@ from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 
 logger = logging.getLogger()
 
-MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
+KEEP_MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
 
 
 class Watcher:
@@ -78,9 +78,6 @@ class Watcher:
             # ATTENTION! While we handle current head, new head could be happened
             # We should keep eye on handler execution time
             self._handle_head(current_head)
-            self.handled_headers.append(current_head)
-            if len(self.handled_headers) > MAX_HANDLED_HEADERS_COUNT:
-                self.handled_headers.pop(0)
 
             SLOT_NUMBER.set(current_head.header.message.slot)
             logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
@@ -110,6 +107,9 @@ class Watcher:
         tasks = [h.handle(self, head) for h in self.handlers]
         for t in tasks:
             t.result()
+        self.handled_headers.append(head)
+        if len(self.handled_headers) > KEEP_MAX_HANDLED_HEADERS_COUNT:
+            self.handled_headers.pop(0)
 
     @unsync
     @duration_meter()

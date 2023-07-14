@@ -111,7 +111,7 @@ class SlashingHandler(WatcherHandler):
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
             alert = CommonAlert(name="HeadWatcherLidoSlashing", severity="critical")
-            watcher.alertmanager.send_alerts([alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS)])
+            self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
         if unknown_slashings:
             summary = f'🚨 {len(list(unknown_slashings))} unknown validators were slashed!'
             description = ''
@@ -134,7 +134,7 @@ class SlashingHandler(WatcherHandler):
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
             alert = CommonAlert(name="HeadWatcherUnknownSlashing", severity="critical")
-            watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
+            self.send_alert(watcher, alert.build_body(summary, description))
         if other_slashings:
             summary = f'ℹ️ {len(list(other_slashings))} other validators were slashed'
             description = ''
@@ -157,4 +157,4 @@ class SlashingHandler(WatcherHandler):
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
             alert = CommonAlert(name="HeadWatcherOtherSlashing", severity="info")
-            watcher.alertmanager.send_alerts([alert.build_body(summary, description)])
+            self.send_alert(watcher, alert.build_body(summary, description))
