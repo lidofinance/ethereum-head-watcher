@@ -56,21 +56,34 @@ class KeysAPIClient(HTTPProvider):
         return KeysApiStatus.from_response(**cast(dict, data))
 
     @staticmethod
-    def parse_modules(data: TransientStreamingJSONList) -> dict[tuple[str, str], str]:
-        module_operator_name = {}
+    def parse_modules(
+        data: TransientStreamingJSONList,
+    ) -> tuple[dict[tuple[str, str], tuple[str, str]], dict[str, list[str]],]:
+        module_operators: dict[str, list[str]] = {}
+        module_operator_name: dict[tuple[str, str], tuple[str, str]] = {}
         for module in data.persistent():
+            staking_module_index = module["module"]["id"]
             staking_module_address = module["module"]["stakingModuleAddress"]
             for operator in module["operators"]:
-                module_operator_name[(staking_module_address, operator["index"])] = operator["name"]
-        return module_operator_name
+                module_operator_name[(staking_module_address, operator["index"])] = (
+                    staking_module_index,
+                    operator["name"],
+                )
+                module_operators.setdefault(module["module"]["id"], []).append(operator["index"])
+        return module_operator_name, module_operators
 
     @staticmethod
     def parse_keys(
-        data: TransientStreamingJSONList, modules_operators_dict: dict[tuple[str, str], str]
+        data: TransientStreamingJSONList, modules_operators_dict: dict[tuple[str, str], tuple[str, str]]
     ) -> dict[str, LidoNamedKey]:
         keys = {}
         for lido_key in data.persistent():
             pubkey = lido_key['key']
-            operator_name = modules_operators_dict[(lido_key['moduleAddress'], lido_key['operatorIndex'])]
-            keys[pubkey] = LidoNamedKey(key=pubkey, operatorName=operator_name)
+            module_index, operator_name = modules_operators_dict[(lido_key['moduleAddress'], lido_key['operatorIndex'])]
+            keys[pubkey] = LidoNamedKey(
+                key=pubkey,
+                operatorIndex=lido_key['operatorIndex'],
+                operatorName=operator_name,
+                moduleIndex=module_index,
+            )
         return keys

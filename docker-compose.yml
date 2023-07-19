@@ -23,9 +23,12 @@ services:
       - 9000
     environment:
       - CONSENSUS_CLIENT_URI=${CONSENSUS_CLIENT_URI}
+      - EXECUTION_CLIENT_URI=${EXECUTION_CLIENT_URI}
+      - LIDO_LOCATOR_ADDRESS=${LIDO_LOCATOR}
       - KEYS_API_URI=${KEYS_API_URI}
       - ALERTMANAGER_URI=${ALERTMANAGER_URI}
       - LOG_LEVEL=${LOG_LEVEL}
+      - DRY_RUN=true
 
   app-goerli:
     container_name: ethereum-head-watcher-goerli
@@ -45,10 +48,13 @@ services:
       - 9000
     environment:
       - CONSENSUS_CLIENT_URI=${CONSENSUS_CLIENT_URI_GOERLI}
+      - EXECUTION_CLIENT_URI=${EXECUTION_CLIENT_URI_GOERLI}
+      - LIDO_LOCATOR_ADDRESS=${LIDO_LOCATOR_GOERLI}
       - KEYS_API_URI=${KEYS_API_URI_GOERLI}
       - ALERTMANAGER_URI=${ALERTMANAGER_URI}
       - LOG_LEVEL=${LOG_LEVEL}
       - NETWORK_NAME=goerli
+      - DRY_RUN=true
 
   prometheus:
     image: prom/prometheus:latest

@@ -6,6 +6,8 @@ from src.utils.dataclass import FromResponse
 @dataclass
 class LidoKey:
     key: str
+    operatorIndex: str
+    moduleIndex: str
 
 
 @dataclass
