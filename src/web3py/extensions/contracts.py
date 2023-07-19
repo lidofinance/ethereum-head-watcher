@@ -9,12 +9,6 @@ from web3.module import Module
 
 from src import variables
 
-# from web3.types import Wei
-
-
-# from src.metrics.prometheus.business import FRAME_PREV_REPORT_REF_SLOT
-# from src.typings import BlockStamp, SlotNumber
-# from src.utils.cache import global_lru_cache as lru_cache
 
 logger = logging.getLogger()
 
