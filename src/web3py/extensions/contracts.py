@@ -9,7 +9,6 @@ from web3.module import Module
 
 from src import variables
 
-
 logger = logging.getLogger()
 
 
