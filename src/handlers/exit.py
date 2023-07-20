@@ -75,7 +75,7 @@ class ExitsHandler(WatcherHandler):
                     (lido_exit.module_index, lido_exit.operator_index)
                 ]
                 if int(lido_exit.index) > operator_last_exited_index:
-                    by_operator[lido_exit.operator].append(lido_exit)
+                    by_operator[str(lido_exit.operator)].append(lido_exit)
             if by_operator:
                 for operator, operator_exits in by_operator.items():
                     description += f'\n{operator} -'

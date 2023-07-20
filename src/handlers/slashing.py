@@ -86,7 +86,7 @@ class SlashingHandler(WatcherHandler):
             description = ''
             by_operator: dict[str, list] = defaultdict(list)
             for slashing in lido_slashings:
-                by_operator[slashing.operator].append(slashing)
+                by_operator[str(slashing.operator)].append(slashing)
             for operator, operator_slashing in by_operator.items():
                 description += f'\n{operator} -'
                 by_duty: dict[str, list] = defaultdict(list)
