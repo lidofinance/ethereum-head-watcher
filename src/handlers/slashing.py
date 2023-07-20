@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -81,16 +82,16 @@ class SlashingHandler(WatcherHandler):
         unknown_slashings = [s for s in slashings if s.owner == 'unknown']
         other_slashings = [s for s in slashings if s.owner == 'other']
         if lido_slashings:
-            summary = f'🚨🚨🚨 {len(list(lido_slashings))} Lido validators were slashed! 🚨🚨🚨'
+            summary = f'🚨🚨🚨 {len(lido_slashings)} Lido validators were slashed! 🚨🚨🚨'
             description = ''
-            by_operator: dict[str, list] = {}
+            by_operator: dict[str, list] = defaultdict(list)
             for slashing in lido_slashings:
-                by_operator.setdefault(str(slashing.operator), []).append(slashing)
+                by_operator[slashing.operator].append(slashing)
             for operator, operator_slashing in by_operator.items():
                 description += f'\n{operator} -'
-                by_duty: dict[str, list] = {}
+                by_duty: dict[str, list] = defaultdict(list)
                 for slashing in operator_slashing:
-                    by_duty.setdefault(slashing.duty, []).append(slashing)
+                    by_duty[slashing.duty].append(slashing)
                 for duty, duty_group in by_duty.items():
                     description += f' Violated duty: {duty} | Validators: '
                     description += (
@@ -109,7 +110,7 @@ class SlashingHandler(WatcherHandler):
             alert = CommonAlert(name="HeadWatcherLidoSlashing", severity="critical")
             self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
         if unknown_slashings:
-            summary = f'🚨 {len(list(unknown_slashings))} unknown validators were slashed!'
+            summary = f'🚨 {len(unknown_slashings)} unknown validators were slashed!'
             description = ''
             by_duty = {}
             for slashing in unknown_slashings:
@@ -132,7 +133,7 @@ class SlashingHandler(WatcherHandler):
             alert = CommonAlert(name="HeadWatcherUnknownSlashing", severity="critical")
             self.send_alert(watcher, alert.build_body(summary, description))
         if other_slashings:
-            summary = f'ℹ️ {len(list(other_slashings))} other validators were slashed'
+            summary = f'ℹ️ {len(other_slashings)} other validators were slashed'
             description = ''
             by_duty = {}
             for slashing in other_slashings:

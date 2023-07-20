@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -66,16 +67,16 @@ class ExitsHandler(WatcherHandler):
         unknown_exits = [s for s in exits if s.owner == 'unknown']
         if lido_exits:
             self._update_last_requested_validator_indexes(watcher, block)
-            summary = f'🚨🚨🚨 {len(list(lido_exits))} Lido validators were unexpected exited! 🚨🚨🚨'
+            summary = f'🚨🚨🚨 {len(lido_exits)} Lido validators were unexpected exited! 🚨🚨🚨'
             description = ''
-            by_operator: dict[str, list] = {}
+            by_operator: dict[str, list] = defaultdict(list)
             for lido_exit in lido_exits:
                 operator_last_exited_index = self.last_requested_validator_indexes[
                     (lido_exit.module_index, lido_exit.operator_index)
                 ]
                 if int(lido_exit.index) > operator_last_exited_index:
-                    by_operator.setdefault(str(lido_exit.operator), []).append(lido_exit)
-            if by_operator.keys():
+                    by_operator[lido_exit.operator].append(lido_exit)
+            if by_operator:
                 for operator, operator_exits in by_operator.items():
                     description += f'\n{operator} -'
                     description += (
@@ -94,7 +95,7 @@ class ExitsHandler(WatcherHandler):
                 alert = CommonAlert(name="HeadWatcherLidoUnexpectedExit", severity="critical")
                 self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
         if unknown_exits:
-            summary = f'🚨 {len(list(unknown_exits))} unknown validators were exited!'
+            summary = f'🚨 {len(unknown_exits)} unknown validators were exited!'
             description = (
                 "["
                 + ', '.join(
