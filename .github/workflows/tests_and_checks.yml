@@ -35,7 +35,7 @@ jobs:
         env:
           CONSENSUS_CLIENT_URI: ${{ secrets.CL_API_URL }}
           EXECUTION_CLIENT_URI: ${{ secrets.EXECUTION_API_URL }}
-          LIDO_LOCATOR_ADDRESS: ${{ secrets.LIDO_LOCATOR }}
+          LIDO_LOCATOR_ADDRESS: "${{ secrets.LIDO_LOCATOR }}"
           KEYS_API_URI: ${{ secrets.KEYS_API_URL }}
           DRY_RUN: true
 
