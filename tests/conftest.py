@@ -4,23 +4,13 @@ from src import variables
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
+from src.watcher import Watcher
 from src.web3py.extensions import FallbackProviderModule, LidoContracts
 from src.web3py.typings import Web3
 
 
 @pytest.fixture
-def slot_range_param():
-    return "6213851-6213858"
-
-
-@pytest.fixture
-def mock_slot_range(monkeypatch, slot_range_param):
-    monkeypatch.setattr(variables, "SLOTS_RANGE", slot_range_param)
-
-
-@pytest.fixture
-def watcher(mock_slot_range):
-    from src.watcher import Watcher  # pylint: disable=import-outside-toplevel
+def watcher(request, monkeypatch):
 
     web3 = Web3(
         FallbackProviderModule(variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT})
@@ -30,4 +20,5 @@ def watcher(mock_slot_range):
             'lido_contracts': LidoContracts,
         }
     )
+
     return Watcher([SlashingHandler(), ForkHandler(), ExitsHandler()], web3)

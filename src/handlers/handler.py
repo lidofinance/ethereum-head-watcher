@@ -10,7 +10,10 @@ KEEP_MAX_SENT_ALERTS = 10
 
 
 class WatcherHandler(ABC):
-    sent_alerts: list[AlertBody] = []
+    sent_alerts: list[AlertBody]
+
+    def __init__(self):
+        self.sent_alerts = []
 
     @unsync
     @abstractmethod

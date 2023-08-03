@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 from dataclasses import asdict
+from typing import Optional
 
 import json_stream.requests
 import sseclient
@@ -46,32 +47,36 @@ class Watcher:
     handlers: list[WatcherHandler]
 
     # Tasks
-    validators_updater: Unfuture = None
-    keys_updater: Unfuture = None
-    exits_updater: Unfuture = None
-    chain_reorg_event_listener: threading.Thread | None = None
+    validators_updater: Unfuture
+    keys_updater: Unfuture
+    chain_reorg_event_listener: threading.Thread | None
 
     # Last state
-    keys_api_status: KeysApiStatus | None = None
-    keys_api_nonce: int = 0
+    keys_api_status: KeysApiStatus | None
+    keys_api_nonce: int
 
-    modules_operators_dict: dict[str, list[str]] = {}
-    lido_keys: dict[str, LidoNamedKey] = {}
-    indexed_validators_keys: dict[str, str] = {}
+    modules_operators_dict: dict[str, list[str]]
+    lido_keys: dict[str, LidoNamedKey]
+    indexed_validators_keys: dict[str, str]
 
-    chain_reorgs: dict[str, ChainReorgEvent] = {}
+    chain_reorgs: dict[str, ChainReorgEvent]
 
-    handled_headers: list[BlockHeaderResponseData] = []
+    handled_headers: list[BlockHeaderResponseData]
 
     def __init__(self, handlers: list[WatcherHandler], web3: Web3):
+        self.execution = web3
         self.consensus = ConsensusClient(variables.CONSENSUS_CLIENT_URI)
         self.keys_api = KeysAPIClient(variables.KEYS_API_URI)
         self.alertmanager = AlertmanagerClient(variables.ALERTMANAGER_URI)
         self.genesis_time = int(self.consensus.get_genesis().genesis_time)
         self.handlers = handlers
-        self.execution = web3
+        self.modules_operators_dict = {}
+        self.lido_keys = {}
+        self.indexed_validators_keys = {}
+        self.chain_reorgs = {}
+        self.handled_headers = []
 
-    def run(self):
+    def run(self, slots_range: Optional[str] = SLOTS_RANGE):
         def _run(slot_to_handle='head'):
             current_head = self._get_header_full_info(slot_to_handle)
             if not current_head:
@@ -96,8 +101,8 @@ class Watcher:
 
         logger.info({'msg': f'Watcher started. Handlers: {[handler.__class__.__name__ for handler in self.handlers]}'})
 
-        if SLOTS_RANGE:
-            start, end = SLOTS_RANGE.split('-')
+        if slots_range is not None:
+            start, end = slots_range.split('-')
             for slot in range(int(start), int(end) + 1):
                 try:
                     _run(str(slot))

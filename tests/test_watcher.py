@@ -1,8 +1,5 @@
-import pytest
-
-
 def test_processing(watcher):
-    watcher.run()
+    watcher.run("6213851-6213858")
 
     assert [h.header.message.slot for h in watcher.handled_headers] == [str(s) for s in range(6213851, 6213859)]
 
@@ -42,8 +39,7 @@ slashing_alerts = [
 
 
 def test_slashings(caplog, watcher):
-    with caplog.at_level("INFO"):
-        watcher.run()
+    watcher.run("6213851-6213858")
 
     for alert in slashing_alerts:
         assert str(alert) in caplog.text, f"Alert {alert} should be in logs"
@@ -89,18 +85,14 @@ exit_alerts = [
 ]
 
 
-@pytest.mark.parametrize('slot_range_param', ["6897643-6897655"])
-def test_unexpected_exits(caplog, watcher, slot_range_param):
-    with caplog.at_level("INFO"):
-        watcher.run()
+def test_unexpected_exits(caplog, watcher):
+    watcher.run("6897643-6897655")
 
     for alert in exit_alerts:
         assert str(alert) in caplog.text, f"Alert {alert} should be in logs"
 
 
-@pytest.mark.parametrize('slot_range_param', ["6833022-6833039"])
-def test_expected_exits(caplog, watcher, slot_range_param):
-    with caplog.at_level("INFO"):
-        watcher.run()
+def test_expected_exits(caplog, watcher):
+    watcher.run("6833022-6833039")
 
     assert 'Lido validators were unexpected exited!' not in caplog.text, "Alert should not be in logs"
