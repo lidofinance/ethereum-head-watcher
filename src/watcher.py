@@ -70,6 +70,11 @@ class Watcher:
         self.alertmanager = AlertmanagerClient(variables.ALERTMANAGER_URI)
         self.genesis_time = int(self.consensus.get_genesis().genesis_time)
         self.handlers = handlers
+        self.validators_updater = None
+        self.keys_updater = None
+        self.chain_reorg_event_listener = None
+        self.keys_api_status = None
+        self.keys_api_nonce = 0
         self.modules_operators_dict = {}
         self.lido_keys = {}
         self.indexed_validators_keys = {}
