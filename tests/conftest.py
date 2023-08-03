@@ -19,7 +19,7 @@ def mock_slot_range(monkeypatch, slot_range_param):
 
 
 @pytest.fixture
-def watcher(mock_slot_range, caplog):
+def watcher(mock_slot_range):
     from src.watcher import Watcher  # pylint: disable=import-outside-toplevel
 
     web3 = Web3(
@@ -30,5 +30,4 @@ def watcher(mock_slot_range, caplog):
             'lido_contracts': LidoContracts,
         }
     )
-    with caplog.at_level("INFO"):
-        yield Watcher([SlashingHandler(), ForkHandler(), ExitsHandler()], web3)
+    return Watcher([SlashingHandler(), ForkHandler(), ExitsHandler()], web3)
