@@ -11,7 +11,6 @@ from src.web3py.typings import Web3
 
 @pytest.fixture
 def watcher(request, monkeypatch):
-
     web3 = Web3(
         FallbackProviderModule(variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT})
     )
