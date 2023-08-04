@@ -28,7 +28,7 @@ class BlockRootResponse(FromResponse):
 
 
 @dataclass
-class BlockHeaderMessage(FromResponse):
+class BlockHeaderMessage(Nested, FromResponse):
     slot: str
     proposer_index: str
     parent_root: BlockRoot
@@ -59,12 +59,36 @@ class BlockHeaderFullResponse(Nested, FromResponse):
 
 
 @dataclass
-class BlockMessage(FromResponse):
+class BlockExecutionPayload(FromResponse):
+    block_number: str
+
+
+@dataclass
+class VoluntaryExit(FromResponse):
+    validator_index: str
+
+
+@dataclass
+class BlockVoluntaryExit(Nested, FromResponse):
+    message: VoluntaryExit
+    signature: str
+
+
+@dataclass
+class BlockBody(Nested, FromResponse):
+    execution_payload: BlockExecutionPayload
+    voluntary_exits: list[BlockVoluntaryExit]
+    proposer_slashings: list
+    attester_slashings: list
+
+
+@dataclass
+class BlockMessage(Nested, FromResponse):
     slot: str
     proposer_index: str
     parent_root: str
     state_root: StateRoot
-    body: dict
+    body: BlockBody
 
 
 @dataclass
@@ -72,6 +96,11 @@ class BlockDetailsResponse(Nested, FromResponse):
     # https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2
     message: BlockMessage
     signature: str
+
+
+@dataclass
+class FullBlockInfo(BlockDetailsResponse, BlockHeaderResponseData):
+    pass
 
 
 @dataclass

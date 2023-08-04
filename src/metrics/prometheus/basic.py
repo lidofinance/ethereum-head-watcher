@@ -30,6 +30,13 @@ CL_REQUESTS_DURATION = Histogram(
     namespace=PROMETHEUS_PREFIX,
 )
 
+EL_REQUESTS_DURATION = Histogram(
+    'el_requests_duration',
+    'Duration of requests to EL API',
+    ['endpoint', 'code', 'domain', 'call_method', 'call_to'],
+    namespace=PROMETHEUS_PREFIX,
+)
+
 KEYS_API_REQUESTS_DURATION = Histogram(
     'keys_api_requests_duration',
     'Duration of requests to Keys API',
