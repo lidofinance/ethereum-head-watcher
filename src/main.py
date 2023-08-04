@@ -7,6 +7,8 @@ from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
 from src.metrics.healthcheck_server import start_pulse_server
 from src.metrics.logging import logging
+from src.metrics.prometheus.basic import BUILD_INFO
+from src.utils.build import get_build_info
 from src.watcher import Watcher
 from src.web3py.extensions import FallbackProviderModule, LidoContracts
 from src.web3py.middleware import metrics_collector
@@ -16,6 +18,8 @@ logger = logging.getLogger()
 
 
 def main():
+    BUILD_INFO.info(get_build_info())
+
     logger.info({'msg': 'Ethereum head watcher startup.'})
 
     logger.info({'msg': f'Start healthcheck server for Docker container on port {variables.HEALTHCHECK_SERVER_PORT}'})
