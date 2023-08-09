@@ -45,7 +45,7 @@ EXPOSE $PROMETHEUS_PORT
 USER www-data
 
 HEALTHCHECK --interval=10s --timeout=3s \
-    CMD curl -f http://localhost:$HEALTHCHECK_SERVER_PORT/healthcheck || exit 1
+    CMD curl -f http://localhost:$HEALTHCHECK_SERVER_PORT/pulse/ || exit 1
 
 WORKDIR /app/
 
