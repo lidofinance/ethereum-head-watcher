@@ -2,6 +2,8 @@ import json
 import logging
 import threading
 import time
+from dataclasses import asdict
+from typing import Optional
 
 import json_stream.requests
 import sseclient
@@ -18,11 +20,17 @@ from src.metrics.prometheus.watcher import (
 )
 from src.providers.alertmanager.client import AlertmanagerClient
 from src.providers.consensus.client import ConsensusClient
-from src.providers.consensus.typings import BlockHeaderResponseData, ChainReorgEvent
+from src.providers.consensus.typings import (
+    BlockHeaderResponseData,
+    ChainReorgEvent,
+    FullBlockInfo,
+)
+from src.providers.http_provider import NotOkResponse
 from src.providers.keys.client import KeysAPIClient
 from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
 from src.utils.decorators import thread_as_daemon
 from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
+from src.web3py.typings import Web3
 
 logger = logging.getLogger()
 
@@ -31,6 +39,7 @@ KEEP_MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) fo
 
 class Watcher:
     # Init
+    execution: Web3
     consensus: ConsensusClient
     keys_api: KeysAPIClient
     alertmanager: AlertmanagerClient
@@ -38,31 +47,43 @@ class Watcher:
     handlers: list[WatcherHandler]
 
     # Tasks
-    validators_updater: Unfuture = None
-    keys_updater: Unfuture = None
-    chain_reorg_event_listener: threading.Thread | None = None
+    validators_updater: Unfuture
+    keys_updater: Unfuture
+    chain_reorg_event_listener: threading.Thread | None
 
     # Last state
-    keys_api_status: KeysApiStatus | None = None
-    keys_api_nonce: int = 0
+    keys_api_status: KeysApiStatus | None
+    keys_api_nonce: int
 
-    lido_keys: dict[str, LidoNamedKey] = {}
-    indexed_validators_keys: dict[str, str] = {}
+    modules_operators_dict: dict[str, list[str]]
+    lido_keys: dict[str, LidoNamedKey]
+    indexed_validators_keys: dict[str, str]
 
-    chain_reorgs: dict[str, ChainReorgEvent] = {}
+    chain_reorgs: dict[str, ChainReorgEvent]
 
-    handled_headers: list[BlockHeaderResponseData] = []
+    handled_headers: list[BlockHeaderResponseData]
 
-    def __init__(self, handlers: list[WatcherHandler]):
+    def __init__(self, handlers: list[WatcherHandler], web3: Web3):
+        self.execution = web3
         self.consensus = ConsensusClient(variables.CONSENSUS_CLIENT_URI)
         self.keys_api = KeysAPIClient(variables.KEYS_API_URI)
         self.alertmanager = AlertmanagerClient(variables.ALERTMANAGER_URI)
         self.genesis_time = int(self.consensus.get_genesis().genesis_time)
         self.handlers = handlers
+        self.validators_updater = None
+        self.keys_updater = None
+        self.chain_reorg_event_listener = None
+        self.keys_api_status = None
+        self.keys_api_nonce = 0
+        self.modules_operators_dict = {}
+        self.lido_keys = {}
+        self.indexed_validators_keys = {}
+        self.chain_reorgs = {}
+        self.handled_headers = []
 
-    def run(self):
+    def run(self, slots_range: Optional[str] = SLOTS_RANGE):
         def _run(slot_to_handle='head'):
-            current_head = self._get_header(slot_to_handle)
+            current_head = self._get_header_full_info(slot_to_handle)
             if not current_head:
                 logger.debug({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
                 time.sleep(CYCLE_SLEEP_IN_SECONDS)
@@ -85,10 +106,14 @@ class Watcher:
 
         logger.info({'msg': f'Watcher started. Handlers: {[handler.__class__.__name__ for handler in self.handlers]}'})
 
-        if SLOTS_RANGE:
-            start, end = SLOTS_RANGE.split('-')
+        if slots_range is not None:
+            start, end = slots_range.split('-')
             for slot in range(int(start), int(end) + 1):
-                _run(str(slot))
+                try:
+                    _run(str(slot))
+                except NotOkResponse as e:
+                    if e.status == 404:
+                        pass
                 self.keys_updater.result()
                 self.validators_updater.result()
         else:
@@ -103,7 +128,7 @@ class Watcher:
                     time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
     @duration_meter()
-    def _handle_head(self, head: BlockHeaderResponseData):
+    def _handle_head(self, head: FullBlockInfo):
         tasks = [h.handle(self, head) for h in self.handlers]
         for t in tasks:
             t.result()
@@ -160,13 +185,13 @@ class Watcher:
 
             logger.info({'msg': 'Updating Lido keys'})
             modules_operators_stream = self.keys_api.get_operators_stream()
-            modules_operators_dict = KeysAPIClient.parse_modules(
+            module_operators_name, self.modules_operators_dict = KeysAPIClient.parse_modules(
                 json_stream.requests.load(modules_operators_stream)['data']
             )
 
             fetched_lido_keys_stream = self.keys_api.get_used_lido_keys_stream()
             self.lido_keys = KeysAPIClient.parse_keys(
-                json_stream.requests.load(fetched_lido_keys_stream)['data'], modules_operators_dict
+                json_stream.requests.load(fetched_lido_keys_stream)['data'], module_operators_name
             )
 
             self.keys_api_status = current_keys_status
@@ -179,7 +204,7 @@ class Watcher:
         KEYS_API_SLOT_NUMBER.set(int(header.header.message.slot))
 
     @duration_meter()
-    def _get_header(self, slot=None) -> BlockHeaderResponseData | None:
+    def _get_header_full_info(self, slot=None) -> FullBlockInfo | None:
         def force_use_fallback_callback(result) -> bool:
             """Callback that will be called if we can't get valid head block from beacon node"""
             data, _ = result
@@ -197,7 +222,8 @@ class Watcher:
             self.handled_headers[-1].header.message.slot
         ):
             return None
-        return current_head
+        current_block = self.consensus.get_block_details(current_head.root)
+        return FullBlockInfo(**asdict(current_head), **asdict(current_block))
 
     @thread_as_daemon
     def listen_chain_reorg_event(self):
