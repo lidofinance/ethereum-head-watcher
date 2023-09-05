@@ -8,7 +8,8 @@ Bot which watches Ethereum head and handle "events" and sends notifications thro
 
 Currently it supports:
  - new slashing events
- - `TBD`
+ - unexpected exit events
+ - forking events
 
 ## Run via docker
 

@@ -21,10 +21,10 @@ groups:
           description: "It's not OK. Please, check app health"
 
       - alert: KeysAPISlotIsNotChanging
-        expr: absent(ethereum_head_watcher_keys_api_slot_number) OR changes(ethereum_head_watcher_keys_api_slot_number[1h]) == 0
+        expr: absent(ethereum_head_watcher_keys_source_slot_number) OR changes(ethereum_head_watcher_keys_api_slot_number[1h]) == 0
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "⏳🔑 KeysAPI index slot doesn't change for more than 1 hour"
+          summary: "⏳🔑 Keys source index slot doesn't change for more than 1 hour"
           description: "It's not OK. Please, check app health"

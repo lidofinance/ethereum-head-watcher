@@ -12,9 +12,10 @@ from unsync import Unfuture, unsync
 from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
 from src.handlers.handler import WatcherHandler
+from src.keys_source.base_source import BaseSource, NamedKey
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
-    KEYS_API_SLOT_NUMBER,
+    KEYS_SOURCE_SLOT_NUMBER,
     SLOT_NUMBER,
     VALIDATORS_INDEX_SLOT_NUMBER,
 )
@@ -26,8 +27,6 @@ from src.providers.consensus.typings import (
     FullBlockInfo,
 )
 from src.providers.http_provider import NotOkResponse
-from src.providers.keys.client import KeysAPIClient
-from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
 from src.utils.decorators import thread_as_daemon
 from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 from src.web3py.typings import Web3
@@ -38,48 +37,22 @@ KEEP_MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) fo
 
 
 class Watcher:
-    # Init
-    execution: Web3
-    consensus: ConsensusClient
-    keys_api: KeysAPIClient
-    alertmanager: AlertmanagerClient
-    genesis_time: int
-    handlers: list[WatcherHandler]
-
-    # Tasks
-    validators_updater: Unfuture
-    keys_updater: Unfuture
-    chain_reorg_event_listener: threading.Thread | None
-
-    # Last state
-    keys_api_status: KeysApiStatus | None
-    keys_api_nonce: int
-
-    modules_operators_dict: dict[str, list[str]]
-    lido_keys: dict[str, LidoNamedKey]
-    indexed_validators_keys: dict[str, str]
-
-    chain_reorgs: dict[str, ChainReorgEvent]
-
-    handled_headers: list[BlockHeaderResponseData]
-
-    def __init__(self, handlers: list[WatcherHandler], web3: Web3):
-        self.execution = web3
-        self.consensus = ConsensusClient(variables.CONSENSUS_CLIENT_URI)
-        self.keys_api = KeysAPIClient(variables.KEYS_API_URI)
-        self.alertmanager = AlertmanagerClient(variables.ALERTMANAGER_URI)
-        self.genesis_time = int(self.consensus.get_genesis().genesis_time)
-        self.handlers = handlers
-        self.validators_updater = None
-        self.keys_updater = None
-        self.chain_reorg_event_listener = None
-        self.keys_api_status = None
-        self.keys_api_nonce = 0
-        self.modules_operators_dict = {}
-        self.lido_keys = {}
-        self.indexed_validators_keys = {}
-        self.chain_reorgs = {}
-        self.handled_headers = []
+    def __init__(self, handlers: list[WatcherHandler], keys_source: BaseSource, web3: Web3 = None):
+        # Init
+        self.execution: Web3 | None = web3
+        self.consensus: ConsensusClient = ConsensusClient(variables.CONSENSUS_CLIENT_URI)
+        self.keys_source: BaseSource = keys_source
+        self.alertmanager: AlertmanagerClient = AlertmanagerClient(variables.ALERTMANAGER_URI)
+        self.genesis_time: int = int(self.consensus.get_genesis().genesis_time)
+        self.handlers: list[WatcherHandler] = handlers
+        # Tasks
+        self.validators_updater: Unfuture = None
+        self.keys_updater: Unfuture = None
+        self.chain_reorg_event_listener: threading.Thread | None = None
+        self.user_keys: dict[str, NamedKey] = {}
+        self.indexed_validators_keys: dict[str, str] = {}
+        self.chain_reorgs: dict[str, ChainReorgEvent] = {}
+        self.handled_headers: list[BlockHeaderResponseData] = []
 
     def run(self, slots_range: Optional[str] = SLOTS_RANGE):
         def _run(slot_to_handle='head'):
@@ -90,7 +63,7 @@ class Watcher:
                 return
 
             if self.keys_updater is None or self.keys_updater.done():
-                self.keys_updater = self._update_lido_keys(current_head)
+                self.keys_updater = self._update_user_keys(current_head)
             if self.validators_updater is None or self.validators_updater.done():
                 self.validators_updater = self._update_validators()
 
@@ -164,44 +137,17 @@ class Watcher:
 
     @unsync
     @duration_meter()
-    def _update_lido_keys(self, header: BlockHeaderResponseData) -> None:
-        """Return dict with `publickey` as key and `LidoNamedKey` as value"""
+    def _update_user_keys(self, header: BlockHeaderResponseData) -> None:
+        """Return dict with `publickey` as key and `NamedKey` as value"""
         try:
-            current_keys_status = self.keys_api.get_status()
-            if self.keys_api_status is not None and (
-                self.keys_api_status.elBlockSnapshot['timestamp'] >= current_keys_status.elBlockSnapshot['timestamp']
-            ):
-                return
-
-            # Get modules and calculate current nonce
-            # If nonce is not changed - we don't need to update keys
-            modules = self.keys_api.get_modules()[0]
-
-            current_nonce = sum(module['nonce'] for module in modules)
-            if self.keys_api_nonce == current_nonce:
-                KEYS_API_SLOT_NUMBER.set(int(header.header.message.slot))
-                return
-            self.keys_api_nonce = current_nonce
-
-            logger.info({'msg': 'Updating Lido keys'})
-            modules_operators_stream = self.keys_api.get_operators_stream()
-            module_operators_name, self.modules_operators_dict = KeysAPIClient.parse_modules(
-                json_stream.requests.load(modules_operators_stream)['data']
-            )
-
-            fetched_lido_keys_stream = self.keys_api.get_used_lido_keys_stream()
-            self.lido_keys = KeysAPIClient.parse_keys(
-                json_stream.requests.load(fetched_lido_keys_stream)['data'], module_operators_name
-            )
-
-            self.keys_api_status = current_keys_status
-
+            new_keys = self.keys_source.update_keys()
         except Exception as e:  # pylint: disable=broad-except
-            logger.error({'msg': 'Can not update lido keys', 'exception': str(e)})
+            logger.error({'msg': 'Can not update user keys', 'exception': str(e)})
             return
-
-        logger.warning({'msg': f'Lido keys updated: [{len(self.lido_keys)}]'})
-        KEYS_API_SLOT_NUMBER.set(int(header.header.message.slot))
+        if new_keys:
+            self.user_keys = new_keys
+            logger.warning({'msg': f'User keys updated: [{len(self.user_keys)}]'})
+        KEYS_SOURCE_SLOT_NUMBER.set(int(header.header.message.slot))
 
     @duration_meter()
     def _get_header_full_info(self, slot=None) -> FullBlockInfo | None:

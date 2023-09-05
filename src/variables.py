@@ -11,7 +11,7 @@ ALERTMANAGER_URI = os.getenv('ALERTMANAGER_URI', '').split(',')
 
 NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
 
-# Additional labels for alerts. Must be in JSON string format.
+# Additional labels for alerts for our validators. Must be in JSON string format.
 # For example - '{"a":"valueA","b":"valueB"}'
 ADDITIONAL_ALERTMANAGER_LABELS = json.loads(os.getenv('ADDITIONAL_ALERTMANAGER_LABELS', '{}'))
 
@@ -20,6 +20,10 @@ DRY_RUN = os.getenv('DRY_RUN', 'false').lower() == 'true'
 SLOTS_RANGE = os.getenv('SLOTS_RANGE')
 
 CYCLE_SLEEP_IN_SECONDS = int(os.getenv('CYCLE_SLEEP_IN_SECONDS', 1))
+
+KEYS_SOURCE = os.getenv('KEYS_SOURCE', 'keys_api')
+
+KEYS_FILE_PATH = os.getenv('KEYS_FILE_PATH', './docker/validators/keys.yml')
 
 KEYS_API_REQUEST_TIMEOUT = int(os.getenv('KEYS_API_REQUEST_TIMEOUT', 3 * 60))
 KEYS_API_REQUEST_RETRY_COUNT = int(os.getenv('KEYS_API_REQUEST_RETRY_COUNT', 3))
@@ -52,10 +56,15 @@ def check_uri_required_variables():
     errors = []
     if '' in CONSENSUS_CLIENT_URI:
         errors.append('CONSENSUS_CLIENT_URI')
-    if '' in KEYS_API_URI:
-        errors.append('KEYS_API_URI')
-    if '' in ALERTMANAGER_URI:
+    if not DRY_RUN and '' in ALERTMANAGER_URI:
         errors.append('ALERTMANAGER_URI')
+    if KEYS_SOURCE == 'keys_api':
+        if '' in KEYS_API_URI:
+            errors.append('KEYS_API_URI')
+        if '' in LIDO_LOCATOR_ADDRESS:
+            errors.append('LIDO_LOCATOR_ADDRESS')
+        if '' in EXECUTION_CLIENT_URI:
+            errors.append('EXECUTION_CLIENT_URI')
     return errors
 
 

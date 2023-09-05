@@ -13,7 +13,7 @@ from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
 
 logger = logging.getLogger()
 
-Owner = Literal['lido', 'other', 'unknown']
+Owner = Literal['user', 'other', 'unknown']
 
 
 @dataclass
@@ -39,14 +39,14 @@ class ExitsHandler(WatcherHandler):
             if validator_key is None:
                 exits.append(ExitInfo(index=validator_index, owner='unknown'))
             else:
-                if lido_key := watcher.lido_keys.get(validator_key):
+                if user_key := watcher.user_keys.get(validator_key):
                     exits.append(
                         ExitInfo(
                             index=validator_index,
-                            owner='lido',
-                            operator=lido_key.operatorName,
-                            operator_index=lido_key.operatorIndex,
-                            module_index=lido_key.moduleIndex,
+                            owner='user',
+                            operator=user_key.operatorName,
+                            operator_index=user_key.operatorIndex,
+                            module_index=user_key.moduleIndex,
                         )
                     )
                 else:
@@ -63,19 +63,19 @@ class ExitsHandler(WatcherHandler):
             self._send_alerts(watcher, head, exits)
 
     def _send_alerts(self, watcher, block: FullBlockInfo, exits):
-        lido_exits = [s for s in exits if s.owner == 'lido']
+        user_exits = [s for s in exits if s.owner == 'user']
         unknown_exits = [s for s in exits if s.owner == 'unknown']
-        if lido_exits:
+        if user_exits:
             self._update_last_requested_validator_indexes(watcher, block)
-            summary = f'🚨🚨🚨 {len(lido_exits)} Lido validators were unexpected exited! 🚨🚨🚨'
+            summary = f'🚨🚨🚨 {len(user_exits)} Our validators were unexpected exited! 🚨🚨🚨'
             description = ''
             by_operator: dict[str, list] = defaultdict(list)
-            for lido_exit in lido_exits:
-                operator_last_exited_index = self.last_requested_validator_indexes[
-                    (lido_exit.module_index, lido_exit.operator_index)
-                ]
-                if int(lido_exit.index) > operator_last_exited_index:
-                    by_operator[str(lido_exit.operator)].append(lido_exit)
+            for user_exit in user_exits:
+                operator_last_exited_index = self.last_requested_validator_indexes.get(
+                    (user_exit.module_index, user_exit.operator_index), 0
+                )
+                if int(user_exit.index) > operator_last_exited_index:
+                    by_operator[str(user_exit.operator)].append(user_exit)
             if by_operator:
                 for operator, operator_exits in by_operator.items():
                     description += f'\n{operator} -'
@@ -92,7 +92,7 @@ class ExitsHandler(WatcherHandler):
                 description += (
                     f'\n\nslot: [{block.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{block.message.slot})'
                 )
-                alert = CommonAlert(name="HeadWatcherLidoUnexpectedExit", severity="critical")
+                alert = CommonAlert(name="HeadWatcherUserUnexpectedExit", severity="critical")
                 self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
         if unknown_exits:
             summary = f'🚨 {len(unknown_exits)} unknown validators were exited!'
@@ -115,7 +115,7 @@ class ExitsHandler(WatcherHandler):
     @duration_meter()
     def _update_last_requested_validator_indexes(self, watcher, block: BlockDetailsResponse) -> None:
         """Update last requested to exit validator indexes"""
-        if not watcher.modules_operators_dict:
+        if not watcher.keys_source.modules_operators_dict:
             return
         # todo:
         #  should we look at the refSlot for report?
@@ -129,7 +129,7 @@ class ExitsHandler(WatcherHandler):
         if total_requests_processed <= self.last_total_requests_processed:
             return
         logger.info({'msg': 'Get last requested to exit Lido validator indexes'})
-        for module_index, operators in watcher.modules_operators_dict.items():
+        for module_index, operators in watcher.keys_source.modules_operators_dict.items():
             requested_validator_indexes = (
                 watcher.execution.lido_contracts.validators_exit_bus_oracle.functions.getLastRequestedValidatorIndices(
                     module_index, operators

@@ -5,7 +5,7 @@ from requests import Response
 
 from src.metrics.prometheus.basic import KEYS_API_REQUESTS_DURATION
 from src.providers.http_provider import HTTPProvider
-from src.providers.keys.typings import KeysApiStatus, LidoNamedKey
+from src.providers.keys_api.typings import KeysApiStatus, LidoNamedKey
 from src.variables import (
     KEYS_API_REQUEST_RETRY_COUNT,
     KEYS_API_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS,

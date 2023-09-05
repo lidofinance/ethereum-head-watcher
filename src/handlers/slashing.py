@@ -15,7 +15,7 @@ logger = logging.getLogger()
 
 
 Duty = Literal['proposer', 'attester']
-Owner = Literal['lido', 'other', 'unknown']
+Owner = Literal['user', 'other', 'unknown']
 
 
 @dataclass
@@ -38,10 +38,10 @@ class SlashingHandler(WatcherHandler):
             if proposer_key is None:
                 slashings.append(SlashingInfo(index=proposer_index, owner='unknown', duty='proposer'))
             else:
-                if lido_key := watcher.lido_keys.get(proposer_key):
+                if user_key := watcher.user_keys.get(proposer_key):
                     slashings.append(
                         SlashingInfo(
-                            index=proposer_index, owner='lido', duty='proposer', operator=lido_key.operatorName
+                            index=proposer_index, owner='user', duty='proposer', operator=user_key.operatorName
                         )
                     )
                 else:
@@ -62,9 +62,9 @@ class SlashingHandler(WatcherHandler):
                 if attester_key is None:
                     slashings.append(SlashingInfo(index=attester, owner='unknown', duty='attester'))
                 else:
-                    if lido_key := watcher.lido_keys.get(attester_key):
+                    if user_key := watcher.user_keys.get(attester_key):
                         slashings.append(
-                            SlashingInfo(index=attester, owner='lido', duty='attester', operator=lido_key.operatorName)
+                            SlashingInfo(index=attester, owner='user', duty='attester', operator=user_key.operatorName)
                         )
                     else:
                         slashings.append(SlashingInfo(index=attester, owner='other', duty='attester'))
@@ -78,14 +78,14 @@ class SlashingHandler(WatcherHandler):
         return slashings
 
     def _send_alerts(self, watcher, head: BlockDetailsResponse, slashings: list[SlashingInfo]):
-        lido_slashings = [s for s in slashings if s.owner == 'lido']
+        user_slashings = [s for s in slashings if s.owner == 'user']
         unknown_slashings = [s for s in slashings if s.owner == 'unknown']
         other_slashings = [s for s in slashings if s.owner == 'other']
-        if lido_slashings:
-            summary = f'🚨🚨🚨 {len(lido_slashings)} Lido validators were slashed! 🚨🚨🚨'
+        if user_slashings:
+            summary = f'🚨🚨🚨 {len(user_slashings)} Our validators were slashed! 🚨🚨🚨'
             description = ''
             by_operator: dict[str, list] = defaultdict(list)
-            for slashing in lido_slashings:
+            for slashing in user_slashings:
                 by_operator[str(slashing.operator)].append(slashing)
             for operator, operator_slashing in by_operator.items():
                 description += f'\n{operator} -'
@@ -107,7 +107,7 @@ class SlashingHandler(WatcherHandler):
             description += (
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
-            alert = CommonAlert(name="HeadWatcherLidoSlashing", severity="critical")
+            alert = CommonAlert(name="HeadWatcherUserSlashing", severity="critical")
             self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
         if unknown_slashings:
             summary = f'🚨 {len(unknown_slashings)} unknown validators were slashed!'
