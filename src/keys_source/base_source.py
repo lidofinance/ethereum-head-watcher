@@ -1,7 +1,5 @@
 import logging
-
 from abc import ABC, abstractmethod
-
 from enum import Enum
 
 from src.providers.keys_api.typings import LidoNamedKey
