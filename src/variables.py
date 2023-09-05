@@ -41,7 +41,7 @@ CL_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS = float(os.getenv('CL_REQUEST_SLEEP_BEF
 
 EL_REQUEST_TIMEOUT = float(os.getenv('EL_REQUEST_TIMEOUT', 5))
 
-LIDO_LOCATOR_ADDRESS = os.getenv('LIDO_LOCATOR_ADDRESS')
+LIDO_LOCATOR_ADDRESS = os.getenv('LIDO_LOCATOR_ADDRESS', '')
 
 # - Metrics -
 PROMETHEUS_PORT = int(os.getenv('PROMETHEUS_PORT', 9000))
@@ -61,7 +61,7 @@ def check_uri_required_variables():
     if KEYS_SOURCE == 'keys_api':
         if '' in KEYS_API_URI:
             errors.append('KEYS_API_URI')
-        if '' in LIDO_LOCATOR_ADDRESS:
+        if '' == LIDO_LOCATOR_ADDRESS:
             errors.append('LIDO_LOCATOR_ADDRESS')
         if '' in EXECUTION_CLIENT_URI:
             errors.append('EXECUTION_CLIENT_URI')

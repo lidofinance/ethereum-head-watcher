@@ -4,6 +4,7 @@ from src import variables
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
+from src.keys_source.keys_api_source import KeysApiSource
 from src.watcher import Watcher
 from src.web3py.extensions import FallbackProviderModule, LidoContracts
 from src.web3py.typings import Web3
@@ -20,4 +21,4 @@ def watcher(request, monkeypatch):
         }
     )
 
-    return Watcher([SlashingHandler(), ForkHandler(), ExitsHandler()], web3)
+    return Watcher([SlashingHandler(), ForkHandler(), ExitsHandler()], KeysApiSource(), web3)
