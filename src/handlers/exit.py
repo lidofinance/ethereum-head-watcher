@@ -5,8 +5,10 @@ from typing import Literal, Optional
 
 from unsync import unsync
 
+from src import variables
 from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
+from src.keys_source.base_source import SourceType
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
@@ -66,7 +68,8 @@ class ExitsHandler(WatcherHandler):
         user_exits = [s for s in exits if s.owner == 'user']
         unknown_exits = [s for s in exits if s.owner == 'unknown']
         if user_exits:
-            self._update_last_requested_validator_indexes(watcher, block)
+            if variables.KEYS_SOURCE == SourceType.KEYS_API.value:
+                self._update_last_requested_validator_indexes(watcher, block)
             summary = f'🚨🚨🚨 {len(user_exits)} Our validators were unexpected exited! 🚨🚨🚨'
             description = ''
             by_operator: dict[str, list] = defaultdict(list)

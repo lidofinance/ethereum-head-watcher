@@ -37,7 +37,7 @@ KEEP_MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) fo
 
 
 class Watcher:
-    def __init__(self, handlers: list[WatcherHandler], keys_source: BaseSource, web3: Web3 = None):
+    def __init__(self, handlers: list[WatcherHandler], keys_source: BaseSource, web3: Web3 | None = None):
         # Init
         self.execution: Web3 | None = web3
         self.consensus: ConsensusClient = ConsensusClient(variables.CONSENSUS_CLIENT_URI)
