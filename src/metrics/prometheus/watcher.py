@@ -14,9 +14,9 @@ SLOT_NUMBER = Gauge(
     namespace=PROMETHEUS_PREFIX,
 )
 
-KEYS_API_SLOT_NUMBER = Gauge(
-    "keys_api_slot_number",
-    "Keys API last updated slot number",
+KEYS_SOURCE_SLOT_NUMBER = Gauge(
+    "keys_source_slot_number",
+    "Keys source last updated slot number",
     namespace=PROMETHEUS_PREFIX,
 )
 

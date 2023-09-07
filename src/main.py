@@ -5,6 +5,9 @@ from src import variables
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
+from src.keys_source.base_source import SourceType
+from src.keys_source.file_source import FileSource
+from src.keys_source.keys_api_source import KeysApiSource
 from src.metrics.healthcheck_server import start_pulse_server
 from src.metrics.logging import logging
 from src.metrics.prometheus.basic import BUILD_INFO
@@ -28,16 +31,26 @@ def main():
     logger.info({'msg': f'Start http server with prometheus metrics on port {variables.PROMETHEUS_PORT}'})
     start_http_server(variables.PROMETHEUS_PORT)
 
-    web3 = Web3(
-        FallbackProviderModule(variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT})
-    )
-    web3.attach_modules(
-        {
-            'lido_contracts': LidoContracts,
-        }
-    )
-    web3.middleware_onion.add(metrics_collector)
-    web3.middleware_onion.add(simple_cache_middleware)
+    if variables.KEYS_SOURCE == SourceType.KEYS_API.value:
+        keys_source = KeysApiSource()
+        web3 = Web3(
+            FallbackProviderModule(
+                variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT}
+            )
+        )
+        web3.attach_modules(
+            {
+                'lido_contracts': LidoContracts,
+            }
+        )
+        web3.middleware_onion.add(metrics_collector)
+        web3.middleware_onion.add(simple_cache_middleware)
+    elif variables.KEYS_SOURCE == SourceType.FILE.value:
+        keys_source = FileSource()
+        web3 = None
+    else:
+        raise ValueError(f'Unknown keys source: {variables.KEYS_SOURCE}')
+    logger.info({'msg': f'Using keys source: {variables.KEYS_SOURCE}'})
 
     if variables.DRY_RUN:
         logger.warning({'msg': 'Dry run mode enabled! No alerts will be sent.'})
@@ -48,7 +61,7 @@ def main():
         ExitsHandler(),
         # FinalityHandler(), ???
     ]
-    Watcher(handlers, web3).run()
+    Watcher(handlers, keys_source, web3).run()
 
 
 if __name__ == "__main__":
