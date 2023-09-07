@@ -1,4 +1,20 @@
-# 0.1.0 (2023-08-17)
+# [0.2.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.1.0...0.2.0) (2023-09-07)
+
+
+### Bug Fixes
+
+* isort ([6fbbc5b](https://github.com/lidofinance/ethereum-head-watcher/commit/6fbbc5b5644b215f968857760a920ee06c0953f5))
+* mypy ([a8d3948](https://github.com/lidofinance/ethereum-head-watcher/commit/a8d3948ea00b75e96dc669aed6cb97658997f27b))
+* test ([f0e1201](https://github.com/lidofinance/ethereum-head-watcher/commit/f0e120169c24816dde80727fb2ec8f7691dd0447))
+
+
+### Features
+
+* custom validators list ([fb81bcb](https://github.com/lidofinance/ethereum-head-watcher/commit/fb81bcb7f1255ac5ecd37dc07b275cf31a5445f5))
+
+
+
+# [0.1.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0b049a1e0307414919d37e831425faf285542b84...0.1.0) (2023-08-17)
 
 
 ### Bug Fixes
