@@ -11,7 +11,7 @@ Currently it supports:
  - unexpected exit events
  - forking events
 
-## Run via docker
+## Run via docker to monitor Lido validators
 
 1. Copy `.env.example` to `.env` and fill it with your values
 2. `docker-compose up -d`
@@ -21,6 +21,15 @@ Currently it supports:
 1. Copy `.env.example` to `.env` and fill it with your values
 2. `poetry install`
 3. `poetry run python -m src.main`
+
+## Run with keys file to monitor your custom validators
+
+> All exits will be handled as unexpected for specified keys
+
+1. Fill `docker/validators/keys.yml` with your values
+2. Set `KEYS_SOURCE=keys_file` in `.env`
+
+> If you want to use another path, specify it in `KEYS_FILE_PATH` env variable
 
 ## Application Env variables
 
@@ -39,6 +48,7 @@ Currently it supports:
 ---
 `KEYS_FILE_PATH` - Path to file with keys
 * **Required:** if `KEYS_SOURCE` is `keys_file`
+* **Default:** ./docker/validators/keys.yml
 ---
 `CONSENSUS_CLIENT_URI` - Ethereum consensus layer comma separated API urls
 * **Required:** true

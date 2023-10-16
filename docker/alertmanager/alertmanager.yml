@@ -15,5 +15,5 @@ receivers:
   - name: 'empty'
   - name: 'discord_webhook_mainnet'
     webhook_configs:
-      - url: 'http://alertmanager-discord:5001/hook/slashing-watcher-mainnet'
+      - url: 'http://alertmanager-discord:5001/hook/head-watcher'
         send_resolved: false
