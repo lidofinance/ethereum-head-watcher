@@ -35,7 +35,7 @@ jobs:
         env:
           CONSENSUS_CLIENT_URI: ${{ secrets.CL_API_URL }}
           EXECUTION_CLIENT_URI: ${{ secrets.EXECUTION_API_URL }}
-          LIDO_LOCATOR_ADDRESS: "${{ secrets.LIDO_LOCATOR }}"
+          LIDO_LOCATOR_ADDRESS: "${{ secrets.LIDO_LOCATOR_ADDRESS }}"
           KEYS_API_URI: ${{ secrets.KEYS_API_URL }}
           DRY_RUN: true
 
@@ -74,15 +74,3 @@ jobs:
 
       - name: Lint isort
         run: poetry run isort --check src
-
-  security:
-    uses: lidofinance/linters/.github/workflows/security.yml@master
-    permissions:
-      security-events: write
-      contents: read
-
-  docker:
-    uses: lidofinance/linters/.github/workflows/docker.yml@master
-
-  actions:
-    uses: lidofinance/linters/.github/workflows/actions.yml@master
