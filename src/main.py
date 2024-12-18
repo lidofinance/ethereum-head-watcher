@@ -2,9 +2,11 @@ from prometheus_client import start_http_server
 from web3.middleware import simple_cache_middleware
 
 from src import variables
+from src.handlers.el_triggered_exit import ElTriggeredExitHandler
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
+from src.handlers.consolidation import ConsolidationHandler
 from src.keys_source.base_source import SourceType
 from src.keys_source.file_source import FileSource
 from src.keys_source.keys_api_source import KeysApiSource
@@ -60,6 +62,8 @@ def main():
         ForkHandler(),
         ExitsHandler(),
         # FinalityHandler(), ???
+        ConsolidationHandler(),
+        ElTriggeredExitHandler()
     ]
     Watcher(handlers, keys_source, web3).run()
 
