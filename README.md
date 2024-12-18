@@ -27,7 +27,7 @@ Currently it supports:
 > All exits will be handled as unexpected for specified keys
 
 1. Fill `docker/validators/keys.yml` with your values
-2. Set `KEYS_SOURCE=keys_file` in `.env`
+2. Set `KEYS_SOURCE=file` in `.env`
 
 > If you want to use another path, specify it in `KEYS_FILE_PATH` env variable
 
@@ -42,12 +42,12 @@ Currently it supports:
 * **Required:** false
 * **Default:** false
 ---
-`KEYS_SOURCE` - Keys source. If `keys_api` - application will fetch keys from Keys API, if `keys_file` - application will fetch keys from `KEYS_FILE_PATH`
+`KEYS_SOURCE` - Keys source. If `keys_api` - application will fetch keys from Keys API, if `file` - application will fetch keys from `KEYS_FILE_PATH`
 * **Required:** false
 * **Default:** keys_api
 ---
 `KEYS_FILE_PATH` - Path to file with keys
-* **Required:** if `KEYS_SOURCE` is `keys_file`
+* **Required:** if `KEYS_SOURCE` is `file`
 * **Default:** ./docker/validators/keys.yml
 ---
 `CONSENSUS_CLIENT_URI` - Ethereum consensus layer comma separated API urls
