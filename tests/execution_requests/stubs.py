@@ -38,6 +38,6 @@ class WatcherStub:
         valid_withdrawal_addresses: set[str] = None,
     ):
         self.alertmanager = AlertmanagerStub()
-        self.user_keys = user_keys or dict()
-        self.indexed_validators_keys = indexed_validators_keys or dict()
+        self.user_keys = user_keys or {}
+        self.indexed_validators_keys = indexed_validators_keys or {}
         self.valid_withdrawal_addresses = valid_withdrawal_addresses or set()
