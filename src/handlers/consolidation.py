@@ -27,7 +27,7 @@ class ConsolidationHandler(WatcherHandler):
                 summary = "🔗🤗 Validator consolidation was requested from Withdrawal Vault source address"
             elif consolidation.source_pubkey in watcher.user_keys:
                 alert = CommonAlert(name="HeadWatcherConsolidationSourceLido", severity="moderate")
-                summary = "🔗🤗 Attempt to consolidate Lido validator"
+                summary = "🔗🤗 Consolidation was requested for our validators"
             elif consolidation.target_pubkey in watcher.user_keys:
                 alert = CommonAlert(name="HeadWatcherConsolidationPossibleDonation", severity="moderate")
                 summary = "🔗🤗 Someone wants to donate to Lido"
