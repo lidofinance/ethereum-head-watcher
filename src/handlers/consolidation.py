@@ -24,7 +24,7 @@ class ConsolidationHandler(WatcherHandler):
             alert, summary = None, ""
             if consolidation.source_address in watcher.suspicious_addresses:
                 alert = CommonAlert(name="HeadWatcherConsolidationSuspiciousSourceAddress", severity="critical")
-                summary = "🔗🤗 Highly suspicious source address"
+                summary = "🔗🤗 Validator consolidation was requested from Withdrawal Vault source address"
             elif consolidation.source_pubkey in watcher.user_keys:
                 alert = CommonAlert(name="HeadWatcherConsolidationSourceLido", severity="moderate")
                 summary = "🔗🤗 Attempt to consolidate Lido validator"
