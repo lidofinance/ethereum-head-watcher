@@ -29,7 +29,7 @@ class ConsolidationHandler(WatcherHandler):
                 alert = CommonAlert(name="HeadWatcherConsolidationSourceLido", severity="moderate")
                 summary = "🔗🤗 Consolidation was requested for our validators"
             elif consolidation.target_pubkey in watcher.user_keys:
-                alert = CommonAlert(name="HeadWatcherConsolidationPossibleDonation", severity="moderate")
+                alert = CommonAlert(name="HeadWatcherConsolidationUserTargetPubkey", severity="info")
                 summary = "🔗🤗 Someone attempts to consolidate their validators to our validators"
             # in the future we should check the type of validator WC:
             # if it is 0x02 and source_address == WCs of source validator - It's donation!
