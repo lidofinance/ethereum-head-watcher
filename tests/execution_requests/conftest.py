@@ -1,8 +1,8 @@
 import pytest
 
 from src.keys_source.base_source import NamedKey
-from tests.eip7251.helpers import gen_random_address
-from tests.eip7251.stubs import TestValidator, WatcherStub
+from tests.execution_requests.helpers import gen_random_address
+from tests.execution_requests.stubs import TestValidator, WatcherStub
 
 
 @pytest.fixture
@@ -16,11 +16,11 @@ def validator():
 
 
 @pytest.fixture
-def lido_validator(user_keys):
+def user_validator(user_keys):
     random_validator = TestValidator.random()
     user_keys[random_validator.pubkey] = NamedKey(
         key=random_validator.pubkey,
-        operatorName='Dimon operator',
+        operatorName='Test operator',
         operatorIndex='1',
         moduleIndex='1'
     )
@@ -35,7 +35,7 @@ def watcher(user_keys) -> WatcherStub:
 
 
 @pytest.fixture
-def lido_withdrawal_vault(watcher: WatcherStub) -> str:
+def withdrawal_address(watcher: WatcherStub) -> str:
     address = gen_random_address()
-    watcher.suspicious_addresses.add(address)
+    watcher.valid_withdrawal_addresses.add(address)
     return address

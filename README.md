@@ -139,6 +139,10 @@ Currently it supports:
 `ALERTMANAGER_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS` - Alertmanager request retry timeout in seconds
 * **Required:** false
 * **Default:** 1
+---
+`VALID_WITHDRAWAL_ADDRESSES` - A comma-separated list of addresses. Triggers a critical alert if a monitored execution_request contains a source_address matching any of these addresses 
+* **Required:** false
+* **Default:** []
 
 ## Application metrics
 

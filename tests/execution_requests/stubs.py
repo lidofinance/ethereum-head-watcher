@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from src.keys_source.base_source import NamedKey
 from src.providers.alertmanager.typings import AlertBody
-from tests.eip7251.helpers import gen_random_address, gen_random_pubkey
+from tests.execution_requests.helpers import gen_random_address, gen_random_pubkey
 
 
 @dataclass
@@ -30,11 +30,11 @@ class WatcherStub:
     alertmanager: AlertmanagerStub
     user_keys: dict[str, NamedKey]
     indexed_validators_keys: dict[str, str]
-    suspicious_addresses: set[str]
+    valid_withdrawal_addresses: set[str]
 
     def __init__(self, user_keys: dict[str, NamedKey] = None, indexed_validators_keys: dict[str, str] = None,
-                 suspicious_source_addresses: set[str] = None):
+                 valid_withdrawal_addresses: set[str] = None):
         self.alertmanager = AlertmanagerStub()
         self.user_keys = user_keys or dict()
         self.indexed_validators_keys = indexed_validators_keys or dict()
-        self.suspicious_addresses = suspicious_source_addresses or set()
+        self.valid_withdrawal_addresses = valid_withdrawal_addresses or set()

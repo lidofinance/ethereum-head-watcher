@@ -53,9 +53,9 @@ class Watcher:
         self.indexed_validators_keys: dict[str, str] = {}
         self.chain_reorgs: dict[str, ChainReorgEvent] = {}
         self.handled_headers: list[BlockHeaderResponseData] = []
-        self.suspicious_addresses = variables.SUSPICIOUS_ADDRESSES
-        if not self.suspicious_addresses and self.execution:
-            self.suspicious_addresses = {
+        self.valid_withdrawal_addresses = variables.VALID_WITHDRAWAL_ADDRESSES
+        if not self.valid_withdrawal_addresses and self.execution:
+            self.valid_withdrawal_addresses = {
                 self.execution.lido_contracts.lido_locator.functions.withdrawalVault().call()
             }
 

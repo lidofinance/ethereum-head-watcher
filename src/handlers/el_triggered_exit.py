@@ -22,7 +22,7 @@ class ElTriggeredExitHandler(WatcherHandler):
         slot = head.message.slot
         for withdrawal in head.message.body.execution_requests.withdrawals:
             alert, summary = None, ""
-            if withdrawal.source_address in watcher.suspicious_addresses:
+            if withdrawal.source_address in watcher.valid_withdrawal_addresses:
                 alert = CommonAlert(name="HeadWatcherELWithdrawalFromUserWithdrawalAddress", severity="critical")
                 summary = "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
             elif withdrawal.validator_pubkey in watcher.user_keys:

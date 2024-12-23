@@ -22,15 +22,15 @@ class ConsolidationHandler(WatcherHandler):
         slot = head.message.slot
         for consolidation in head.message.body.execution_requests.consolidations:
             alert, summary = None, ""
-            if consolidation.source_address in watcher.suspicious_addresses:
-                alert = CommonAlert(name="HeadWatcherConsolidationSuspiciousSourceAddress", severity="critical")
-                summary = "🔗🤗 Validator consolidation was requested from Withdrawal Vault source address"
+            if consolidation.source_address in watcher.valid_withdrawal_addresses:
+                alert = CommonAlert(name="HeadWatcherConsolidationSourceWithdrawalAddress", severity="critical")
+                summary = "‼️⛔️Validator consolidation was requested from Withdrawal Vault source address"
             elif consolidation.source_pubkey in watcher.user_keys:
-                alert = CommonAlert(name="HeadWatcherConsolidationSourceLido", severity="moderate")
-                summary = "🔗🤗 Consolidation was requested for our validators"
+                alert = CommonAlert(name="HeadWatcherConsolidationUserSourcePubkey", severity="info")
+                summary = "⚠️Consolidation was requested for our validators"
             elif consolidation.target_pubkey in watcher.user_keys:
                 alert = CommonAlert(name="HeadWatcherConsolidationUserTargetPubkey", severity="info")
-                summary = "🔗🤗 Someone attempts to consolidate their validators to our validators"
+                summary = "⚠️Someone attempts to consolidate their validators to our validators"
             # in the future we should check the type of validator WC:
             # if it is 0x02 and source_address == WCs of source validator - It's donation!
 
