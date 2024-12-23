@@ -12,8 +12,7 @@ class TestValidator:
 
     @staticmethod
     def random():
-        return TestValidator(pubkey=gen_random_pubkey(),
-                             withdrawal_address=gen_random_address())
+        return TestValidator(pubkey=gen_random_pubkey(), withdrawal_address=gen_random_address())
 
 
 class AlertmanagerStub:
@@ -32,8 +31,12 @@ class WatcherStub:
     indexed_validators_keys: dict[str, str]
     valid_withdrawal_addresses: set[str]
 
-    def __init__(self, user_keys: dict[str, NamedKey] = None, indexed_validators_keys: dict[str, str] = None,
-                 valid_withdrawal_addresses: set[str] = None):
+    def __init__(
+        self,
+        user_keys: dict[str, NamedKey] = None,
+        indexed_validators_keys: dict[str, str] = None,
+        valid_withdrawal_addresses: set[str] = None,
+    ):
         self.alertmanager = AlertmanagerStub()
         self.user_keys = user_keys or dict()
         self.indexed_validators_keys = indexed_validators_keys or dict()

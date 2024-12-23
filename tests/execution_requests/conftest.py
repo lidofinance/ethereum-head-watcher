@@ -19,19 +19,14 @@ def validator():
 def user_validator(user_keys):
     random_validator = TestValidator.random()
     user_keys[random_validator.pubkey] = NamedKey(
-        key=random_validator.pubkey,
-        operatorName='Test operator',
-        operatorIndex='1',
-        moduleIndex='1'
+        key=random_validator.pubkey, operatorName='Test operator', operatorIndex='1', moduleIndex='1'
     )
     return random_validator
 
 
 @pytest.fixture
 def watcher(user_keys) -> WatcherStub:
-    return WatcherStub(
-        user_keys=user_keys
-    )
+    return WatcherStub(user_keys=user_keys)
 
 
 @pytest.fixture

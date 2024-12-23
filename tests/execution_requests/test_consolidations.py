@@ -9,13 +9,15 @@ def test_source_is_valid_withdrawal_address(withdrawal_address: str, watcher: Wa
     random_source_pubkey = gen_random_pubkey()
     random_target_pubkey = gen_random_pubkey()
 
-    block = create_sample_block(consolidations=[
-        ConsolidationRequest(
-            source_address=withdrawal_address,
-            source_pubkey=random_source_pubkey,
-            target_pubkey=random_target_pubkey
-        )
-    ])
+    block = create_sample_block(
+        consolidations=[
+            ConsolidationRequest(
+                source_address=withdrawal_address,
+                source_pubkey=random_source_pubkey,
+                target_pubkey=random_target_pubkey,
+            )
+        ]
+    )
     handler = ConsolidationHandler()
 
     task = handler.handle(watcher, block)
@@ -36,13 +38,15 @@ def test_consolidate_user_validator(user_validator: TestValidator, watcher: Watc
     random_source_address = gen_random_address()
     random_target_pubkey = gen_random_pubkey()
 
-    block = create_sample_block(consolidations=[
-        ConsolidationRequest(
-            source_address=random_source_address,
-            source_pubkey=user_validator.pubkey,
-            target_pubkey=random_target_pubkey
-        )
-    ])
+    block = create_sample_block(
+        consolidations=[
+            ConsolidationRequest(
+                source_address=random_source_address,
+                source_pubkey=user_validator.pubkey,
+                target_pubkey=random_target_pubkey,
+            )
+        ]
+    )
     handler = ConsolidationHandler()
 
     task = handler.handle(watcher, block)
@@ -63,13 +67,15 @@ def test_donation(user_validator: TestValidator, watcher: WatcherStub):
     random_source_address = gen_random_address()
     random_source_pubkey = gen_random_pubkey()
 
-    block = create_sample_block(consolidations=[
-        ConsolidationRequest(
-            source_address=random_source_address,
-            source_pubkey=random_source_pubkey,
-            target_pubkey=user_validator.pubkey
-        )
-    ])
+    block = create_sample_block(
+        consolidations=[
+            ConsolidationRequest(
+                source_address=random_source_address,
+                source_pubkey=random_source_pubkey,
+                target_pubkey=user_validator.pubkey,
+            )
+        ]
+    )
     handler = ConsolidationHandler()
 
     task = handler.handle(watcher, block)
@@ -91,13 +97,15 @@ def test_absence_of_alerts_on_foreign_validators(watcher: WatcherStub):
     random_target_pubkey = gen_random_pubkey()
     random_source_pubkey = gen_random_pubkey()
 
-    block = create_sample_block(consolidations=[
-        ConsolidationRequest(
-            source_address=random_source_address,
-            source_pubkey=random_source_pubkey,
-            target_pubkey=random_target_pubkey
-        )
-    ])
+    block = create_sample_block(
+        consolidations=[
+            ConsolidationRequest(
+                source_address=random_source_address,
+                source_pubkey=random_source_pubkey,
+                target_pubkey=random_target_pubkey,
+            )
+        ]
+    )
     handler = ConsolidationHandler()
 
     task = handler.handle(watcher, block)
