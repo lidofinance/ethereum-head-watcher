@@ -24,7 +24,7 @@ class ElTriggeredExitHandler(WatcherHandler):
             alert, summary = None, ""
             if withdrawal.source_address in watcher.suspicious_addresses:
                 alert = CommonAlert(name="HeadWatcherELWithdrawalFromUserWithdrawalAddress", severity="critical")
-                summary = "🔗‍🏃🚪Highly suspicious source address"
+                summary = "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
             elif withdrawal.validator_pubkey in watcher.user_keys:
                 alert = CommonAlert(name="HeadWatcherElWithdrawalUnexpected", severity="moderate")
                 summary = "🔗‍🏃🚪Unexpected EL withdrawal request found"
