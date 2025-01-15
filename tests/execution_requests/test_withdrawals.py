@@ -5,7 +5,7 @@ from tests.execution_requests.helpers import create_sample_block, gen_random_add
 from tests.execution_requests.stubs import WatcherStub, TestValidator
 
 
-def tedt_user_validator(user_validator: TestValidator, watcher: WatcherStub):
+def test_user_validator(user_validator: TestValidator, watcher: WatcherStub):
     random_address = gen_random_address()
     block = create_sample_block(
         withdrawals=[
@@ -58,8 +58,8 @@ def test_from_user_withdrawal_address(validator: TestValidator, withdrawal_addre
     assert alert.labels.alertname.startswith('HeadWatcherELWithdrawalFromUserWithdrawalAddress')
     assert alert.labels.severity == 'critical'
     assert (
-        alert.annotations.summary
-        == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
+            alert.annotations.summary
+            == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
     )
     assert validator.pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
@@ -104,3 +104,53 @@ def test_absense_of_alerts_for_foreign_validator():
     task.result()
 
     assert len(watcher.alertmanager.sent_alerts) == 0
+
+
+def test_group_similar_alerts():
+    validator1 = TestValidator.random()
+    validator2 = TestValidator.random()
+    withdrawal_address = gen_random_address()
+
+    watcher = WatcherStub(
+
+        user_keys={
+            validator1.pubkey: NamedKey(operatorName='test operator', key=validator1.pubkey, operatorIndex='1',
+                                        moduleIndex='1')
+        },
+        valid_withdrawal_addresses={
+            withdrawal_address
+        }
+    )
+    block = create_sample_block(
+        withdrawals=[
+            WithdrawalRequest(
+                source_address=withdrawal_address,
+                validator_pubkey=validator1.pubkey,
+                amount='32',
+            ),
+            WithdrawalRequest(
+                source_address=withdrawal_address,
+                validator_pubkey=validator2.pubkey,
+                amount='32',
+            )
+        ]
+    )
+    handler = ElTriggeredExitHandler()
+
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) == 1
+    alert = watcher.alertmanager.sent_alerts[0]
+    assert alert.labels.alertname.startswith('HeadWatcherELWithdrawalFromUserWithdrawalAddress')
+    assert alert.labels.severity == 'critical'
+    assert (
+            alert.annotations.summary
+            == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
+    )
+    assert validator1.pubkey in alert.annotations.description
+    assert validator2.pubkey in alert.annotations.description
+    assert 'test operator' in alert.annotations.description
+    assert withdrawal_address in alert.annotations.description
+    assert '32' in alert.annotations.description
+    assert block.message.slot in alert.annotations.description

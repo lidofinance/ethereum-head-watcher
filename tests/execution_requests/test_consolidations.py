@@ -112,3 +112,39 @@ def test_absence_of_alerts_on_foreign_validators(watcher: WatcherStub):
     task.result()
 
     assert len(watcher.alertmanager.sent_alerts) == 0
+
+
+def test_group_similar_alerts(user_validator: TestValidator, watcher: WatcherStub):
+    random_source_address = gen_random_address()
+    random_target_pubkey1 = gen_random_pubkey()
+    random_target_pubkey2 = gen_random_pubkey()
+
+    block = create_sample_block(
+        consolidations=[
+            ConsolidationRequest(
+                source_address=random_source_address,
+                source_pubkey=user_validator.pubkey,
+                target_pubkey=random_target_pubkey1,
+            ),
+            ConsolidationRequest(
+                source_address=random_source_address,
+                source_pubkey=user_validator.pubkey,
+                target_pubkey=random_target_pubkey2,
+            )
+        ]
+    )
+    handler = ConsolidationHandler()
+
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) == 1
+    alert = watcher.alertmanager.sent_alerts[0]
+    assert alert.labels.alertname.startswith('HeadWatcherConsolidationUserSourcePubkey')
+    assert alert.labels.severity == 'info'
+    assert alert.annotations.summary == "⚠️Consolidation was requested for our validators"
+    assert random_source_address in alert.annotations.description
+    assert random_target_pubkey1 in alert.annotations.description
+    assert random_target_pubkey2 in alert.annotations.description
+    assert user_validator.pubkey in alert.annotations.description
+    assert block.message.slot in alert.annotations.description
