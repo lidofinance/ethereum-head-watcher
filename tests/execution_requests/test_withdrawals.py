@@ -58,8 +58,8 @@ def test_from_user_withdrawal_address(validator: TestValidator, withdrawal_addre
     assert alert.labels.alertname.startswith('HeadWatcherELWithdrawalFromUserWithdrawalAddress')
     assert alert.labels.severity == 'critical'
     assert (
-            alert.annotations.summary
-            == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
+        alert.annotations.summary
+        == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
     )
     assert validator.pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
@@ -112,14 +112,12 @@ def test_group_similar_alerts():
     withdrawal_address = gen_random_address()
 
     watcher = WatcherStub(
-
         user_keys={
-            validator1.pubkey: NamedKey(operatorName='test operator', key=validator1.pubkey, operatorIndex='1',
-                                        moduleIndex='1')
+            validator1.pubkey: NamedKey(
+                operatorName='test operator', key=validator1.pubkey, operatorIndex='1', moduleIndex='1'
+            )
         },
-        valid_withdrawal_addresses={
-            withdrawal_address
-        }
+        valid_withdrawal_addresses={withdrawal_address},
     )
     block = create_sample_block(
         withdrawals=[
@@ -132,7 +130,7 @@ def test_group_similar_alerts():
                 source_address=withdrawal_address,
                 validator_pubkey=validator2.pubkey,
                 amount='32',
-            )
+            ),
         ]
     )
     handler = ElTriggeredExitHandler()
@@ -145,8 +143,8 @@ def test_group_similar_alerts():
     assert alert.labels.alertname.startswith('HeadWatcherELWithdrawalFromUserWithdrawalAddress')
     assert alert.labels.severity == 'critical'
     assert (
-            alert.annotations.summary
-            == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
+        alert.annotations.summary
+        == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
     )
     assert validator1.pubkey in alert.annotations.description
     assert validator2.pubkey in alert.annotations.description

@@ -130,7 +130,7 @@ def test_group_similar_alerts(user_validator: TestValidator, watcher: WatcherStu
                 source_address=random_source_address,
                 source_pubkey=user_validator.pubkey,
                 target_pubkey=random_target_pubkey2,
-            )
+            ),
         ]
     )
     handler = ConsolidationHandler()

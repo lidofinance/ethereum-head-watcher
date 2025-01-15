@@ -32,10 +32,10 @@ class WatcherStub:
     valid_withdrawal_addresses: set[str]
 
     def __init__(
-            self,
-            user_keys: dict[str, NamedKey] = None,
-            indexed_validators_keys: dict[str, str] = None,
-            valid_withdrawal_addresses: set[str] = None,
+        self,
+        user_keys: dict[str, NamedKey] = None,
+        indexed_validators_keys: dict[str, str] = None,
+        valid_withdrawal_addresses: set[str] = None,
     ):
         self.alertmanager = AlertmanagerStub()
         self.user_keys = user_keys or {}
