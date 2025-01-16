@@ -1,7 +1,7 @@
 import functools
 from dataclasses import dataclass, fields, is_dataclass
 from types import GenericAlias
-from typing import Callable, Self, Sequence, TypeVar, get_origin, Union, get_args
+from typing import Callable, Self, Sequence, TypeVar, Union, get_args, get_origin
 
 
 class DecodeToDataclassException(Exception):

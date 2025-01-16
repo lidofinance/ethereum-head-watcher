@@ -6,7 +6,7 @@ from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.handlers.helpers import beaconchain, validator_pubkey_link
 from src.metrics.prometheus.duration_meter import duration_meter
-from src.providers.consensus.typings import FullBlockInfo, ConsolidationRequest
+from src.providers.consensus.typings import ConsolidationRequest, FullBlockInfo
 
 logger = logging.getLogger()
 
