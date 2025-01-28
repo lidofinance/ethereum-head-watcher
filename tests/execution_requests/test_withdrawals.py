@@ -21,7 +21,7 @@ def test_user_validator(user_validator: TestValidator, watcher: WatcherStub):
     alert = watcher.alertmanager.sent_alerts[0]
     assert alert.labels.alertname.startswith('HeadWatcherUserELWithdrawal')
     assert alert.labels.severity == 'info'
-    assert alert.annotations.summary == "🔗‍🏃🚪Our validator triggered withdrawal was requested"
+    assert alert.annotations.summary == "⚠️⚠️⚠️ Our validator triggered withdrawal was requested"
     assert user_validator.pubkey in alert.annotations.description
     assert random_address in alert.annotations.description
     assert '32' in alert.annotations.description
@@ -59,7 +59,7 @@ def test_from_user_withdrawal_address(validator: TestValidator, withdrawal_addre
     assert alert.labels.severity == 'critical'
     assert (
         alert.annotations.summary
-        == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
+        == "🚨🚨🚨 Our validator triggered withdrawal was requested from our Withdrawal Vault address"
     )
     assert validator.pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
@@ -144,7 +144,7 @@ def test_group_similar_alerts():
     assert alert.labels.severity == 'critical'
     assert (
         alert.annotations.summary
-        == "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
+        == "🚨🚨🚨 Our validator triggered withdrawal was requested from our Withdrawal Vault address"
     )
     assert validator1.pubkey in alert.annotations.description
     assert validator2.pubkey in alert.annotations.description

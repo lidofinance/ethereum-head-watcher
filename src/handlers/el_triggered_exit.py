@@ -35,13 +35,13 @@ class ElTriggeredExitHandler(WatcherHandler):
 
     def _send_withdrawal_address_alerts(self, watcher, slot: str, withdrawals: list[WithdrawalRequest]):
         alert = CommonAlert(name="HeadWatcherELWithdrawalFromUserWithdrawalAddress", severity="critical")
-        summary = "🔗‍🏃🚪Our validator triggered withdrawal was requested from our Withdrawal Vault address"
+        summary = "🚨🚨🚨 Our validator triggered withdrawal was requested from our Withdrawal Vault address"
         description = '\n\n'.join(map(lambda w: self._describe_withdrawal(w, watcher.user_keys), withdrawals))
         self._send_alert(watcher, alert, summary, description, slot)
 
     def _send_our_validators_alert(self, watcher, slot: str, withdrawals: list[WithdrawalRequest]):
         alert = CommonAlert(name="HeadWatcherUserELWithdrawal", severity="info")
-        summary = "🔗‍🏃🚪Our validator triggered withdrawal was requested"
+        summary = "⚠️⚠️⚠️ Our validator triggered withdrawal was requested"
         description = '\n\n'.join(map(lambda w: self._describe_withdrawal(w, watcher.user_keys), withdrawals))
         self._send_alert(watcher, alert, summary, description, slot)
 

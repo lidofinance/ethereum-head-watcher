@@ -40,17 +40,17 @@ class ConsolidationHandler(WatcherHandler):
 
     def _send_withdrawals_address(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationSourceWithdrawalAddress", severity="critical")
-        summary = "‼️⛔️Validator consolidation was requested from Withdrawal Vault source address"
+        summary = "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address"
         self._send_alert(watcher, slot, alert, summary, consolidations)
 
     def _send_source_pubkey(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationUserSourcePubkey", severity="info")
-        summary = "⚠️Consolidation was requested for our validators"
+        summary = "⚠️⚠️⚠️ Consolidation was requested for our validators"
         self._send_alert(watcher, slot, alert, summary, consolidations)
 
     def _send_target_pubkey(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationUserTargetPubkey", severity="info")
-        summary = "⚠️Someone attempts to consolidate their validators to our validators"
+        summary = "⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators"
         self._send_alert(watcher, slot, alert, summary, consolidations)
 
     def _send_alert(self, watcher, slot: str, alert: CommonAlert, summary: str,
