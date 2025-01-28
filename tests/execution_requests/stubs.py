@@ -7,6 +7,7 @@ from tests.execution_requests.helpers import gen_random_address, gen_random_pubk
 
 @dataclass
 class TestValidator:
+    __test__ = False
     pubkey: str
     withdrawal_address: str
 
