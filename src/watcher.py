@@ -56,7 +56,7 @@ class Watcher:
         self.valid_withdrawal_addresses = set(variables.VALID_WITHDRAWAL_ADDRESSES)
         if not self.valid_withdrawal_addresses and self.execution:
             self.valid_withdrawal_addresses = {
-                self.execution.lido_contracts.lido_locator.functions.withdrawalVault().call()
+                self.execution.lido_contracts.lido_locator.functions.withdrawalVault().call().lower()
             }
 
     def run(self, slots_range: Optional[str] = SLOTS_RANGE):
