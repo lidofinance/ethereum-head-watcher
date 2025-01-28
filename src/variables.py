@@ -43,7 +43,7 @@ EL_REQUEST_TIMEOUT = float(os.getenv('EL_REQUEST_TIMEOUT', 5))
 
 LIDO_LOCATOR_ADDRESS = os.getenv('LIDO_LOCATOR_ADDRESS', '')
 
-VALID_WITHDRAWAL_ADDRESSES = os.getenv('VALID_WITHDRAWAL_ADDRESSES', '').split(',')
+VALID_WITHDRAWAL_ADDRESSES = [x for x in os.getenv('VALID_WITHDRAWAL_ADDRESSES', '').split(',') if x]
 
 # - Metrics -
 PROMETHEUS_PORT = int(os.getenv('PROMETHEUS_PORT', 9000))
