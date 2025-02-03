@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 from dataclasses import asdict
+from functools import cached_property
 from typing import Optional
 
 import json_stream.requests
@@ -53,11 +54,6 @@ class Watcher:
         self.indexed_validators_keys: dict[str, str] = {}
         self.chain_reorgs: dict[str, ChainReorgEvent] = {}
         self.handled_headers: list[BlockHeaderResponseData] = []
-        self.valid_withdrawal_addresses = set(variables.VALID_WITHDRAWAL_ADDRESSES)
-        if not self.valid_withdrawal_addresses and self.execution:
-            self.valid_withdrawal_addresses = {
-                self.execution.lido_contracts.lido_locator.functions.withdrawalVault().call().lower()
-            }
 
     def run(self, slots_range: Optional[str] = SLOTS_RANGE):
         def _run(slot_to_handle='head'):
@@ -191,3 +187,12 @@ class Watcher:
                     self.chain_reorgs[event.slot] = event
         except Exception as e:  # pylint: disable=broad-except
             logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
+
+    @cached_property
+    def valid_withdrawal_addresses(self):
+        addresses = set(variables.VALID_WITHDRAWAL_ADDRESSES)
+        if not addresses and self.execution:
+            addresses = {
+                self.execution.lido_contracts.lido_locator.functions.withdrawalVault().call().lower()
+            }
+        return addresses
