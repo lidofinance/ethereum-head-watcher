@@ -75,11 +75,38 @@ class BlockVoluntaryExit(Nested, FromResponse):
 
 
 @dataclass
+class ConsolidationRequest(FromResponse):
+    source_address: str
+    source_pubkey: str
+    target_pubkey: str
+
+@dataclass
+class WithdrawalRequest(FromResponse):
+    source_address: str
+    validator_pubkey: str
+    amount: str
+
+@dataclass
+class DepositRequest(FromResponse):
+    pubkey: str
+    withdrawal_credentials: str
+    amount: str
+    signature: str
+    index: int
+
+@dataclass
+class ExecutionRequests(Nested, FromResponse):
+    deposits: list[DepositRequest]
+    withdrawals: list[WithdrawalRequest]
+    consolidations: list[ConsolidationRequest]
+
+@dataclass
 class BlockBody(Nested, FromResponse):
     execution_payload: BlockExecutionPayload
     voluntary_exits: list[BlockVoluntaryExit]
     proposer_slashings: list
     attester_slashings: list
+    execution_requests: Optional[ExecutionRequests] = None
 
 
 @dataclass

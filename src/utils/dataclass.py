@@ -1,11 +1,19 @@
 import functools
 from dataclasses import dataclass, fields, is_dataclass
 from types import GenericAlias
-from typing import Callable, Self, Sequence, TypeVar
+from typing import Callable, Self, Sequence, TypeVar, Union, get_args, get_origin
 
 
 class DecodeToDataclassException(Exception):
     pass
+
+
+def try_extract_underlying_type_from_optional(field):
+    args = get_args(field)
+    types = [x for x in args if x != type(None)]
+    if get_origin(field) is Union and type(None) in args and len(types) == 1:
+        return types[0]
+    return None
 
 
 @dataclass
@@ -30,6 +38,9 @@ class Nested:
                     )
             elif is_dataclass(field.type) and not is_dataclass(getattr(self, field.name)):
                 factory = self.__get_dataclass_factory(field.type)
+                setattr(self, field.name, factory(**getattr(self, field.name)))
+            elif getattr(self, field.name) and (underlying := try_extract_underlying_type_from_optional(field.type)):
+                factory = self.__get_dataclass_factory(underlying)
                 setattr(self, field.name, factory(**getattr(self, field.name)))
 
     @staticmethod
