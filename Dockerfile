@@ -39,7 +39,7 @@ COPY . .
 RUN apt-get clean && find /var/lib/apt/lists/ -type f -delete && chown -R www-data /app/
 
 ENV PROMETHEUS_PORT=9000
-ENV HEALTHCHECK_SERVER_POR=9010
+ENV HEALTHCHECK_SERVER_PORT=9010
 
 EXPOSE $PROMETHEUS_PORT
 USER www-data
