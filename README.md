@@ -143,6 +143,10 @@ Currently it supports:
 `VALID_WITHDRAWAL_ADDRESSES` - A comma-separated list of addresses. Triggers a critical alert if a monitored execution_request contains a source_address matching any of these addresses 
 * **Required:** false
 * **Default:** []
+---
+`DISABLE_UNEXPECTED_EXIT_ALERTS` - A comma-separated list of module indexes for which unexpected exit alerts are disabled.  
+* **Required:** false
+* **Default:** []
 
 ## Application metrics
 

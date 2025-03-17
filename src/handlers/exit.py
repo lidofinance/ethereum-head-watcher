@@ -58,6 +58,8 @@ class ExitsHandler(WatcherHandler):
                             owner='other',
                         )
                     )
+        if watcher.disable_unexpected_exit_alerts:
+            exits = [e for e in exits if e.owner == 'user' and str(e.module_index) not in watcher.disable_unexpected_exit_alerts]
         if not exits:
             logger.debug({'msg': f'No exits in block [{head.message.slot}]'})
         else:

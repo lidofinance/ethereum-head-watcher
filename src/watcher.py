@@ -54,6 +54,7 @@ class Watcher:
         self.indexed_validators_keys: dict[str, str] = {}
         self.chain_reorgs: dict[str, ChainReorgEvent] = {}
         self.handled_headers: list[BlockHeaderResponseData] = []
+        self.disable_unexpected_exit_alerts: list[str] = variables.DISABLE_UNEXPECTED_EXIT_ALERTS
 
     def run(self, slots_range: Optional[str] = SLOTS_RANGE):
         def _run(slot_to_handle='head'):
