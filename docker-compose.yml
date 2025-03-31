@@ -31,6 +31,7 @@ services:
       - ALERTMANAGER_URI=${ALERTMANAGER_URI}
       - LOG_LEVEL=${LOG_LEVEL}
       - DRY_RUN=${DRY_RUN}
+      - DISABLE_UNEXPECTED_EXIT_ALERTS=${DISABLE_UNEXPECTED_EXIT_ALERTS}
 
   prometheus:
     image: prom/prometheus:latest
@@ -52,7 +53,7 @@ services:
       - 9090
 
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.25.0
     container_name: alertmanager
     restart: unless-stopped
     networks:

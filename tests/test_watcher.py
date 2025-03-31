@@ -96,3 +96,11 @@ def test_expected_exits(caplog, watcher):
     watcher.run("6833022-6833039")
 
     assert 'Our validators were unexpected exited!' not in caplog.text, "Alert should not be in logs"
+
+
+def test_disabled_alerts_exits(caplog, watcher, monkeypatch):
+    monkeypatch.setattr(watcher, "disable_unexpected_exit_alerts", ['3'])
+
+    watcher.run("11180702-11180703")
+
+    assert 'Our validators were unexpected exited!' not in caplog.text, "Alerts should not be in logs"
