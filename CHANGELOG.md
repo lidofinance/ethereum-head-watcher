@@ -1,3 +1,18 @@
+# [0.3.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.2.1...0.3.0) (2025-04-07)
+
+
+### Bug Fixes
+
+* typo in Dockerfile HEALTHCHECK_SERVER_PORT ([#59](https://github.com/lidofinance/ethereum-head-watcher/issues/59)) ([8bdf046](https://github.com/lidofinance/ethereum-head-watcher/commit/8bdf046d8f45d90105dd050b899b345b2cf656f6))
+
+
+### Features
+
+* add support for disabling unexpected exit alerts per module ([#60](https://github.com/lidofinance/ethereum-head-watcher/issues/60)) ([73f7fde](https://github.com/lidofinance/ethereum-head-watcher/commit/73f7fdebacfc0f6c759540ac21531d10fde10198))
+* workflows adjustments for hoodi/holesky deployments ([c3b4839](https://github.com/lidofinance/ethereum-head-watcher/commit/c3b4839d5a15e158a3ce0b970be7364958fa7515))
+
+
+
 ## [0.2.1](https://github.com/lidofinance/ethereum-head-watcher/compare/0.2.0...0.2.1) (2024-08-13)
 
 
