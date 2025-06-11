@@ -5,3 +5,10 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    target-branch: "develop"
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    target-branch: "develop"
+    open-pull-requests-limit: 5
