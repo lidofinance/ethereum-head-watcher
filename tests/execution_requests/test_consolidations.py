@@ -27,7 +27,9 @@ def test_source_is_valid_withdrawal_address(withdrawal_address: str, watcher: Wa
     alert = watcher.alertmanager.sent_alerts[0]
     assert alert.labels.alertname.startswith('HeadWatcherConsolidationSourceWithdrawalAddress')
     assert alert.labels.severity == 'critical'
-    assert alert.annotations.summary == "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address"
+    assert (
+        alert.annotations.summary == "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address"
+    )
     assert random_source_pubkey in alert.annotations.description
     assert random_target_pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
