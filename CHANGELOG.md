@@ -1,3 +1,31 @@
+# [0.3.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.2.1...0.3.0) (2025-04-07)
+
+
+### Bug Fixes
+
+* typo in Dockerfile HEALTHCHECK_SERVER_PORT ([#59](https://github.com/lidofinance/ethereum-head-watcher/issues/59)) ([8bdf046](https://github.com/lidofinance/ethereum-head-watcher/commit/8bdf046d8f45d90105dd050b899b345b2cf656f6))
+
+
+### Features
+
+* add support for disabling unexpected exit alerts per module ([#60](https://github.com/lidofinance/ethereum-head-watcher/issues/60)) ([73f7fde](https://github.com/lidofinance/ethereum-head-watcher/commit/73f7fdebacfc0f6c759540ac21531d10fde10198))
+* workflows adjustments for hoodi/holesky deployments ([c3b4839](https://github.com/lidofinance/ethereum-head-watcher/commit/c3b4839d5a15e158a3ce0b970be7364958fa7515))
+
+
+
+## [0.2.1](https://github.com/lidofinance/ethereum-head-watcher/compare/0.2.0...0.2.1) (2024-08-13)
+
+
+### Bug Fixes
+
+* adjusted secret variable name in test&checks workflow ([c4a59c4](https://github.com/lidofinance/ethereum-head-watcher/commit/c4a59c427420a4917866d1cd42bd203c8fa86316))
+* curl version ([7d7b994](https://github.com/lidofinance/ethereum-head-watcher/commit/7d7b9946e074549e7fba791bcfc5fa4ebe2a0c1e))
+* incorrect curl version ([4641d9a](https://github.com/lidofinance/ethereum-head-watcher/commit/4641d9a6bcbaaa521524c05d29feec9206a1546b))
+* incorrect curl version ([412b786](https://github.com/lidofinance/ethereum-head-watcher/commit/412b7865d18204c2b2ad77f194ae8f441d54dde5))
+* incorrect env variable name ([3c6124a](https://github.com/lidofinance/ethereum-head-watcher/commit/3c6124ac22b37a311290e1fc43cba6333ee4cc48))
+
+
+
 # [0.2.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.1.0...0.2.0) (2023-09-07)
 
 
