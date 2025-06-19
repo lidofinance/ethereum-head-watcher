@@ -2127,14 +2127,14 @@ tester = ["eth-tester[py-evm] (==v0.9.0-b.2)", "py-geth (>=3.11.0)"]
 
 [[package]]
 name = "web3-multi-provider"
-version = "0.6.0"
+version = "1.0.0"
 description = "Web3py provider that makes it easy to switch between different blockchain nodes to make sure application will be be online if main blockchain node will be unavailable."
 optional = false
-python-versions = ">=3.7.10,<4"
+python-versions = "<4,>=3.7.10"
 groups = ["main"]
 files = [
-    {file = "web3_multi_provider-0.6.0-py3-none-any.whl", hash = "sha256:edf787d77d9503928ae5e51146b1fb511e6a00b479d86b4fbdb4eaabf057e59d"},
-    {file = "web3_multi_provider-0.6.0.tar.gz", hash = "sha256:16cc0c826eec8690e5dda41ded51f1ea9d1117409c76cca8af0342a7874474fc"},
+    {file = "web3_multi_provider-1.0.0-py3-none-any.whl", hash = "sha256:0b59256ad3d738328110259cf9c6779ec5be51abe6f01f3d76f115e06254183e"},
+    {file = "web3_multi_provider-1.0.0.tar.gz", hash = "sha256:3164330894b0baeae701d75b6c30210fdaa9db7edb6d07593e062c949887a0db"},
 ]
 
 [package.dependencies]
@@ -2427,4 +2427,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "571a0052015b8d74da7e628b98282879b9b1a32d78b56cfbacad8a9885e42cd8"
+content-hash = "a1f4828731d68fd7a925fca632ec4f919ece59aabdb69078e571fb4c62c143cb"
