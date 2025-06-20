@@ -11,7 +11,7 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-prometheus-client = "^0.16.0"
+prometheus-client = "^0.22.1"
 requests = "^2.32.4"
 unsync = "^1.4.0"
 json-stream = "^2.3.0"
