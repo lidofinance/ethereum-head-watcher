@@ -1,3 +1,17 @@
+## [0.3.1](https://github.com/lidofinance/ethereum-head-watcher/compare/0.3.0...0.3.1) (2025-06-24)
+
+
+### Bug Fixes
+
+* replace curl with python in healthcheck ([#79](https://github.com/lidofinance/ethereum-head-watcher/issues/79)) ([ab8378f](https://github.com/lidofinance/ethereum-head-watcher/commit/ab8378f5c08a6053d948d2fc48c281efcc7e3f93))
+
+
+### Reverts
+
+* Revert "chore(deps): bump eth-abi from 4.1.0 to 5.0.1 (#70)" (#86) ([2086d96](https://github.com/lidofinance/ethereum-head-watcher/commit/2086d9639cec959d3e4401950e47e18b7495cd11)), closes [#70](https://github.com/lidofinance/ethereum-head-watcher/issues/70) [#86](https://github.com/lidofinance/ethereum-head-watcher/issues/86)
+
+
+
 # [0.3.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.2.1...0.3.0) (2025-04-07)
 
 
