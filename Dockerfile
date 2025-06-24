@@ -5,7 +5,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends -qq \
     libffi-dev=3.3-6 \
     g++=4:10.2.1-1 \
     git=1:2.30.2-1+deb11u2 \
-    curl=7.74.0-1.3+deb11u14 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -45,7 +44,7 @@ EXPOSE $PROMETHEUS_PORT
 USER www-data
 
 HEALTHCHECK --interval=10s --timeout=3s \
-    CMD curl -f http://localhost:$HEALTHCHECK_SERVER_PORT/pulse/ || exit 1
+  CMD sh -c 'python3 -c "import urllib.request; exit(0) if urllib.request.urlopen(f\"http://localhost:${HEALTHCHECK_SERVER_PORT}/pulse/\").status == 200 else exit(1)"'
 
 WORKDIR /app/
 
