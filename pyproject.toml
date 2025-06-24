@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ethereum-head-watcher"
-version = "0.3.0"
+version = "0.3.1"
 description = "Bot that watches for important events on Ethereum head"
 authors = ["vladimir.g@lido.fi"]
 license = "MIT License"
