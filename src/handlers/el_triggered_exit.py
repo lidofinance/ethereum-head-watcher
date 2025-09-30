@@ -8,6 +8,7 @@ from src.handlers.helpers import beaconchain, validator_pubkey_link
 from src.keys_source.base_source import NamedKey
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import FullBlockInfo, WithdrawalRequest
+from src.variables import ADDITIONAL_ALERTMANAGER_LABELS
 
 logger = logging.getLogger()
 
@@ -39,12 +40,11 @@ class ElTriggeredExitHandler(WatcherHandler):
         if full_our_withdrawals:
             self._send_full_withdrawal_alert(watcher, slot, full_our_withdrawals)
 
-
     def _send_partial_withdrawal_alert(self, watcher, slot: str, withdrawals: list[WithdrawalRequest]):
         alert = CommonAlert(name="HeadWatcherPartialELWithdrawalObserved", severity="critical")
         summary = "🚨 Partial withdrawal observed for our validator(s) (unsupported)"
         description = '\n\n'.join(self._describe_withdrawal(w, watcher.user_keys) for w in withdrawals)
-        self._send_alert(watcher, alert, summary, description, slot)
+        self._send_alert(watcher, alert, summary, description, slot, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_full_withdrawal_alert(self, watcher, slot: str, withdrawals: list[WithdrawalRequest]):
         alert = CommonAlert(name="HeadWatcherUserELWithdrawal", severity="info")
@@ -52,9 +52,10 @@ class ElTriggeredExitHandler(WatcherHandler):
         description = '\n\n'.join(self._describe_withdrawal(w, watcher.user_keys) for w in withdrawals)
         self._send_alert(watcher, alert, summary, description, slot)
 
-    def _send_alert(self, watcher, alert: CommonAlert, summary: str, description: str, slot: str):
+    def _send_alert(self, watcher, alert: CommonAlert, summary: str, description: str, slot: str,
+                    additional_labels=None):
         description += f'\n\nSlot: {beaconchain(slot)}'
-        self.send_alert(watcher, alert.build_body(summary, description))
+        self.send_alert(watcher, alert.build_body(summary, description, additional_labels))
 
     @staticmethod
     def _is_full(withdrawal: WithdrawalRequest) -> bool:
