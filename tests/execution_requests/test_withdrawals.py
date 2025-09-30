@@ -5,7 +5,30 @@ from tests.execution_requests.helpers import create_sample_block, gen_random_add
 from tests.execution_requests.stubs import WatcherStub, TestValidator
 
 
-def test_user_validator(user_validator: TestValidator, watcher: WatcherStub):
+def test_user_validator_full_withdrawal(user_validator: TestValidator, watcher: WatcherStub):
+    random_address = gen_random_address()
+    block = create_sample_block(
+        withdrawals=[
+            WithdrawalRequest(source_address=random_address, validator_pubkey=user_validator.pubkey, amount='0')
+        ]
+    )
+    handler = ElTriggeredExitHandler()
+
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) == 1
+    alert = watcher.alertmanager.sent_alerts[0]
+    assert alert.labels.alertname.startswith('HeadWatcherUserELWithdrawal')
+    assert alert.labels.severity == 'info'
+    assert alert.annotations.summary == "⚠️ Full withdrawal (exit) requested for our validator(s)"
+    assert user_validator.pubkey in alert.annotations.description
+    assert random_address in alert.annotations.description
+    assert '0' in alert.annotations.description
+    assert block.message.slot in alert.annotations.description
+
+
+def test_user_validator_partial_withdrawal(user_validator: TestValidator, watcher: WatcherStub):
     random_address = gen_random_address()
     block = create_sample_block(
         withdrawals=[
@@ -19,9 +42,9 @@ def test_user_validator(user_validator: TestValidator, watcher: WatcherStub):
 
     assert len(watcher.alertmanager.sent_alerts) == 1
     alert = watcher.alertmanager.sent_alerts[0]
-    assert alert.labels.alertname.startswith('HeadWatcherUserELWithdrawal')
-    assert alert.labels.severity == 'info'
-    assert alert.annotations.summary == "⚠️⚠️⚠️ Our validator triggered withdrawal was requested"
+    assert alert.labels.alertname.startswith('HeadWatcherPartialELWithdrawalObserved')
+    assert alert.labels.severity == 'critical'
+    assert alert.annotations.summary == "🚨 Partial withdrawal observed for our validator(s) (unsupported)"
     assert user_validator.pubkey in alert.annotations.description
     assert random_address in alert.annotations.description
     assert '32' in alert.annotations.description
@@ -42,7 +65,9 @@ def test_absence_of_alerts_for_foreign_validator(validator: TestValidator, watch
     assert len(watcher.alertmanager.sent_alerts) == 0
 
 
-def test_from_user_withdrawal_address(validator: TestValidator, withdrawal_address: str, watcher: WatcherStub):
+def test_from_user_withdrawal_address_no_longer_alerts(
+    validator: TestValidator, withdrawal_address: str, watcher: WatcherStub
+):
     block = create_sample_block(
         withdrawals=[
             WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=validator.pubkey, amount='32')
@@ -53,18 +78,7 @@ def test_from_user_withdrawal_address(validator: TestValidator, withdrawal_addre
     task = handler.handle(watcher, block)
     task.result()
 
-    assert len(watcher.alertmanager.sent_alerts) == 1
-    alert = watcher.alertmanager.sent_alerts[0]
-    assert alert.labels.alertname.startswith('HeadWatcherELWithdrawalFromUserWithdrawalAddress')
-    assert alert.labels.severity == 'critical'
-    assert (
-        alert.annotations.summary
-        == "🚨🚨🚨 Our validator triggered withdrawal was requested from our Withdrawal Vault address"
-    )
-    assert validator.pubkey in alert.annotations.description
-    assert withdrawal_address in alert.annotations.description
-    assert '32' in alert.annotations.description
-    assert block.message.slot in alert.annotations.description
+    assert len(watcher.alertmanager.sent_alerts) == 0
 
 
 def test_works_on_dencun(watcher: WatcherStub):
@@ -106,30 +120,32 @@ def test_absense_of_alerts_for_foreign_validator():
     assert len(watcher.alertmanager.sent_alerts) == 0
 
 
-def test_group_similar_alerts():
+def test_group_similar_partial_withdrawal_alerts():
     validator1 = TestValidator.random()
     validator2 = TestValidator.random()
-    withdrawal_address = gen_random_address()
 
     watcher = WatcherStub(
         user_keys={
             validator1.pubkey: NamedKey(
-                operatorName='test operator', key=validator1.pubkey, operatorIndex='1', moduleIndex='1'
-            )
+                operatorName='test operator 1', key=validator1.pubkey, operatorIndex='1', moduleIndex='1'
+            ),
+            validator2.pubkey: NamedKey(
+                operatorName='test operator 2', key=validator2.pubkey, operatorIndex='2', moduleIndex='1'
+            ),
         },
-        valid_withdrawal_addresses={withdrawal_address},
+        valid_withdrawal_addresses=set(),  # not used anymore
     )
     block = create_sample_block(
         withdrawals=[
             WithdrawalRequest(
-                source_address=withdrawal_address,
+                source_address=gen_random_address(),
                 validator_pubkey=validator1.pubkey,
-                amount='32',
+                amount='10',  # partial
             ),
             WithdrawalRequest(
-                source_address=withdrawal_address,
+                source_address=gen_random_address(),
                 validator_pubkey=validator2.pubkey,
-                amount='32',
+                amount='20',  # partial
             ),
         ]
     )
@@ -140,15 +156,13 @@ def test_group_similar_alerts():
 
     assert len(watcher.alertmanager.sent_alerts) == 1
     alert = watcher.alertmanager.sent_alerts[0]
-    assert alert.labels.alertname.startswith('HeadWatcherELWithdrawalFromUserWithdrawalAddress')
+    assert alert.labels.alertname.startswith('HeadWatcherPartialELWithdrawalObserved')
     assert alert.labels.severity == 'critical'
-    assert (
-        alert.annotations.summary
-        == "🚨🚨🚨 Our validator triggered withdrawal was requested from our Withdrawal Vault address"
-    )
+    assert alert.annotations.summary == "🚨 Partial withdrawal observed for our validator(s) (unsupported)"
     assert validator1.pubkey in alert.annotations.description
     assert validator2.pubkey in alert.annotations.description
-    assert 'test operator' in alert.annotations.description
-    assert withdrawal_address in alert.annotations.description
-    assert '32' in alert.annotations.description
+    assert 'test operator 1' in alert.annotations.description
+    assert 'test operator 2' in alert.annotations.description
+    assert '10' in alert.annotations.description
+    assert '20' in alert.annotations.description
     assert block.message.slot in alert.annotations.description
