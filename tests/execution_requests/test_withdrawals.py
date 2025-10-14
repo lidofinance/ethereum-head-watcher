@@ -5,7 +5,9 @@ from tests.execution_requests.helpers import create_sample_block, gen_random_add
 from tests.execution_requests.stubs import WatcherStub, TestValidator
 
 
-def test_user_validator_full_withdrawal(user_validator: TestValidator, watcher: WatcherStub):
+def test_user_validator_full_withdrawal_unknown_source_triggers_alert(
+    user_validator: TestValidator, watcher: WatcherStub
+):
     random_address = gen_random_address()
     block = create_sample_block(
         withdrawals=[
@@ -19,20 +21,23 @@ def test_user_validator_full_withdrawal(user_validator: TestValidator, watcher: 
 
     assert len(watcher.alertmanager.sent_alerts) == 1
     alert = watcher.alertmanager.sent_alerts[0]
-    assert alert.labels.alertname.startswith('HeadWatcherUserELWithdrawal')
-    assert alert.labels.severity == 'info'
-    assert alert.annotations.summary == "⚠️ Full withdrawal (exit) requested for our validator(s)"
+    assert alert.labels.alertname.startswith('HeadWatcherELRequestFromUnknownSourceForOurValidators')
+    assert alert.labels.severity == 'critical'
+    assert (
+        alert.annotations.summary == "🚨 Withdrawal request from unknown source address for our validator(s) observed"
+    )
     assert user_validator.pubkey in alert.annotations.description
     assert random_address in alert.annotations.description
     assert '0' in alert.annotations.description
     assert block.message.slot in alert.annotations.description
 
 
-def test_user_validator_partial_withdrawal(user_validator: TestValidator, watcher: WatcherStub):
-    random_address = gen_random_address()
+def test_user_validator_partial_withdrawal_from_valid_source(
+    user_validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
+):
     block = create_sample_block(
         withdrawals=[
-            WithdrawalRequest(source_address=random_address, validator_pubkey=user_validator.pubkey, amount='32')
+            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=user_validator.pubkey, amount='32')
         ]
     )
     handler = ElTriggeredExitHandler()
@@ -46,7 +51,7 @@ def test_user_validator_partial_withdrawal(user_validator: TestValidator, watche
     assert alert.labels.severity == 'critical'
     assert alert.annotations.summary == "🚨 Partial withdrawal observed for our validator(s) (unsupported)"
     assert user_validator.pubkey in alert.annotations.description
-    assert random_address in alert.annotations.description
+    assert withdrawal_address in alert.annotations.description
     assert '32' in alert.annotations.description
     assert block.message.slot in alert.annotations.description
 
@@ -65,7 +70,7 @@ def test_absence_of_alerts_for_foreign_validator(validator: TestValidator, watch
     assert len(watcher.alertmanager.sent_alerts) == 0
 
 
-def test_from_user_withdrawal_address_no_longer_alerts(
+def test_from_user_withdrawal_address_for_foreign_validator_triggers_alert(
     validator: TestValidator, withdrawal_address: str, watcher: WatcherStub
 ):
     block = create_sample_block(
@@ -78,7 +83,17 @@ def test_from_user_withdrawal_address_no_longer_alerts(
     task = handler.handle(watcher, block)
     task.result()
 
-    assert len(watcher.alertmanager.sent_alerts) == 0
+    assert len(watcher.alertmanager.sent_alerts) == 1
+    alert = watcher.alertmanager.sent_alerts[0]
+    assert alert.labels.alertname.startswith('HeadWatcherELRequestFromOurSourceForForeignValidators')
+    assert alert.labels.severity == 'critical'
+    assert (
+        alert.annotations.summary == "🚨️ Withdrawal request from our source address for non-user validator(s) observed"
+    )
+    assert validator.pubkey in alert.annotations.description
+    assert withdrawal_address in alert.annotations.description
+    assert '32' in alert.annotations.description
+    assert block.message.slot in alert.annotations.description
 
 
 def test_works_on_dencun(watcher: WatcherStub):
@@ -124,6 +139,9 @@ def test_group_similar_partial_withdrawal_alerts():
     validator1 = TestValidator.random()
     validator2 = TestValidator.random()
 
+    addr1 = gen_random_address()
+    addr2 = gen_random_address()
+
     watcher = WatcherStub(
         user_keys={
             validator1.pubkey: NamedKey(
@@ -133,19 +151,19 @@ def test_group_similar_partial_withdrawal_alerts():
                 operatorName='test operator 2', key=validator2.pubkey, operatorIndex='2', moduleIndex='1'
             ),
         },
-        valid_withdrawal_addresses=set(),  # not used anymore
+        valid_withdrawal_addresses={addr1, addr2},
     )
     block = create_sample_block(
         withdrawals=[
             WithdrawalRequest(
-                source_address=gen_random_address(),
+                source_address=addr1,
                 validator_pubkey=validator1.pubkey,
-                amount='10',  # partial
+                amount='10',
             ),
             WithdrawalRequest(
-                source_address=gen_random_address(),
+                source_address=addr2,
                 validator_pubkey=validator2.pubkey,
-                amount='20',  # partial
+                amount='20',
             ),
         ]
     )

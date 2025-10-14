@@ -22,23 +22,41 @@ class ElTriggeredExitHandler(WatcherHandler):
             return
 
         slot = head.message.slot
+        withdrawals = head.message.body.execution_requests.withdrawals
+        valid_withdrawal_addresses = watcher.valid_withdrawal_addresses
 
-        our_withdrawals = [
-            w for w in head.message.body.execution_requests.withdrawals
-            if w.validator_pubkey in watcher.user_keys
+        user_partial_withdrawals = [
+            w
+            for w in withdrawals
+            if w.source_address in valid_withdrawal_addresses
+            and self._is_partial(w)
+            and w.validator_pubkey in watcher.user_keys
         ]
 
-        if not our_withdrawals:
-            return
+        requests_from_our_source_for_foreign_validators = [
+            w
+            for w in withdrawals
+            if w.source_address in valid_withdrawal_addresses and w.validator_pubkey not in watcher.user_keys
+        ]
 
-        partial_our_withdrawals: list[WithdrawalRequest] = [w for w in our_withdrawals if self._is_partial(w)]
-        full_our_withdrawals: list[WithdrawalRequest] = [w for w in our_withdrawals if self._is_full(w)]
+        requests_from_unknown_source_for_our_validators = [
+            w
+            for w in withdrawals
+            if w.source_address not in valid_withdrawal_addresses and w.validator_pubkey in watcher.user_keys
+        ]
 
-        if partial_our_withdrawals:
-            self._send_partial_withdrawal_alert(watcher, slot, partial_our_withdrawals)
+        if user_partial_withdrawals:
+            self._send_partial_withdrawal_alert(watcher, slot, user_partial_withdrawals)
 
-        if full_our_withdrawals:
-            self._send_full_withdrawal_alert(watcher, slot, full_our_withdrawals)
+        if requests_from_our_source_for_foreign_validators:
+            self._send_request_from_our_source_for_foreign_validators_alert(
+                watcher, slot, requests_from_our_source_for_foreign_validators
+            )
+
+        if requests_from_unknown_source_for_our_validators:
+            self._send_request_from_unknown_source_for_our_validators_alert(
+                watcher, slot, requests_from_unknown_source_for_our_validators
+            )
 
     def _send_partial_withdrawal_alert(self, watcher, slot: str, withdrawals: list[WithdrawalRequest]):
         alert = CommonAlert(name="HeadWatcherPartialELWithdrawalObserved", severity="critical")
@@ -46,14 +64,25 @@ class ElTriggeredExitHandler(WatcherHandler):
         description = '\n\n'.join(self._describe_withdrawal(w, watcher.user_keys) for w in withdrawals)
         self._send_alert(watcher, alert, summary, description, slot, ADDITIONAL_ALERTMANAGER_LABELS)
 
-    def _send_full_withdrawal_alert(self, watcher, slot: str, withdrawals: list[WithdrawalRequest]):
-        alert = CommonAlert(name="HeadWatcherUserELWithdrawal", severity="info")
-        summary = "⚠️ Full withdrawal (exit) requested for our validator(s)"
+    def _send_request_from_our_source_for_foreign_validators_alert(
+        self, watcher, slot: str, withdrawals: list[WithdrawalRequest]
+    ):
+        alert = CommonAlert(name="HeadWatcherELRequestFromOurSourceForForeignValidators", severity="critical")
+        summary = "🚨️ Withdrawal request from our source address for non-user validator(s) observed"
+        description = '\n\n'.join(self._describe_withdrawal(w, watcher.user_keys) for w in withdrawals)
+        self._send_alert(watcher, alert, summary, description, slot, ADDITIONAL_ALERTMANAGER_LABELS)
+
+    def _send_request_from_unknown_source_for_our_validators_alert(
+        self, watcher, slot: str, withdrawals: list[WithdrawalRequest]
+    ):
+        alert = CommonAlert(name="HeadWatcherELRequestFromUnknownSourceForOurValidators", severity="critical")
+        summary = "🚨 Withdrawal request from unknown source address for our validator(s) observed"
         description = '\n\n'.join(self._describe_withdrawal(w, watcher.user_keys) for w in withdrawals)
         self._send_alert(watcher, alert, summary, description, slot)
 
-    def _send_alert(self, watcher, alert: CommonAlert, summary: str, description: str, slot: str,
-                    additional_labels=None):
+    def _send_alert(
+        self, watcher, alert: CommonAlert, summary: str, description: str, slot: str, additional_labels=None
+    ):
         description += f'\n\nSlot: {beaconchain(slot)}'
         self.send_alert(watcher, alert.build_body(summary, description, additional_labels))
 
@@ -67,8 +96,10 @@ class ElTriggeredExitHandler(WatcherHandler):
 
     @staticmethod
     def _describe_withdrawal(withdrawal: WithdrawalRequest, user_keys: dict[str, NamedKey]) -> str:
-        return '\n'.join([
-            f'Source address: {withdrawal.source_address}',
-            f'Validator: {validator_pubkey_link(withdrawal.validator_pubkey, user_keys)}',
-            f'Amount: {withdrawal.amount}',
-        ])
+        return '\n'.join(
+            [
+                f'Source address (EL): {withdrawal.source_address}',
+                f'Validator pubkey: {validator_pubkey_link(withdrawal.validator_pubkey, user_keys)}',
+                f'Amount (gwei): {withdrawal.amount}',
+            ]
+        )
