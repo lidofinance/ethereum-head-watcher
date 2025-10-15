@@ -50,9 +50,9 @@ def test_user_validator_full_withdrawal_unknown_source_triggers_alert(
     assert len(watcher.alertmanager.sent_alerts) == 1
     alert = watcher.alertmanager.sent_alerts[0]
     assert alert.labels.alertname.startswith('HeadWatcherELRequestFromUnknownSourceForOurValidators')
-    assert alert.labels.severity == 'critical'
+    assert alert.labels.severity == 'info'
     assert (
-        alert.annotations.summary == "🚨 Withdrawal request from unknown source address for our validator(s) observed"
+        alert.annotations.summary == "⚠️ Withdrawal request from unknown source address for our validator(s) observed"
     )
     assert user_validator.pubkey in alert.annotations.description
     assert random_address in alert.annotations.description
@@ -297,7 +297,7 @@ def test_mixed_unknown_source_for_our_and_our_source_for_foreign_generate_two_al
     assert len(kinds) == 2
     assert any(
         k[0].startswith('HeadWatcherELRequestFromUnknownSourceForOurValidators')
-        and k[1] == 'critical'
+        and k[1] == 'info'
         and "unknown source address" in k[2]
         for k in kinds
     )

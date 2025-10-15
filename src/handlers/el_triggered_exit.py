@@ -85,8 +85,8 @@ class ElTriggeredExitHandler(WatcherHandler):
     def _send_request_from_unknown_source_for_our_validators_alert(
         self, watcher, slot: str, withdrawals: list[WithdrawalRequest]
     ):
-        alert = CommonAlert(name="HeadWatcherELRequestFromUnknownSourceForOurValidators", severity="critical")
-        summary = "🚨 Withdrawal request from unknown source address for our validator(s) observed"
+        alert = CommonAlert(name="HeadWatcherELRequestFromUnknownSourceForOurValidators", severity="info")
+        summary = "⚠️ Withdrawal request from unknown source address for our validator(s) observed"
         description = '\n\n'.join(self._describe_withdrawal(w, watcher.user_keys) for w in withdrawals)
         self._send_alert(watcher, alert, summary, description, slot)
 
