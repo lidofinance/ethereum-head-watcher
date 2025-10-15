@@ -5,6 +5,34 @@ from tests.execution_requests.helpers import create_sample_block, gen_random_add
 from tests.execution_requests.stubs import WatcherStub, TestValidator
 
 
+def test_user_validator_full_withdrawal_from_valid_source_triggers_info_alert(
+    user_validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
+):
+    block = create_sample_block(
+        withdrawals=[
+            WithdrawalRequest(
+                source_address=withdrawal_address,
+                validator_pubkey=user_validator.pubkey,
+                amount='0',
+            )
+        ]
+    )
+    handler = ElTriggeredExitHandler()
+
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) == 1
+    alert = watcher.alertmanager.sent_alerts[0]
+    assert alert.labels.alertname.startswith('HeadWatcherFullELWithdrawalObserved')
+    assert alert.labels.severity == 'info'
+    assert alert.annotations.summary == "⚠️ Full withdrawal (exit) requested for our validator(s)"
+    assert user_validator.pubkey in alert.annotations.description
+    assert withdrawal_address in alert.annotations.description
+    assert '0' in alert.annotations.description
+    assert block.message.slot in alert.annotations.description
+
+
 def test_user_validator_full_withdrawal_unknown_source_triggers_alert(
     user_validator: TestValidator, watcher: WatcherStub
 ):
@@ -56,7 +84,7 @@ def test_user_validator_partial_withdrawal_from_valid_source(
     assert block.message.slot in alert.annotations.description
 
 
-def test_absence_of_alerts_for_foreign_validator(validator: TestValidator, watcher: WatcherStub):
+def test_no_alerts_for_foreign_validator(validator: TestValidator, watcher: WatcherStub):
     block = create_sample_block(
         withdrawals=[
             WithdrawalRequest(source_address=gen_random_address(), validator_pubkey=validator.pubkey, amount='32')
@@ -96,7 +124,7 @@ def test_from_user_withdrawal_address_for_foreign_validator_triggers_alert(
     assert block.message.slot in alert.annotations.description
 
 
-def test_works_on_dencun(watcher: WatcherStub):
+def test_no_withdrawals_produce_no_alerts(watcher: WatcherStub):
     handler = ElTriggeredExitHandler()
     block = create_sample_block()
 
@@ -184,3 +212,106 @@ def test_group_similar_partial_withdrawal_alerts():
     assert '10' in alert.annotations.description
     assert '20' in alert.annotations.description
     assert block.message.slot in alert.annotations.description
+
+
+def test_multiple_full_withdrawals_grouped_into_one_alert(user_validator: TestValidator, watcher: WatcherStub):
+    second_validator = TestValidator.random()
+    addr = gen_random_address()
+    watcher.user_keys[second_validator.pubkey] = NamedKey(
+        key=second_validator.pubkey, operatorName='op2', operatorIndex='2', moduleIndex='1'
+    )
+    watcher.valid_withdrawal_addresses.add(addr)
+    block = create_sample_block(
+        withdrawals=[
+            WithdrawalRequest(source_address=addr, validator_pubkey=user_validator.pubkey, amount='0'),
+            WithdrawalRequest(source_address=addr, validator_pubkey=second_validator.pubkey, amount='0'),
+        ]
+    )
+
+    handler = ElTriggeredExitHandler()
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) == 1
+    alert = watcher.alertmanager.sent_alerts[0]
+    assert alert.labels.alertname.startswith('HeadWatcherFullELWithdrawalObserved')
+    assert alert.labels.severity == 'info'
+    assert user_validator.pubkey in alert.annotations.description
+    assert second_validator.pubkey in alert.annotations.description
+    assert '0' in alert.annotations.description
+    assert block.message.slot in alert.annotations.description
+
+
+def test_mixed_user_full_and_partial_generate_two_alerts(
+    user_validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
+):
+    second_validator = TestValidator.random()
+    watcher.user_keys[second_validator.pubkey] = NamedKey(
+        key=second_validator.pubkey, operatorName='op2', operatorIndex='2', moduleIndex='1'
+    )
+    watcher.valid_withdrawal_addresses.add(withdrawal_address)
+    block = create_sample_block(
+        withdrawals=[
+            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=user_validator.pubkey, amount='0'),
+            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=second_validator.pubkey, amount='5'),
+        ]
+    )
+
+    handler = ElTriggeredExitHandler()
+    task = handler.handle(watcher, block)
+    task.result()
+
+    kinds = sorted(
+        (a.labels.alertname, a.labels.severity, a.annotations.summary) for a in watcher.alertmanager.sent_alerts
+    )
+    assert len(kinds) == 2
+    assert any(k[0].startswith('HeadWatcherFullELWithdrawalObserved') and k[1] == 'info' for k in kinds)
+    assert any(k[0].startswith('HeadWatcherPartialELWithdrawalObserved') and k[1] == 'critical' for k in kinds)
+    joined_desc = '\n'.join(a.annotations.description for a in watcher.alertmanager.sent_alerts)
+    assert user_validator.pubkey in joined_desc
+    assert second_validator.pubkey in joined_desc
+    assert '0' in joined_desc
+    assert '5' in joined_desc
+    assert block.message.slot in joined_desc
+
+
+def test_mixed_unknown_source_for_our_and_our_source_for_foreign_generate_two_alerts(
+    user_validator: TestValidator, validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
+):
+    unknown_addr = gen_random_address()
+    watcher.valid_withdrawal_addresses.add(withdrawal_address)
+    block = create_sample_block(
+        withdrawals=[
+            WithdrawalRequest(source_address=unknown_addr, validator_pubkey=user_validator.pubkey, amount='1'),
+            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=validator.pubkey, amount='2'),
+        ]
+    )
+
+    handler = ElTriggeredExitHandler()
+    task = handler.handle(watcher, block)
+    task.result()
+
+    kinds = sorted(
+        (a.labels.alertname, a.labels.severity, a.annotations.summary) for a in watcher.alertmanager.sent_alerts
+    )
+    assert len(kinds) == 2
+    assert any(
+        k[0].startswith('HeadWatcherELRequestFromUnknownSourceForOurValidators')
+        and k[1] == 'critical'
+        and "unknown source address" in k[2]
+        for k in kinds
+    )
+    assert any(
+        k[0].startswith('HeadWatcherELRequestFromOurSourceForForeignValidators')
+        and k[1] == 'critical'
+        and "our source address" in k[2]
+        for k in kinds
+    )
+    joined_desc = '\n'.join(a.annotations.description for a in watcher.alertmanager.sent_alerts)
+    assert user_validator.pubkey in joined_desc
+    assert validator.pubkey in joined_desc
+    assert unknown_addr in joined_desc
+    assert withdrawal_address in joined_desc
+    assert '1' in joined_desc
+    assert '2' in joined_desc
+    assert block.message.slot in joined_desc

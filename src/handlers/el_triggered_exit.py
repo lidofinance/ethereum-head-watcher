@@ -25,13 +25,14 @@ class ElTriggeredExitHandler(WatcherHandler):
         withdrawals = head.message.body.execution_requests.withdrawals
         valid_withdrawal_addresses = watcher.valid_withdrawal_addresses
 
-        user_partial_withdrawals = [
+        user_withdrawals = [
             w
             for w in withdrawals
-            if w.source_address in valid_withdrawal_addresses
-            and self._is_partial(w)
-            and w.validator_pubkey in watcher.user_keys
+            if w.source_address in valid_withdrawal_addresses and w.validator_pubkey in watcher.user_keys
         ]
+
+        user_partial_withdrawals = [w for w in user_withdrawals if self._is_partial(w)]
+        user_full_withdrawals = [w for w in user_withdrawals if self._is_full(w)]
 
         requests_from_our_source_for_foreign_validators = [
             w
@@ -45,6 +46,9 @@ class ElTriggeredExitHandler(WatcherHandler):
             if w.source_address not in valid_withdrawal_addresses and w.validator_pubkey in watcher.user_keys
         ]
 
+        if user_full_withdrawals:
+            self._send_full_withdrawal_alert(watcher, slot, user_full_withdrawals)
+
         if user_partial_withdrawals:
             self._send_partial_withdrawal_alert(watcher, slot, user_partial_withdrawals)
 
@@ -57,6 +61,12 @@ class ElTriggeredExitHandler(WatcherHandler):
             self._send_request_from_unknown_source_for_our_validators_alert(
                 watcher, slot, requests_from_unknown_source_for_our_validators
             )
+
+    def _send_full_withdrawal_alert(self, watcher, slot: str, withdrawals: list[WithdrawalRequest]):
+        alert = CommonAlert(name="HeadWatcherFullELWithdrawalObserved", severity="info")
+        summary = "⚠️ Full withdrawal (exit) requested for our validator(s)"
+        description = '\n\n'.join(self._describe_withdrawal(w, watcher.user_keys) for w in withdrawals)
+        self._send_alert(watcher, alert, summary, description, slot)
 
     def _send_partial_withdrawal_alert(self, watcher, slot: str, withdrawals: list[WithdrawalRequest]):
         alert = CommonAlert(name="HeadWatcherPartialELWithdrawalObserved", severity="critical")
