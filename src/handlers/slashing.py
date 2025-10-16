@@ -131,7 +131,7 @@ class SlashingHandler(WatcherHandler):
                 f'\n\nslot: [{head.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{head.message.slot})'
             )
             alert = CommonAlert(name="HeadWatcherUnknownSlashing", severity="critical")
-            self.send_alert(watcher, alert.build_body(summary, description))
+            self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
         if other_slashings:
             summary = f'ℹ️ {len(other_slashings)} other validators were slashed'
             description = ''

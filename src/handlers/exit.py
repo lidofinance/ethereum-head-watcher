@@ -115,7 +115,7 @@ class ExitsHandler(WatcherHandler):
                 f'\n\nslot: [{block.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{block.message.slot})'
             )
             alert = CommonAlert(name="HeadWatcherUnknownExit", severity="critical")
-            self.send_alert(watcher, alert.build_body(summary, description))
+            self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
     @duration_meter()
     def _update_last_requested_validator_indexes(self, watcher, block: BlockDetailsResponse) -> None:
