@@ -7,6 +7,7 @@ from src.handlers.handler import WatcherHandler
 from src.handlers.helpers import beaconchain, validator_pubkey_link
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import ConsolidationRequest, FullBlockInfo
+from src.variables import ADDITIONAL_ALERTMANAGER_LABELS
 
 logger = logging.getLogger()
 
@@ -41,7 +42,7 @@ class ConsolidationHandler(WatcherHandler):
     def _send_withdrawals_address(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationSourceWithdrawalAddress", severity="critical")
         summary = "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address"
-        self._send_alert(watcher, slot, alert, summary, consolidations)
+        self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_source_pubkey(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationUserSourcePubkey", severity="info")
@@ -54,10 +55,10 @@ class ConsolidationHandler(WatcherHandler):
         self._send_alert(watcher, slot, alert, summary, consolidations)
 
     def _send_alert(self, watcher, slot: str, alert: CommonAlert, summary: str,
-                    consolidations: list[ConsolidationRequest]):
+                    consolidations: list[ConsolidationRequest], additional_labels=None) -> None:
         description = '\n\n'.join(self._describe_consolidation(c, watcher.user_keys) for c in consolidations)
         description += f'\n\nSlot: {beaconchain(slot)}'
-        self.send_alert(watcher, alert.build_body(summary, description))
+        self.send_alert(watcher, alert.build_body(summary, description, additional_labels))
 
     @staticmethod
     def _describe_consolidation(consolidation: ConsolidationRequest, keys):
