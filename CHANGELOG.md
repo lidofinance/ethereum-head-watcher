@@ -1,3 +1,12 @@
+# [0.4.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.3.1...0.4.0) (2025-10-28)
+
+
+### Features
+
+* handle EIP-7002 semantics for withdrawals ([#101](https://github.com/lidofinance/ethereum-head-watcher/issues/101)) ([e4c1a1b](https://github.com/lidofinance/ethereum-head-watcher/commit/e4c1a1b18b07637fa084b1193919356aa3c9a1f0))
+
+
+
 ## [0.3.1](https://github.com/lidofinance/ethereum-head-watcher/compare/0.3.0...0.3.1) (2025-06-24)
 
 
