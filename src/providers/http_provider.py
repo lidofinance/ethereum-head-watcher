@@ -166,7 +166,7 @@ class HTTPProvider(ABC):
         force_raise: Callable[..., Exception | None] = lambda _: None,
         timeout: Optional[float | InfinityType] = None,
         retry_strategy: Retry | None = None,
-    ) -> Tuple[dict | list, dict]:
+    ) -> Tuple[dict | list | str, dict]:
         """
         Post request with fallbacks
         Returns (data, meta) or raises exception
@@ -311,7 +311,7 @@ class HTTPProvider(ABC):
         query_body: Optional[dict | list] = None,
         timeout: Optional[float | InfinityType] = None,
         retry_strategy: Retry | None = None,
-    ) -> Tuple[dict | list, dict]:
+    ) -> Tuple[dict | list | str, dict]:
         """
         Simple post request without fallbacks
         Returns (data, meta) or raises exception
