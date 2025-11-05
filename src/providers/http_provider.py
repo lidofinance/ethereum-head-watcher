@@ -160,12 +160,13 @@ class HTTPProvider(ABC):
     def post(
         self,
         endpoint: str,
+        should_parse_json_response: bool = True,
         path_params: Optional[Sequence[str | int]] = None,
         query_body: Optional[dict | list[dict]] = None,
         force_raise: Callable[..., Exception | None] = lambda _: None,
         timeout: Optional[float | InfinityType] = None,
         retry_strategy: Retry | None = None,
-    ) -> Tuple[dict | list, dict]:
+    ) -> Tuple[dict | list | str, dict]:
         """
         Post request with fallbacks
         Returns (data, meta) or raises exception
@@ -177,7 +178,7 @@ class HTTPProvider(ABC):
 
         for host in self.hosts:
             try:
-                return self._post_without_fallbacks(host, endpoint, path_params, query_body, timeout, retry_strategy)
+                return self._post_without_fallbacks(host, endpoint, should_parse_json_response, path_params, query_body, timeout, retry_strategy)
             except Exception as e:  # pylint: disable=W0703
                 errors.append(e)
 
@@ -305,11 +306,12 @@ class HTTPProvider(ABC):
         self,
         host: str,
         endpoint: str,
+        should_parse_json_response: bool = True,
         path_params: Optional[Sequence[str | int]] = None,
         query_body: Optional[dict | list] = None,
         timeout: Optional[float | InfinityType] = None,
         retry_strategy: Retry | None = None,
-    ) -> Tuple[dict | list, dict]:
+    ) -> Tuple[dict | list | str, dict]:
         """
         Simple post request without fallbacks
         Returns (data, meta) or raises exception
@@ -342,6 +344,9 @@ class HTTPProvider(ABC):
                 response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
+
+            if not should_parse_json_response:
+                return response.text, {}
 
             try:
                 json_response = response.json()
