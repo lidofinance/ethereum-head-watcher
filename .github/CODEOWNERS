@@ -1,6 +1,2 @@
-# These owners will be the default owners for everything in
-# the repo. Unless a later match takes precedence.
-# Uncomment next line
-# * @username
+* @lidofinance/lido-valset-vroom
 .github @lidofinance/review-gh-workflows
-* @lidofinance/lido-tooling
