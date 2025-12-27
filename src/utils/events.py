@@ -5,6 +5,7 @@ from web3.contract.contract import ContractEvent
 from web3.types import EventData
 
 from src.typings import BlockNumber
+from src.variables import EVENTS_SEARCH_STEP
 
 logger = logging.getLogger()
 
@@ -14,9 +15,6 @@ class InconsistentEvents(Exception):
 
 def get_events_in_range(event: ContractEvent, l_block: BlockNumber, r_block: BlockNumber) -> Iterator[EventData]:
     """Fetch all the events in the given blocks range (closed interval)"""
-
-    EVENTS_SEARCH_STEP = 10_000
-
     if l_block > r_block:
         raise ValueError(f"{l_block=} > {r_block=}")
 
