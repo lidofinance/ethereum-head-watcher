@@ -12,6 +12,7 @@ from src.keys_source.base_source import SourceType
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
+from src.utils.events import get_events_in_range
 
 logger = logging.getLogger()
 
@@ -26,10 +27,15 @@ class ExitInfo:
     operator_index: Optional[str] = None
     module_index: Optional[str] = None
 
+@dataclass
+class ExitedOperatorValidators:
+    name: str
+    validator_indexes: list[int]
+
 
 class ExitsHandler(WatcherHandler):
     last_total_requests_processed = 0
-    last_requested_validator_indexes: dict[tuple[int, int], int] = {}
+    last_requested_validator_indexes: dict[int, set[int]] = {}
 
     @unsync
     @duration_meter()
@@ -72,24 +78,33 @@ class ExitsHandler(WatcherHandler):
         if user_exits:
             if variables.KEYS_SOURCE == SourceType.KEYS_API.value:
                 self._update_last_requested_validator_indexes(watcher, block)
-            summary = f'🚨🚨🚨 {len(user_exits)} Our validators were unexpected exited! 🚨🚨🚨'
+
             description = ''
-            by_operator: dict[str, list] = defaultdict(list)
+            by_operator: dict[tuple[int, int], ExitedOperatorValidators] = {}
+
             for user_exit in user_exits:
-                operator_last_exited_index = self.last_requested_validator_indexes.get(
-                    (user_exit.module_index, user_exit.operator_index), 0
-                )
-                if int(user_exit.index) > operator_last_exited_index:
-                    by_operator[str(user_exit.operator)].append(user_exit)
+                if not any(
+                    int(user_exit.index) in validator_indexes
+                    for validator_indexes in last_requested_validator_indexes.values()
+                ):
+                    if not by_operator[(user_exit.module_index, user_exit.operator_index)]:
+                        by_operator[(user_exit.module_index, user_exit.operator_index)] = ExitedOperatorValidators(
+                            name=str(user_exit.operator),
+                            validator_indexes=[],
+                        )
+                    by_operator[(user_exit.module_index, user_exit.operator_index)].validator_indexes.append(int(user_exit.index))
+
             if by_operator:
-                for operator, operator_exits in by_operator.items():
-                    description += f'\n{operator} -'
+                total_exits = 0
+                for global_index, operator_exits in by_operator.items():
+                    total_exits += len(operator_exits.validator_indexes)
+                    description += f'\n{operator_exits.name} -'
                     description += (
                         "["
                         + ', '.join(
                             [
-                                f'[{exit.index}](http://{NETWORK_NAME}.beaconcha.in/validator/{exit.index})'
-                                for exit in operator_exits
+                                f'[{validator_index}](http://{NETWORK_NAME}.beaconcha.in/validator/{validator_index})'
+                                for validator_index in operator_exits.validator_indexes
                             ]
                         )
                         + "]"
@@ -98,7 +113,9 @@ class ExitsHandler(WatcherHandler):
                     f'\n\nslot: [{block.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{block.message.slot})'
                 )
                 alert = CommonAlert(name="HeadWatcherUserUnexpectedExit", severity="critical")
+                summary = f'🚨🚨🚨 {total_exits} Our validators were unexpectedly exited! 🚨🚨🚨'
                 self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
+
         if unknown_exits:
             summary = f'🚨 {len(unknown_exits)} unknown validators were exited!'
             description = (
@@ -119,27 +136,50 @@ class ExitsHandler(WatcherHandler):
 
     @duration_meter()
     def _update_last_requested_validator_indexes(self, watcher, block: BlockDetailsResponse) -> None:
-        """Update last requested to exit validator indexes"""
+        """Update local cache with last validator indexes requested to exit by VEBO"""
         if not watcher.keys_source.modules_operators_dict:
             return
+
+        current_block_number = int(block.message.body.execution_payload.block_number)
+
         # todo:
         #  should we look at the refSlot for report?
         #  compere local last processed refSlot and calculated refSlot (get from contract + frame size)
         #  instead of getting total_requests_processed every block with lido exits
         total_requests_processed = (
             watcher.execution.lido_contracts.validators_exit_bus_oracle.functions.getTotalRequestsProcessed().call(
-                block_identifier=int(block.message.body.execution_payload.block_number)
+                block_identifier=current_block_number
             )
         )
+
         if total_requests_processed <= self.last_total_requests_processed:
             return
-        logger.info({'msg': 'Get last requested to exit Lido validator indexes'})
-        for module_index, operators in watcher.keys_source.modules_operators_dict.items():
-            requested_validator_indexes = (
-                watcher.execution.lido_contracts.validators_exit_bus_oracle.functions.getLastRequestedValidatorIndices(
-                    module_index, operators
-                ).call(block_identifier=int(block.message.body.execution_payload.block_number))
-            )
-            for operator_index, validator_index in enumerate(requested_validator_indexes):
-                self.last_requested_validator_indexes[(int(module_index), operator_index)] = validator_index
+
+        logger.info({'msg': 'Getting last validator indexes requested to exit by VEBO'})
+
+        lookup_window = watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
+            'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
+        ).call(block_identifier=current_block_number)
+
+        last_cached_block = 0
+        if last_requested_validator_indexes:
+            last_cached_block = max(last_requested_validator_indexes)
+
+        l_block = max(last_cached_block, current_block_number - lookup_window)
+
+        events = get_events_in_range(
+            watcher.execution.lido_contracts.lido_contracts.validators_exit_bus_oracle.events.ValidatorExitRequest,
+            l_block=l_block,
+            r_block=current_block_number,
+        )
+
+        for event in events:
+            if not last_requested_validator_indexes[event['blockNumber']]:
+                last_requested_validator_indexes[event['blockNumber']] = set()
+            last_requested_validator_indexes[event['blockNumber']].add(event['args']['validatorIndex'])
+
+        for block in list(last_requested_validator_indexes.keys()):
+            if block < current_block_number - lookup_window:
+                del last_requested_validator_indexes[block]
+
         self.last_total_requests_processed = total_requests_processed
