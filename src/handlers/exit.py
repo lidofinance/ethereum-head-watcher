@@ -1,10 +1,10 @@
 import logging
-from web3 import Web3
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Literal, Optional
 
 from unsync import unsync
+from web3 import Web3
 
 from src import variables
 from src.alerts.common import CommonAlert
@@ -12,9 +12,9 @@ from src.handlers.handler import WatcherHandler
 from src.keys_source.base_source import SourceType
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
-from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
-from src.utils.events import get_events_in_range
 from src.typings import BlockNumber
+from src.utils.events import get_events_in_range
+from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
 
 logger = logging.getLogger()
 
