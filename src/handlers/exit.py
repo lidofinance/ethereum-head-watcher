@@ -1,5 +1,5 @@
 import logging
-from collections import defaultdict
+from web3 import Web3
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -29,7 +29,7 @@ class ExitInfo:
 
 @dataclass
 class ExitedOperatorValidators:
-    name: str
+    operator: str
     validator_indexes: list[int]
 
 
@@ -85,20 +85,20 @@ class ExitsHandler(WatcherHandler):
             for user_exit in user_exits:
                 if not any(
                     int(user_exit.index) in validator_indexes
-                    for validator_indexes in last_requested_validator_indexes.values()
+                    for validator_indexes in self.last_requested_validator_indexes.values()
                 ):
-                    if not by_operator[(user_exit.module_index, user_exit.operator_index)]:
-                        by_operator[(user_exit.module_index, user_exit.operator_index)] = ExitedOperatorValidators(
-                            name=str(user_exit.operator),
+                    if (int(user_exit.module_index), int(user_exit.operator_index)) not in by_operator:
+                        by_operator[(int(user_exit.module_index), int(user_exit.operator_index))] = ExitedOperatorValidators(
+                            operator=user_exit.operator,
                             validator_indexes=[],
                         )
-                    by_operator[(user_exit.module_index, user_exit.operator_index)].validator_indexes.append(int(user_exit.index))
+                    by_operator[(int(user_exit.module_index), int(user_exit.operator_index))].validator_indexes.append(int(user_exit.index))
 
             if by_operator:
                 total_exits = 0
                 for global_index, operator_exits in by_operator.items():
                     total_exits += len(operator_exits.validator_indexes)
-                    description += f'\n{operator_exits.name} -'
+                    description += f'\n{operator_exits.operator} -'
                     description += (
                         "["
                         + ', '.join(
@@ -157,15 +157,15 @@ class ExitsHandler(WatcherHandler):
 
         logger.info({'msg': 'Getting last validator indexes requested to exit by VEBO'})
 
-        lookup_window = watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
+        lookup_window = Web3.to_int(watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
             'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
-        ).call(block_identifier=current_block_number)
+        ).call(block_identifier=current_block_number))
 
-        last_cached_block = 0
-        if last_requested_validator_indexes:
-            last_cached_block = max(last_requested_validator_indexes)
+        last_cached_block = -1
+        if self.last_requested_validator_indexes:
+            last_cached_block = max(self.last_requested_validator_indexes)
 
-        l_block = max(last_cached_block, current_block_number - lookup_window)
+        l_block = max(last_cached_block + 1, current_block_number - lookup_window)
 
         events = get_events_in_range(
             watcher.execution.lido_contracts.lido_contracts.validators_exit_bus_oracle.events.ValidatorExitRequest,
@@ -174,12 +174,12 @@ class ExitsHandler(WatcherHandler):
         )
 
         for event in events:
-            if not last_requested_validator_indexes[event['blockNumber']]:
-                last_requested_validator_indexes[event['blockNumber']] = set()
-            last_requested_validator_indexes[event['blockNumber']].add(event['args']['validatorIndex'])
+            if event['blockNumber'] not in self.last_requested_validator_indexes:
+                self.last_requested_validator_indexes[event['blockNumber']] = set()
+            self.last_requested_validator_indexes[event['blockNumber']].add(event['args']['validatorIndex'])
 
-        for block in list(last_requested_validator_indexes.keys()):
+        for block in list(self.last_requested_validator_indexes.keys()):
             if block < current_block_number - lookup_window:
-                del last_requested_validator_indexes[block]
+                del self.last_requested_validator_indexes[block]
 
         self.last_total_requests_processed = total_requests_processed
