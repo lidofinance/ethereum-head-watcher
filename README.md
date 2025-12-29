@@ -147,6 +147,10 @@ Currently it supports:
 `DISABLE_UNEXPECTED_EXIT_ALERTS` - A comma-separated list of module indexes for which unexpected exit alerts are disabled.  
 * **Required:** false
 * **Default:** []
+---
+`EVENTS_SEARCH_STEP` - Maximum length of a range for `eth_getLogs` EL method calls.
+* **Required:** false
+* **Default:** 10000
 
 ## Application metrics
 
