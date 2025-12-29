@@ -1,5 +1,6 @@
 import logging
 from web3 import Web3
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -13,6 +14,7 @@ from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
 from src.utils.events import get_events_in_range
+from src.typings import BlockNumber
 
 logger = logging.getLogger()
 
@@ -35,7 +37,11 @@ class ExitedOperatorValidators:
 
 class ExitsHandler(WatcherHandler):
     last_total_requests_processed = 0
-    last_requested_validator_indexes: dict[int, set[int]] = {}
+    last_requested_validator_indexes: dict[int, set[int]]
+
+    def __init__(self):
+        super().__init__()
+        self.last_requested_validator_indexes = {}
 
     @unsync
     @duration_meter()
@@ -80,23 +86,22 @@ class ExitsHandler(WatcherHandler):
                 self._update_last_requested_validator_indexes(watcher, block)
 
             description = ''
-            by_operator: dict[tuple[int, int], ExitedOperatorValidators] = {}
+            all_expected = set().union(*self.last_requested_validator_indexes.values())
+            by_operator: defaultdict[tuple[int, int], ExitedOperatorValidators] = defaultdict(
+                lambda: ExitedOperatorValidators(operator='', validator_indexes=[])
+            )
 
             for user_exit in user_exits:
-                if not any(
-                    int(user_exit.index) in validator_indexes
-                    for validator_indexes in self.last_requested_validator_indexes.values()
-                ):
-                    if (int(user_exit.module_index), int(user_exit.operator_index)) not in by_operator:
-                        by_operator[(int(user_exit.module_index), int(user_exit.operator_index))] = ExitedOperatorValidators(
-                            operator=user_exit.operator,
-                            validator_indexes=[],
-                        )
-                    by_operator[(int(user_exit.module_index), int(user_exit.operator_index))].validator_indexes.append(int(user_exit.index))
+                if int(user_exit.index) in all_expected:
+                    continue
+
+                key = int(user_exit.module_index), int(user_exit.operator_index)
+                by_operator[key].operator = user_exit.operator
+                by_operator[key].validator_indexes.append(int(user_exit.index))
 
             if by_operator:
                 total_exits = 0
-                for global_index, operator_exits in by_operator.items():
+                for operator_exits in by_operator.values():
                     total_exits += len(operator_exits.validator_indexes)
                     description += f'\n{operator_exits.operator} -'
                     description += (
@@ -169,8 +174,8 @@ class ExitsHandler(WatcherHandler):
 
         events = get_events_in_range(
             watcher.execution.lido_contracts.validators_exit_bus_oracle.events.ValidatorExitRequest,
-            l_block=l_block,
-            r_block=current_block_number,
+            l_block=BlockNumber(l_block),
+            r_block=BlockNumber(current_block_number),
         )
 
         for event in events:
@@ -178,8 +183,8 @@ class ExitsHandler(WatcherHandler):
                 self.last_requested_validator_indexes[event['blockNumber']] = set()
             self.last_requested_validator_indexes[event['blockNumber']].add(event['args']['validatorIndex'])
 
-        for block in list(self.last_requested_validator_indexes.keys()):
-            if block < current_block_number - lookup_window:
-                del self.last_requested_validator_indexes[block]
+        for cached_block in list(self.last_requested_validator_indexes.keys()):
+            if cached_block < current_block_number - lookup_window:
+                del self.last_requested_validator_indexes[cached_block]
 
         self.last_total_requests_processed = total_requests_processed
