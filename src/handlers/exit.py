@@ -95,7 +95,7 @@ class ExitsHandler(WatcherHandler):
                 if int(user_exit.index) in all_expected:
                     continue
 
-                key = int(user_exit.module_index), int(user_exit.operator_index)
+                key = (int(user_exit.module_index), int(user_exit.operator_index))
                 by_operator[key].operator = user_exit.operator
                 by_operator[key].validator_indexes.append(int(user_exit.index))
 
