@@ -103,7 +103,7 @@ class ExitsHandler(WatcherHandler):
                 total_exits = 0
                 for operator_exits in by_operator.values():
                     total_exits += len(operator_exits.validator_indexes)
-                    description += f'\n{operator_exits.operator} -'
+                    description += f'\n{operator_exits.operator} - '
                     description += (
                         "["
                         + ', '.join(
