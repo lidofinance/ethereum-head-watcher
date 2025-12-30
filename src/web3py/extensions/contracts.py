@@ -14,14 +14,9 @@ logger = logging.getLogger()
 
 class LidoContracts(Module):
     lido_locator: Contract
-    lido: Contract
     accounting_oracle: Contract
-    staking_router: Contract
     validators_exit_bus_oracle: Contract
-    withdrawal_queue_nft: Contract
-    oracle_report_sanity_checker: Contract
     oracle_daemon_config: Contract
-    burner: Contract
 
     def __init__(self, w3: Web3):
         super().__init__(w3)
@@ -66,21 +61,9 @@ class LidoContracts(Module):
             decode_tuples=True,
         )
 
-        self.lido = self.w3.eth.contract(
-            address=self.lido_locator.functions.lido().call(),
-            abi=self.load_abi('Lido'),
-            decode_tuples=True,
-        )
-
         self.accounting_oracle = self.w3.eth.contract(
             address=self.lido_locator.functions.accountingOracle().call(),
             abi=self.load_abi('AccountingOracle'),
-            decode_tuples=True,
-        )
-
-        self.staking_router = self.w3.eth.contract(
-            address=self.lido_locator.functions.stakingRouter().call(),
-            abi=self.load_abi('StakingRouter'),
             decode_tuples=True,
         )
 
@@ -90,27 +73,9 @@ class LidoContracts(Module):
             decode_tuples=True,
         )
 
-        self.withdrawal_queue_nft = self.w3.eth.contract(
-            address=self.lido_locator.functions.withdrawalQueue().call(),
-            abi=self.load_abi('WithdrawalQueueERC721'),
-            decode_tuples=True,
-        )
-
-        self.oracle_report_sanity_checker = self.w3.eth.contract(
-            address=self.lido_locator.functions.oracleReportSanityChecker().call(),
-            abi=self.load_abi('OracleReportSanityChecker'),
-            decode_tuples=True,
-        )
-
         self.oracle_daemon_config = self.w3.eth.contract(
             address=self.lido_locator.functions.oracleDaemonConfig().call(),
             abi=self.load_abi('OracleDaemonConfig'),
-            decode_tuples=True,
-        )
-
-        self.burner = self.w3.eth.contract(
-            address=self.lido_locator.functions.burner().call(),
-            abi=self.load_abi('Burner'),
             decode_tuples=True,
         )
 

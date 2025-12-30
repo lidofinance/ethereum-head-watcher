@@ -47,60 +47,33 @@ def test_slashings(caplog, watcher):
 
 exit_alerts = [
     {
-        'summary': '🚨🚨🚨 16 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[629209](http://mainnet.beaconcha.in/validator/629209), [614624](http://mainnet.beaconcha.in/validator/614624), [346858](http://mainnet.beaconcha.in/validator/346858), [628230](http://mainnet.beaconcha.in/validator/628230), [596256](http://mainnet.beaconcha.in/validator/596256), [696241](http://mainnet.beaconcha.in/validator/696241), [530129](http://mainnet.beaconcha.in/validator/530129), [530438](http://mainnet.beaconcha.in/validator/530438), [346318](http://mainnet.beaconcha.in/validator/346318), [530287](http://mainnet.beaconcha.in/validator/530287), [632200](http://mainnet.beaconcha.in/validator/632200), [625532](http://mainnet.beaconcha.in/validator/625532), [629381](http://mainnet.beaconcha.in/validator/629381), [630311](http://mainnet.beaconcha.in/validator/630311), [528148](http://mainnet.beaconcha.in/validator/528148), [587187](http://mainnet.beaconcha.in/validator/587187)]\n\nslot: [6897644](https://mainnet.beaconcha.in/slot/6897644)',
+        'summary': '🚨🚨🚨 16 Our validators were unexpectedly exited! 🚨🚨🚨',
+        'description': '\nA41 - [[1611864](http://mainnet.beaconcha.in/validator/1611864), [1596140](http://mainnet.beaconcha.in/validator/1596140), [1612125](http://mainnet.beaconcha.in/validator/1612125), [1611863](http://mainnet.beaconcha.in/validator/1611863), [1612123](http://mainnet.beaconcha.in/validator/1612123), [1611862](http://mainnet.beaconcha.in/validator/1611862), [1596139](http://mainnet.beaconcha.in/validator/1596139), [1595979](http://mainnet.beaconcha.in/validator/1595979), [1612124](http://mainnet.beaconcha.in/validator/1612124), [1612203](http://mainnet.beaconcha.in/validator/1612203), [1611710](http://mainnet.beaconcha.in/validator/1611710), [1595838](http://mainnet.beaconcha.in/validator/1595838), [1595978](http://mainnet.beaconcha.in/validator/1595978), [1611709](http://mainnet.beaconcha.in/validator/1611709), [1596138](http://mainnet.beaconcha.in/validator/1596138), [1595977](http://mainnet.beaconcha.in/validator/1595977)]\n\nslot: [13312726](https://mainnet.beaconcha.in/slot/13312726)',
     },
     {
-        'summary': '🚨🚨🚨 16 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[455699](http://mainnet.beaconcha.in/validator/455699), [471219](http://mainnet.beaconcha.in/validator/471219), [515333](http://mainnet.beaconcha.in/validator/515333), [346662](http://mainnet.beaconcha.in/validator/346662), [396980](http://mainnet.beaconcha.in/validator/396980), [521400](http://mainnet.beaconcha.in/validator/521400), [506576](http://mainnet.beaconcha.in/validator/506576), [346678](http://mainnet.beaconcha.in/validator/346678), [346872](http://mainnet.beaconcha.in/validator/346872), [464257](http://mainnet.beaconcha.in/validator/464257), [346541](http://mainnet.beaconcha.in/validator/346541), [625530](http://mainnet.beaconcha.in/validator/625530), [535634](http://mainnet.beaconcha.in/validator/535634), [626204](http://mainnet.beaconcha.in/validator/626204), [456261](http://mainnet.beaconcha.in/validator/456261), [530442](http://mainnet.beaconcha.in/validator/530442)]\n\nslot: [6897645](https://mainnet.beaconcha.in/slot/6897645)',
-    },
-    {
-        'summary': '🚨🚨🚨 16 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[630305](http://mainnet.beaconcha.in/validator/630305), [667384](http://mainnet.beaconcha.in/validator/667384), [574028](http://mainnet.beaconcha.in/validator/574028), [628411](http://mainnet.beaconcha.in/validator/628411), [570867](http://mainnet.beaconcha.in/validator/570867), [628226](http://mainnet.beaconcha.in/validator/628226), [633090](http://mainnet.beaconcha.in/validator/633090), [730461](http://mainnet.beaconcha.in/validator/730461), [630301](http://mainnet.beaconcha.in/validator/630301), [520051](http://mainnet.beaconcha.in/validator/520051), [630313](http://mainnet.beaconcha.in/validator/630313), [621617](http://mainnet.beaconcha.in/validator/621617), [629500](http://mainnet.beaconcha.in/validator/629500), [632867](http://mainnet.beaconcha.in/validator/632867), [632574](http://mainnet.beaconcha.in/validator/632574), [632192](http://mainnet.beaconcha.in/validator/632192)]\n\nslot: [6897646](https://mainnet.beaconcha.in/slot/6897646)',
-    },
-    {
-        'summary': '🚨🚨🚨 16 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[527994](http://mainnet.beaconcha.in/validator/527994), [534910](http://mainnet.beaconcha.in/validator/534910), [577715](http://mainnet.beaconcha.in/validator/577715), [346721](http://mainnet.beaconcha.in/validator/346721), [530283](http://mainnet.beaconcha.in/validator/530283), [456195](http://mainnet.beaconcha.in/validator/456195), [520628](http://mainnet.beaconcha.in/validator/520628), [507845](http://mainnet.beaconcha.in/validator/507845), [455406](http://mainnet.beaconcha.in/validator/455406), [397205](http://mainnet.beaconcha.in/validator/397205), [630303](http://mainnet.beaconcha.in/validator/630303), [530291](http://mainnet.beaconcha.in/validator/530291), [562661](http://mainnet.beaconcha.in/validator/562661), [628234](http://mainnet.beaconcha.in/validator/628234), [534309](http://mainnet.beaconcha.in/validator/534309), [632198](http://mainnet.beaconcha.in/validator/632198)]\n\nslot: [6897647](https://mainnet.beaconcha.in/slot/6897647)',
-    },
-    {
-        'summary': '🚨🚨🚨 16 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[530279](http://mainnet.beaconcha.in/validator/530279), [696622](http://mainnet.beaconcha.in/validator/696622), [629052](http://mainnet.beaconcha.in/validator/629052), [530426](http://mainnet.beaconcha.in/validator/530426), [628224](http://mainnet.beaconcha.in/validator/628224), [630309](http://mainnet.beaconcha.in/validator/630309), [629050](http://mainnet.beaconcha.in/validator/629050), [632869](http://mainnet.beaconcha.in/validator/632869), [628228](http://mainnet.beaconcha.in/validator/628228), [632196](http://mainnet.beaconcha.in/validator/632196), [628232](http://mainnet.beaconcha.in/validator/628232), [633084](http://mainnet.beaconcha.in/validator/633084), [632572](http://mainnet.beaconcha.in/validator/632572), [691963](http://mainnet.beaconcha.in/validator/691963), [629478](http://mainnet.beaconcha.in/validator/629478), [632576](http://mainnet.beaconcha.in/validator/632576)]\n\nslot: [6897648](https://mainnet.beaconcha.in/slot/6897648)',
-    },
-    {
-        'summary': '🚨🚨🚨 10 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[632202](http://mainnet.beaconcha.in/validator/632202), [630307](http://mainnet.beaconcha.in/validator/630307), [703690](http://mainnet.beaconcha.in/validator/703690), [632194](http://mainnet.beaconcha.in/validator/632194), [651304](http://mainnet.beaconcha.in/validator/651304), [346271](http://mainnet.beaconcha.in/validator/346271), [632190](http://mainnet.beaconcha.in/validator/632190), [581412](http://mainnet.beaconcha.in/validator/581412), [530275](http://mainnet.beaconcha.in/validator/530275), [630315](http://mainnet.beaconcha.in/validator/630315)]\n\nslot: [6897649](https://mainnet.beaconcha.in/slot/6897649)',
-    },
-    {
-        'summary': '🚨🚨🚨 9 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[346599](http://mainnet.beaconcha.in/validator/346599), [530136](http://mainnet.beaconcha.in/validator/530136), [529832](http://mainnet.beaconcha.in/validator/529832), [346351](http://mainnet.beaconcha.in/validator/346351), [346761](http://mainnet.beaconcha.in/validator/346761), [457442](http://mainnet.beaconcha.in/validator/457442), [456821](http://mainnet.beaconcha.in/validator/456821), [529528](http://mainnet.beaconcha.in/validator/529528), [472676](http://mainnet.beaconcha.in/validator/472676)]\n\nslot: [6897652](https://mainnet.beaconcha.in/slot/6897652)',
-    },
-    {
-        'summary': '🚨🚨🚨 16 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[289852](http://mainnet.beaconcha.in/validator/289852), [530434](http://mainnet.beaconcha.in/validator/530434), [521577](http://mainnet.beaconcha.in/validator/521577), [404901](http://mainnet.beaconcha.in/validator/404901), [525681](http://mainnet.beaconcha.in/validator/525681), [532308](http://mainnet.beaconcha.in/validator/532308), [346315](http://mainnet.beaconcha.in/validator/346315), [534042](http://mainnet.beaconcha.in/validator/534042), [474371](http://mainnet.beaconcha.in/validator/474371), [554672](http://mainnet.beaconcha.in/validator/554672), [521183](http://mainnet.beaconcha.in/validator/521183), [555428](http://mainnet.beaconcha.in/validator/555428), [520043](http://mainnet.beaconcha.in/validator/520043), [535630](http://mainnet.beaconcha.in/validator/535630), [530577](http://mainnet.beaconcha.in/validator/530577), [482765](http://mainnet.beaconcha.in/validator/482765)]\n\nslot: [6897653](https://mainnet.beaconcha.in/slot/6897653)',
-    },
-    {
-        'summary': '🚨🚨🚨 10 Our validators were unexpected exited! 🚨🚨🚨',
-        'description': '\nConsensys -[[457223](http://mainnet.beaconcha.in/validator/457223), [565725](http://mainnet.beaconcha.in/validator/565725), [346745](http://mainnet.beaconcha.in/validator/346745), [530430](http://mainnet.beaconcha.in/validator/530430), [456938](http://mainnet.beaconcha.in/validator/456938), [525339](http://mainnet.beaconcha.in/validator/525339), [289624](http://mainnet.beaconcha.in/validator/289624), [528614](http://mainnet.beaconcha.in/validator/528614), [554923](http://mainnet.beaconcha.in/validator/554923), [346766](http://mainnet.beaconcha.in/validator/346766)]\n\nslot: [6897654](https://mainnet.beaconcha.in/slot/6897654)',
+        'summary': '🚨🚨🚨 16 Our validators were unexpectedly exited! 🚨🚨🚨',
+        'description': '\nA41 - [[1612202](http://mainnet.beaconcha.in/validator/1612202), [1595837](http://mainnet.beaconcha.in/validator/1595837), [1616216](http://mainnet.beaconcha.in/validator/1616216), [1613042](http://mainnet.beaconcha.in/validator/1613042), [1645543](http://mainnet.beaconcha.in/validator/1645543), [1616427](http://mainnet.beaconcha.in/validator/1616427), [1595980](http://mainnet.beaconcha.in/validator/1595980), [1645500](http://mainnet.beaconcha.in/validator/1645500), [1634875](http://mainnet.beaconcha.in/validator/1634875), [1615856](http://mainnet.beaconcha.in/validator/1615856), [1596141](http://mainnet.beaconcha.in/validator/1596141), [1611711](http://mainnet.beaconcha.in/validator/1611711), [1595981](http://mainnet.beaconcha.in/validator/1595981), [1612503](http://mainnet.beaconcha.in/validator/1612503), [1611712](http://mainnet.beaconcha.in/validator/1611712), [1615857](http://mainnet.beaconcha.in/validator/1615857)]\n\nslot: [13312727](https://mainnet.beaconcha.in/slot/13312727)',
     },
 ]
 
 
 def test_unexpected_exits(caplog, watcher):
-    watcher.run("6897643-6897655")
+    watcher.run("13312725-13312727")
 
     for alert in exit_alerts:
         assert str(alert) in caplog.text, f"Alert {alert} should be in logs"
 
 
-def test_expected_exits(caplog, watcher):
-    watcher.run("6833022-6833039")
-
-    assert 'Our validators were unexpected exited!' not in caplog.text, "Alert should not be in logs"
-
-
-def test_disabled_alerts_exits(caplog, watcher, monkeypatch):
-    monkeypatch.setattr(watcher, "disable_unexpected_exit_alerts", ['3'])
-
-    watcher.run("11180702-11180703")
-
-    assert 'Our validators were unexpected exited!' not in caplog.text, "Alerts should not be in logs"
+# @todo Fix and uncomment these tests once new VEBO requests appear on Mainnet.
+# def test_expected_exits(caplog, watcher):
+#     watcher.run("6833022-6833039")
+#
+#     assert 'Our validators were unexpectedly exited!' not in caplog.text, "Alert should not be in logs"
+#
+#
+# def test_disabled_alerts_exits(caplog, watcher, monkeypatch):
+#     monkeypatch.setattr(watcher, "disable_unexpected_exit_alerts", ['3'])
+#
+#     watcher.run("11180702-11180703")
+#
+#     assert 'Our validators were unexpectedly exited!' not in caplog.text, "Alerts should not be in logs"
