@@ -1,4 +1,25 @@
-# [0.4.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.3.1...0.4.0) (2025-10-28)
+# [0.5.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.4.0...0.5.0) (2025-12-30)
+
+
+### Bug Fixes
+
+* bug in `get_events_in_range` function call ([0033430](https://github.com/lidofinance/ethereum-head-watcher/commit/0033430aa8d20abca7ddc00b183dda6fb2c8a68b))
+* bugs in new unexpected exit processing algorithm ([2548487](https://github.com/lidofinance/ethereum-head-watcher/commit/254848712b7e36de7587f43a0e9c7f5c39c07a52))
+* e2e tests for unexpected exit alerts ([b6f17db](https://github.com/lidofinance/ethereum-head-watcher/commit/b6f17db3f7763ddd66e649824860f0e755d82c82))
+* linter errors ([bb51702](https://github.com/lidofinance/ethereum-head-watcher/commit/bb51702af695b4064e2cb79c4b144c2a7c6b5e2e))
+* linter errors ([2e341e3](https://github.com/lidofinance/ethereum-head-watcher/commit/2e341e35fdfb0a2cf176f49f7e247159327bbe5d))
+* missing parentheses ([2335f31](https://github.com/lidofinance/ethereum-head-watcher/commit/2335f317c715c0727471017a3f5ea8378d6f88c7))
+* review comments and lint issues ([26b9530](https://github.com/lidofinance/ethereum-head-watcher/commit/26b953053567cad182b3453528287c750068be9b))
+* unexpected exits alert ([ac185a4](https://github.com/lidofinance/ethereum-head-watcher/commit/ac185a40a0c0a2198eb3b2a374fd1c6d468620a6))
+
+
+### Features
+
+* add env variable for `eth_getLogs` method calls ([4d59ef2](https://github.com/lidofinance/ethereum-head-watcher/commit/4d59ef29ecd77b4017970200c4f9fc3de7eb60ea))
+
+
+
+# [0.4.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.3.1...0.4.0) (2025-10-30)
 
 
 ### Features
