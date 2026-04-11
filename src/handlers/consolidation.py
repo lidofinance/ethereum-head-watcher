@@ -11,6 +11,16 @@ from src.variables import ADDITIONAL_ALERTMANAGER_LABELS
 
 logger = logging.getLogger()
 
+@dataclass
+class OverDepositConsolidation:
+    source_address: str
+    source_index: int
+    source_pubkey: str
+    source_balance: int
+    target_index: int
+    target_pubkey: str
+    target_balance: int
+
 
 class ConsolidationHandler(WatcherHandler):
     @unsync
@@ -24,6 +34,7 @@ class ConsolidationHandler(WatcherHandler):
         our_wa = []
         our_wa_foreign_source_pubkey = []
         our_wa_foreign_target_pubkey = []
+        our_wa_our_source_target_pubkey = []
         foreign_wa_our_source_pubkey = []
         foreign_wa_our_target_pubkey = []
         for consolidation in head.message.body.execution_requests.consolidations:
@@ -34,6 +45,8 @@ class ConsolidationHandler(WatcherHandler):
                     our_wa_foreign_source_pubkey.append(consolidation)
                 if consolidation.target_pubkey not in watcher.user_keys:
                     our_wa_foreign_target_pubkey.append(consolidation)
+                if consolidation.source_pubkey in watcher.user_keys and consolidation.target_pubkey in watcher.user_keys:
+                    our_wa_our_source_target_pubkey.append(consolidation)
             else:
                 if consolidation.source_pubkey in watcher.user_keys:
                     foreign_wa_our_source_pubkey.append(consolidation)
@@ -52,6 +65,8 @@ class ConsolidationHandler(WatcherHandler):
             self._send_foreign_withdrawal_address_our_source_pubkey(watcher, slot, foreign_wa_our_source_pubkey)
         if foreign_wa_our_target_pubkey:
             self._send_foreign_withdrawal_address_our_target_pubkey(watcher, slot, foreign_wa_our_target_pubkey)
+        if our_wa_our_source_target_pubkey:
+            self._send_our_withdrawal_address_our_source_target_pubkey(watcher, slot, our_wa_our_source_target_pubkey)
 
     def _send_withdrawals_address(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationSourceWithdrawalAddress", severity="critical")
@@ -86,6 +101,42 @@ class ConsolidationHandler(WatcherHandler):
         summary = "⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)"
         self._send_alert(watcher, slot, alert, summary, consolidations)
 
+    def _send_our_withdrawal_address_our_source_target_pubkey(
+        self, watcher, slot, consolidations: list[ConsolidationRequest]
+    ):
+        pubkeys = list({pk for c in consolidations for pk in (c.source_pubkey, c.target_pubkey)})
+        validators = watcher.consensus.get_validators(slot, pubkeys)
+
+        over_deposit_consolidations = []
+        for consolidation in consolidations:
+            source_validator = next((v for v in validators if v.validator.pubkey == consolidation.source_pubkey), None)
+            target_validator = next((v for v in validators if v.validator.pubkey == consolidation.target_pubkey), None)
+
+            if (source_validator is None)
+                raise ValueError(f'Unknown source validator pubkey: {consolidation.source_pubkey}')
+            if (target_validator is None)
+                raise ValueError(f'Unknown target validator pubkey: {consolidation.target_pubkey}')
+
+            if (source_validator.balance + target_validator.balance > 2048000000000):
+                over_deposit_consolidations.append(
+                    OverDepositConsolidation(
+                        source_address=consolidation.source_address,
+                        source_index=source_validator.index,
+                        source_pubkey=consolidation.source_pubkey,
+                        source_balance=source_validator.balance,
+                        target_index=target_validator.index,
+                        target_pubkey=consolidation.target_pubkey,
+                        target_balance=target_validator.balance,
+                    )
+                )
+
+            alert = CommonAlert(name="HeadWatcherConsolidationOverDeposit", severity="critical")
+            summary = "⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2048 ETH"
+            description = '\n\n'.join(self._describe_over_deposit_consolidation(c, watcher.user_keys) for c in over_deposit_consolidations)
+            description += f'\n\nSlot: {beaconchain(slot)}'
+            self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
+
+
     def _send_alert(self, watcher, slot: str, alert: CommonAlert, summary: str,
                     consolidations: list[ConsolidationRequest], additional_labels=None) -> None:
         description = '\n\n'.join(self._describe_consolidation(c, watcher.user_keys) for c in consolidations)
@@ -98,4 +149,16 @@ class ConsolidationHandler(WatcherHandler):
             f'Request source address: {consolidation.source_address}',
             f'Source: {validator_pubkey_link(consolidation.source_pubkey, keys)}',
             f'Target: {validator_pubkey_link(consolidation.target_pubkey, keys)}',
+        ])
+
+    @staticmethod
+    def _describe_over_deposit_consolidation(consolidation: OverDepositConsolidation, keys):
+        return '\n'.join([
+            f'Request source address: {consolidation.source_address}',
+            f'Source index: {consolidation.source_index}',
+            f'Source pubkey: {validator_pubkey_link(consolidation.source_pubkey, keys)}',
+            f'Source balance (gwei): {consolidation.source_balance}',
+            f'Target index: {consolidation.target_index}',
+            f'Target pubkey: {validator_pubkey_link(consolidation.target, keys)}',
+            f'Target balance (gwei): {consolidation.target_balance}',
         ])

@@ -129,6 +129,11 @@ class BlockDetailsResponse(Nested, FromResponse):
 class FullBlockInfo(BlockDetailsResponse, BlockHeaderResponseData):
     pass
 
+# @dataclass
+# class ValidatorsFullResponse(Nested, FromResponse):
+#     execution_optimistic: bool
+#     data: list[Validator]
+#     finalized: Optional[bool] = None
 
 @dataclass
 class ChainReorgEvent(FromResponse):

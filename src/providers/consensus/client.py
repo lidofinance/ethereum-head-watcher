@@ -13,6 +13,8 @@ from src.providers.consensus.typings import (
     BlockHeaderResponseData,
     BlockRootResponse,
     GenesisResponse,
+    Validator,
+#     ValidatorsFullResponse,
 )
 from src.providers.http_provider import HTTPProvider, NotOkResponse
 from src.typings import BlockRoot, Infinity, SlotNumber
@@ -121,6 +123,23 @@ class ConsensusClient(HTTPProvider):
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getBlockV2")
         return BlockDetailsResponse.from_response(**data)
+
+    def get_validators(self, state_id: Union[SlotNumber, BlockRoot, LiteralState], validator_pubkeys: list[str]) -> list[Validator]:
+        """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidators"""
+
+        data, _ = self.get(
+            self.API_GET_VALIDATORS,
+            path_params=(state_id,),
+            query_params={'id': ",".join(validator_pubkeys)},
+            force_raise=self.__raise_last_missed_slot_error,
+            timeout=1.5,
+            retry_strategy=Retry(
+                total=1, backoff_factor=0.5, status_forcelist=self.HTTP_REQUEST_RETRY_STATUS_FORCELIST
+            ),
+        )
+        if not isinstance(data, dict):
+            raise ValueError("Expected mapping response from getStateValidators")
+        return Validator.from_response(**data)
 
     def get_validators_stream(self, slot_number: SlotNumber | LiteralState) -> Response:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidators"""
