@@ -124,6 +124,10 @@ class BlockDetailsResponse(Nested, FromResponse):
     message: BlockMessage
     signature: str
 
+@dataclass
+class PendingConsolidation(Nested, FromResponse):
+    source_index: str
+    target_index: str
 
 @dataclass
 class FullBlockInfo(BlockDetailsResponse, BlockHeaderResponseData):

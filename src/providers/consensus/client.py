@@ -13,6 +13,7 @@ from src.providers.consensus.typings import (
     BlockHeaderResponseData,
     BlockRootResponse,
     GenesisResponse,
+    PendingConsolidation,
     Validator,
 #     ValidatorsFullResponse,
 )
@@ -49,6 +50,7 @@ class ConsensusClient(HTTPProvider):
     API_GET_BLOCK_HEADER = 'eth/v1/beacon/headers/{}'
     API_GET_BLOCK_DETAILS = 'eth/v2/beacon/blocks/{}'
     API_GET_VALIDATORS = 'eth/v1/beacon/states/{}/validators'
+    API_GET_PENDING_CONSOLIDATIONS = 'eth/v1/beacon/states/{}/pending_consolidations'
     API_GET_SPEC = 'eth/v1/config/spec'
     API_GET_GENESIS = 'eth/v1/beacon/genesis'
     API_GET_EVENTS = 'eth/v1/events'
@@ -139,6 +141,22 @@ class ConsensusClient(HTTPProvider):
         )
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getStateValidators")
+        return Validator.from_response(**data)
+
+    def get_pending_consolidations(self, state_id: Union[SlotNumber, BlockRoot, LiteralState]) -> list[PendingConsolidation]
+        """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getPendingConsolidations"""
+
+        data, _ = self.get(
+            self.API_GET_PENDING_CONSOLIDATIONS,
+            path_params=(state_id,),
+            force_raise=self.__raise_last_missed_slot_error,
+            timeout=2,
+            retry_strategy=Retry(
+                total=1, backoff_factor=0.5, status_forcelist=self.HTTP_REQUEST_RETRY_STATUS_FORCELIST
+            ),
+        )
+        if not isinstance(data, dict):
+            raise ValueError("Expected mapping response from getPendingConsolidations")
         return Validator.from_response(**data)
 
     def get_validators_stream(self, slot_number: SlotNumber | LiteralState) -> Response:
