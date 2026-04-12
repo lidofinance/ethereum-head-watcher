@@ -59,6 +59,9 @@ Currently it supports:
 `LIDO_LOCATOR_ADDRESS` - Lido locator contract address
 * **Required:** if `KEYS_SOURCE` is `keys_api`
 ---
+`LIDO_CONSOLIDATION_BUS_ADDRESS` - Lido ConsolidationBus contract address
+* **Required:** false
+---
 `KEYS_API_URI` - Comma separated Keys API urls
 * **Required:** if `KEYS_SOURCE` is `keys_api`
 ---

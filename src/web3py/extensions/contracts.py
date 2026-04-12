@@ -17,6 +17,7 @@ class LidoContracts(Module):
     accounting_oracle: Contract
     validators_exit_bus_oracle: Contract
     oracle_daemon_config: Contract
+    consolidation_bus: Optional[Contract] = None
 
     def __init__(self, w3: Web3):
         super().__init__(w3)
@@ -78,6 +79,13 @@ class LidoContracts(Module):
             abi=self.load_abi('OracleDaemonConfig'),
             decode_tuples=True,
         )
+
+        if variables.LIDO_CONSOLIDATION_BUS_ADDRESS:
+            self.consolidation_bus = self.w3.eth.contract(
+                address=variables.LIDO_CONSOLIDATION_BUS_ADDRESS,
+                abi=self.load_abi('ConsolidationBus'),
+                decode_tuples=True,
+            )
 
         self._check_contracts()
 

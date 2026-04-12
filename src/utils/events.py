@@ -34,3 +34,6 @@ def get_events_in_range(event: ContractEvent, l_block: BlockNumber, r_block: Blo
             break
 
         l_block = BlockNumber(to_block + 1)
+
+def hex_str_to_bytes(hex_str: str) -> bytes:
+    return bytes.fromhex(hex_str[2:]) if hex_str.startswith("0x") else bytes.fromhex(hex_str)
