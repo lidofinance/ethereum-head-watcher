@@ -6,7 +6,8 @@ from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.handlers.helpers import beaconchain, validator_pubkey_link
 from src.metrics.prometheus.duration_meter import duration_meter
-from src.providers.consensus.typings import ConsolidationRequest, FullBlockInfo, ValidatorStatus
+from src.providers.consensus.typings import BlockDetailsResponse, ConsolidationRequest, FullBlockInfo, ValidatorStatus
+from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS
 
 logger = logging.getLogger()
@@ -33,7 +34,22 @@ class InvalidStatusConsolidation:
     target_status: ValidatorStatus
     target_exit_epoch: int
 
+@dataclass
+class RequestedToExitConsolidation:
+    source_address: str
+    source_index: int
+    source_pubkey: str
+    target_index: int
+    target_pubkey: str
+
 class ConsolidationHandler(WatcherHandler):
+    last_total_vebo_requests_processed = 0
+    last_requested_exit_indexes: dict[int, set[int]]
+
+    def __init__(self):
+        super().__init__()
+        self.last_requested_exit_indexes = {}
+
     @unsync
     @duration_meter()
     def handle(self, watcher, head: FullBlockInfo):
@@ -77,29 +93,34 @@ class ConsolidationHandler(WatcherHandler):
         if foreign_wa_our_target_pubkey:
             self._send_foreign_withdrawal_address_our_target_pubkey(watcher, slot, foreign_wa_our_target_pubkey)
         if our_wa_our_source_target_pubkey:
-            self._process_our_withdrawal_address_our_source_target_pubkey(watcher, slot, our_wa_our_source_target_pubkey)
+            self._process_our_withdrawal_address_our_source_target_pubkey(watcher, head, our_wa_our_source_target_pubkey)
 
     def _process_our_withdrawal_address_our_source_target_pubkey(
-        self, watcher, slot, consolidations: list[ConsolidationRequest]
+        self, watcher, block: FullBlockInfo, consolidations: list[ConsolidationRequest]
     ):
+        slot = block.message.slot
         pubkeys = list({pk for c in consolidations for pk in (c.source_pubkey, c.target_pubkey)})
         validators = watcher.consensus.get_validators(slot, pubkeys)
         pending_consolidations = watcher.consensus.get_pending_consolidations(slot)
+        self._update_last_requested_exit_indexes(watcher, block)
+
+        all_exit_indexes = set().union(*self.last_requested_exit_indexes.values())
 
         over_deposit_consolidations = []
         invalid_status_consolidations = []
         rejected_consolidations = []
+        requested_to_exit_consolidations = []
 
         for consolidation in consolidations:
             source_validator = next((v for v in validators if v.validator.pubkey == consolidation.source_pubkey), None)
             target_validator = next((v for v in validators if v.validator.pubkey == consolidation.target_pubkey), None)
 
-            if (source_validator is None)
+            if source_validator is None:
                 raise ValueError(f'Unknown source validator pubkey: {consolidation.source_pubkey}')
-            if (target_validator is None)
+            if target_validator is None:
                 raise ValueError(f'Unknown target validator pubkey: {consolidation.target_pubkey}')
 
-            if (source_validator.balance + target_validator.balance > 2048000000000):
+            if source_validator.balance + target_validator.balance > 2048000000000:
                 over_deposit_consolidations.append(
                     OverDepositConsolidation(
                         source_address=consolidation.source_address,
@@ -112,7 +133,7 @@ class ConsolidationHandler(WatcherHandler):
                     )
                 )
 
-            if (source_validator.status != ValidatorStatus.ACTIVE_ONGOING or target_validator.status != ValidatorStatus.ACTIVE_ONGOING):
+            if source_validator.status != ValidatorStatus.ACTIVE_ONGOING or target_validator.status != ValidatorStatus.ACTIVE_ONGOING:
                 invalid_status_consolidations.append(
                     InvalidStatusConsolidation(
                         source_address=consolidation.source_address,
@@ -128,8 +149,19 @@ class ConsolidationHandler(WatcherHandler):
                 )
 
             pending_consolidation = next((pc for pc in pending_consolidations if pc.source_index == source_validator.index and pc.target_index == target_validator.index), None)
-            if (pending_consolidation is None)
+            if pending_consolidation is None:
                 rejected_consolidations.append(consolidation)
+
+            if source_validator.index in all_exit_indexes or target_validator.index in all_exit_indexes:
+                requested_to_exit_consolidations.append(
+                    RequestedToExitConsolidation(
+                        source_address=consolidation.source_address,
+                        source_index=source_validator.index,
+                        source_pubkey=consolidation.source_pubkey,
+                        target_index=target_validator.index,
+                        target_pubkey=consolidation.target_pubkey,
+                    )
+                )
 
         if over_deposit_consolidations:
             self._send_over_deposit(watcher, slot, over_deposit_consolidations)
@@ -137,6 +169,8 @@ class ConsolidationHandler(WatcherHandler):
             self._send_invalid_status(watcher, slot, invalid_status_consolidations)
         if rejected_consolidations:
             self._send_rejected(watcher, slot, rejected_consolidations)
+        if requested_to_exit_consolidations:
+            self._send_requested_to_exit(watcher, slot, requested_to_exit_consolidations)
 
     def _send_withdrawals_address(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationSourceWithdrawalAddress", severity="critical")
@@ -190,6 +224,13 @@ class ConsolidationHandler(WatcherHandler):
         description += f'\n\nSlot: {beaconchain(slot)}'
         self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
+    def _send_requested_to_exit(self, watcher, slot: str, consolidations: list[RequestedToExitConsolidation]):
+        alert = CommonAlert(name="HeadWatcherConsolidationRequestedToExit", severity="critical")
+        summary = "⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO"
+        description = '\n\n'.join(self._describe_requested_to_exit_consolidation(c, watcher.user_keys) for c in consolidations)
+        description += f'\n\nSlot: {beaconchain(slot)}'
+        self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
+
     def _send_alert(self, watcher, slot: str, alert: CommonAlert, summary: str,
                     consolidations: list[ConsolidationRequest], additional_labels=None) -> None:
         description = '\n\n'.join(self._describe_consolidation(c, watcher.user_keys) for c in consolidations)
@@ -229,3 +270,27 @@ class ConsolidationHandler(WatcherHandler):
             f'Target status: {consolidation.target_status}',
             f'Target exit epoch: {consolidation.target_exit_epoch}',
         ])
+
+    @staticmethod
+    def _describe_requested_to_exit_consolidation(consolidation: RequestedToExitConsolidation, keys):
+        return '\n'.join([
+            f'Request source address: {consolidation.source_address}',
+            f'Source index: {consolidation.source_index}',
+            f'Source pubkey: {validator_pubkey_link(consolidation.source_pubkey, keys)}',
+            f'Target index: {consolidation.target_index}',
+            f'Target pubkey: {validator_pubkey_link(consolidation.target_pubkey, keys)}',
+        ])
+
+    @duration_meter()
+    def _update_last_requested_exit_indexes(self, watcher, block: BlockDetailsResponse) -> None:
+        """Update local cache with last validator indexes requested to exit by VEBO"""
+
+        exits_info = ValidatorExitsInfo(
+            last_total_requests_processed=self.last_total_vebo_requests_processed,
+            last_requested_exit_indexes=self.last_requested_exit_indexes,
+        )
+
+        updated_exits_info = get_last_requested_validator_exit_indexes(watcher, block, exits_info)
+
+        self.last_total_vebo_requests_processed = updated_exits_info.last_total_requests_processed
+        self.last_requested_exit_indexes = updated_exits_info.last_requested_exit_indexes

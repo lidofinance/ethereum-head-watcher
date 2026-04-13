@@ -15,6 +15,7 @@ from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
 from src.typings import BlockNumber
 from src.utils.events import get_events_in_range, hex_str_to_bytes
+from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
 
 logger = logging.getLogger()
@@ -104,7 +105,6 @@ class ExitsHandler(WatcherHandler):
                 self._update_last_requested_exit_indexes(watcher, block)
                 self._update_last_consolidations(watcher, block)
 
-            description = ''
             all_expected = set().union(*self.last_requested_exit_indexes.values())
             all_consolidation_pubkeys = set().union(*(
                 {item.target_pubkey, *item.source_pubkeys}
@@ -134,6 +134,8 @@ class ExitsHandler(WatcherHandler):
 
             if by_operator_exits:
                 total_exits = 0
+                description = ''
+
                 for operator_exits in by_operator_exits.values():
                     total_exits += len(operator_exits.validator_indexes)
                     description += f'\n{operator_exits.module}#{operator_exits.operator} - '
@@ -155,24 +157,25 @@ class ExitsHandler(WatcherHandler):
                 self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
             if by_operator_consolidations:
-               for operator_exits in by_operator_consolidations.values():
-                   description += f'\n{operator_exits.module}#{operator_exits.operator} - '
-                   description += (
-                       "["
-                       + ', '.join(
-                           [
-                               f'[{validator_index}](http://{NETWORK_NAME}.beaconcha.in/validator/{validator_index})'
-                               for validator_index in operator_exits.validator_indexes
-                           ]
-                       )
-                       + "]"
-                   )
-               description += (
-                   f'\n\nslot: [{block.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{block.message.slot})'
-               )
-               alert = CommonAlert(name="HeadWatcherUserExitForRequestedConsolidation", severity="critical")
-               summary = f'🚨🚨🚨 Voluntary exit of validators for which consolidation was requested in ConsolidationBus'
-               self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
+                description = ''
+                for operator_exits in by_operator_consolidations.values():
+                    description += f'\n{operator_exits.module}#{operator_exits.operator} - '
+                    description += (
+                        "["
+                        + ', '.join(
+                            [
+                                f'[{validator_index}](http://{NETWORK_NAME}.beaconcha.in/validator/{validator_index})'
+                                for validator_index in operator_exits.validator_indexes
+                            ]
+                        )
+                        + "]"
+                    )
+                description += (
+                    f'\n\nslot: [{block.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{block.message.slot})'
+                )
+                alert = CommonAlert(name="HeadWatcherUserExitForRequestedConsolidation", severity="critical")
+                summary = f'🚨🚨🚨 Voluntary exit of validators for which consolidation was requested in ConsolidationBus'
+                self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
         if unknown_exits:
             summary = f'🚨 {len(unknown_exits)} unknown validators were exited!'
@@ -198,49 +201,15 @@ class ExitsHandler(WatcherHandler):
         if not watcher.keys_source.modules_operators_dict:
             return
 
-        current_block_number = int(block.message.body.execution_payload.block_number)
-
-        # todo:
-        #  should we look at the refSlot for report?
-        #  compere local last processed refSlot and calculated refSlot (get from contract + frame size)
-        #  instead of getting total_requests_processed every block with lido exits
-        total_requests_processed = (
-            watcher.execution.lido_contracts.validators_exit_bus_oracle.functions.getTotalRequestsProcessed().call(
-                block_identifier=current_block_number
-            )
+        exits_info = ValidatorExitsInfo(
+            last_total_requests_processed=self.last_total_vebo_requests_processed,
+            last_requested_exit_indexes=self.last_requested_exit_indexes,
         )
 
-        if total_requests_processed <= self.last_total_vebo_requests_processed:
-            return
+        updated_exits_info = get_last_requested_validator_exit_indexes(watcher, block, exits_info)
 
-        logger.info({'msg': 'Getting last validator indexes requested to exit by VEBO'})
-
-        lookup_window = Web3.to_int(watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
-            'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
-        ).call(block_identifier=current_block_number))
-
-        last_cached_block = -1
-        if self.last_requested_exit_indexes:
-            last_cached_block = max(self.last_requested_exit_indexes)
-
-        l_block = max(last_cached_block + 1, current_block_number - lookup_window)
-
-        events = get_events_in_range(
-            watcher.execution.lido_contracts.validators_exit_bus_oracle.events.ValidatorExitRequest,
-            l_block=BlockNumber(l_block),
-            r_block=BlockNumber(current_block_number),
-        )
-
-        for event in events:
-            if event['blockNumber'] not in self.last_requested_exit_indexes:
-                self.last_requested_exit_indexes[event['blockNumber']] = set()
-            self.last_requested_exit_indexes[event['blockNumber']].add(event['args']['validatorIndex'])
-
-        for cached_block in list(self.last_requested_exit_indexes.keys()):
-            if cached_block < current_block_number - lookup_window:
-                del self.last_requested_exit_indexes[cached_block]
-
-        self.last_total_vebo_requests_processed = total_requests_processed
+        self.last_total_vebo_requests_processed = updated_exits_info.last_total_requests_processed
+        self.last_requested_exit_indexes = updated_exits_info.last_requested_exit_indexes
 
     @duration_meter()
     def _update_last_consolidations(self, watcher, block: BlockDetailsResponse) -> None:
