@@ -85,9 +85,11 @@ class ConsolidationHandler(WatcherHandler):
     ):
         pubkeys = list({pk for c in consolidations for pk in (c.source_pubkey, c.target_pubkey)})
         validators = watcher.consensus.get_validators(slot, pubkeys)
+        pending_consolidations = watcher.consensus.get_pending_consolidations(slot)
 
         over_deposit_consolidations = []
         invalid_status_consolidations = []
+        rejected_consolidations = []
 
         for consolidation in consolidations:
             source_validator = next((v for v in validators if v.validator.pubkey == consolidation.source_pubkey), None)
@@ -126,11 +128,16 @@ class ConsolidationHandler(WatcherHandler):
                     )
                 )
 
+            pending_consolidation = next((pc for pc in pending_consolidations if pc.source_index == source_validator.index and pc.target_index == target_validator.index), None)
+            if pending_consolidation is None:
+                rejected_consolidations.append(consolidation)
+
         if over_deposit_consolidations:
             self._send_over_deposit(watcher, slot, over_deposit_consolidations)
-
         if invalid_status_consolidations:
             self._send_invalid_status(watcher, slot, invalid_status_consolidations)
+        if rejected_consolidations:
+            self._send_rejected(watcher, slot, rejected_consolidations)
 
     def _send_withdrawals_address(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationSourceWithdrawalAddress", severity="critical")
@@ -164,6 +171,11 @@ class ConsolidationHandler(WatcherHandler):
         alert = CommonAlert(name="HeadWatcherConsolidationUserTargetPubkey", severity="info")
         summary = "⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)"
         self._send_alert(watcher, slot, alert, summary, consolidations)
+
+    def _send_rejected(self, watcher, slot, consolidations: list[ConsolidationRequest]):
+        alert = CommonAlert(name="HeadWatcherConsolidationCLRejected", severity="critical")
+        summary = "🚨🚨🚨 Validator consolidation was rejected on CL"
+        self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_over_deposit(self, watcher, slot: str, consolidations: list[OverDepositConsolidation]):
         alert = CommonAlert(name="HeadWatcherConsolidationOverDeposit", severity="critical")
