@@ -6,13 +6,13 @@ from tests.execution_requests.stubs import WatcherStub, TestValidator
 
 
 def test_user_validator_full_withdrawal_from_valid_source_triggers_info_alert(
-    user_validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
+    user_validator_1: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         withdrawals=[
             WithdrawalRequest(
                 source_address=withdrawal_address,
-                validator_pubkey=user_validator.pubkey,
+                validator_pubkey=user_validator_1.pubkey,
                 amount='0',
             )
         ]
@@ -27,19 +27,19 @@ def test_user_validator_full_withdrawal_from_valid_source_triggers_info_alert(
     assert alert.labels.alertname.startswith('HeadWatcherFullELWithdrawalObserved')
     assert alert.labels.severity == 'info'
     assert alert.annotations.summary == "⚠️ Full withdrawal (exit) requested for our validator(s)"
-    assert user_validator.pubkey in alert.annotations.description
+    assert user_validator_1.pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
     assert '0' in alert.annotations.description
     assert block.message.slot in alert.annotations.description
 
 
 def test_user_validator_full_withdrawal_unknown_source_triggers_alert(
-    user_validator: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, watcher: WatcherStub
 ):
     random_address = gen_random_address()
     block = create_sample_block(
         withdrawals=[
-            WithdrawalRequest(source_address=random_address, validator_pubkey=user_validator.pubkey, amount='0')
+            WithdrawalRequest(source_address=random_address, validator_pubkey=user_validator_1.pubkey, amount='0')
         ]
     )
     handler = ElTriggeredExitHandler()
@@ -52,18 +52,18 @@ def test_user_validator_full_withdrawal_unknown_source_triggers_alert(
     assert alert.labels.alertname.startswith('HeadWatcherELRequestFromUnknownSourceForOurValidators')
     assert alert.labels.severity == 'info'
     assert alert.annotations.summary == "⚠️ Withdrawal request from unknown source address for our validator(s) observed"
-    assert user_validator.pubkey in alert.annotations.description
+    assert user_validator_1.pubkey in alert.annotations.description
     assert random_address in alert.annotations.description
     assert '0' in alert.annotations.description
     assert block.message.slot in alert.annotations.description
 
 
 def test_user_validator_partial_withdrawal_from_valid_source(
-    user_validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
+    user_validator_1: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         withdrawals=[
-            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=user_validator.pubkey, amount='32')
+            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=user_validator_1.pubkey, amount='32')
         ]
     )
     handler = ElTriggeredExitHandler()
@@ -76,7 +76,7 @@ def test_user_validator_partial_withdrawal_from_valid_source(
     assert alert.labels.alertname.startswith('HeadWatcherPartialELWithdrawalObserved')
     assert alert.labels.severity == 'critical'
     assert alert.annotations.summary == "🚨 Partial withdrawal observed for our validator(s) (unsupported)"
-    assert user_validator.pubkey in alert.annotations.description
+    assert user_validator_1.pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
     assert '32' in alert.annotations.description
     assert block.message.slot in alert.annotations.description
@@ -212,7 +212,7 @@ def test_group_similar_partial_withdrawal_alerts():
     assert block.message.slot in alert.annotations.description
 
 
-def test_multiple_full_withdrawals_grouped_into_one_alert(user_validator: TestValidator, watcher: WatcherStub):
+def test_multiple_full_withdrawals_grouped_into_one_alert(user_validator_1: TestValidator, watcher: WatcherStub):
     second_validator = TestValidator.random()
     addr = gen_random_address()
     watcher.user_keys[second_validator.pubkey] = NamedKey(
@@ -221,7 +221,7 @@ def test_multiple_full_withdrawals_grouped_into_one_alert(user_validator: TestVa
     watcher.valid_withdrawal_addresses.add(addr)
     block = create_sample_block(
         withdrawals=[
-            WithdrawalRequest(source_address=addr, validator_pubkey=user_validator.pubkey, amount='0'),
+            WithdrawalRequest(source_address=addr, validator_pubkey=user_validator_1.pubkey, amount='0'),
             WithdrawalRequest(source_address=addr, validator_pubkey=second_validator.pubkey, amount='0'),
         ]
     )
@@ -234,14 +234,14 @@ def test_multiple_full_withdrawals_grouped_into_one_alert(user_validator: TestVa
     alert = watcher.alertmanager.sent_alerts[0]
     assert alert.labels.alertname.startswith('HeadWatcherFullELWithdrawalObserved')
     assert alert.labels.severity == 'info'
-    assert user_validator.pubkey in alert.annotations.description
+    assert user_validator_1.pubkey in alert.annotations.description
     assert second_validator.pubkey in alert.annotations.description
     assert '0' in alert.annotations.description
     assert block.message.slot in alert.annotations.description
 
 
 def test_mixed_user_full_and_partial_generate_two_alerts(
-    user_validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
+    user_validator_1: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     second_validator = TestValidator.random()
     watcher.user_keys[second_validator.pubkey] = NamedKey(
@@ -250,7 +250,7 @@ def test_mixed_user_full_and_partial_generate_two_alerts(
     watcher.valid_withdrawal_addresses.add(withdrawal_address)
     block = create_sample_block(
         withdrawals=[
-            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=user_validator.pubkey, amount='0'),
+            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=user_validator_1.pubkey, amount='0'),
             WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=second_validator.pubkey, amount='5'),
         ]
     )
@@ -266,7 +266,7 @@ def test_mixed_user_full_and_partial_generate_two_alerts(
     assert any(k[0].startswith('HeadWatcherFullELWithdrawalObserved') and k[1] == 'info' for k in kinds)
     assert any(k[0].startswith('HeadWatcherPartialELWithdrawalObserved') and k[1] == 'critical' for k in kinds)
     joined_desc = '\n'.join(a.annotations.description for a in watcher.alertmanager.sent_alerts)
-    assert user_validator.pubkey in joined_desc
+    assert user_validator_1.pubkey in joined_desc
     assert second_validator.pubkey in joined_desc
     assert '0' in joined_desc
     assert '5' in joined_desc
@@ -274,13 +274,13 @@ def test_mixed_user_full_and_partial_generate_two_alerts(
 
 
 def test_mixed_unknown_source_for_our_and_our_source_for_foreign_generate_two_alerts(
-    user_validator: TestValidator, validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
+    user_validator_1: TestValidator, validator: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     unknown_addr = gen_random_address()
     watcher.valid_withdrawal_addresses.add(withdrawal_address)
     block = create_sample_block(
         withdrawals=[
-            WithdrawalRequest(source_address=unknown_addr, validator_pubkey=user_validator.pubkey, amount='1'),
+            WithdrawalRequest(source_address=unknown_addr, validator_pubkey=user_validator_1.pubkey, amount='1'),
             WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=validator.pubkey, amount='2'),
         ]
     )
@@ -306,7 +306,7 @@ def test_mixed_unknown_source_for_our_and_our_source_for_foreign_generate_two_al
         for k in kinds
     )
     joined_desc = '\n'.join(a.annotations.description for a in watcher.alertmanager.sent_alerts)
-    assert user_validator.pubkey in joined_desc
+    assert user_validator_1.pubkey in joined_desc
     assert validator.pubkey in joined_desc
     assert unknown_addr in joined_desc
     assert withdrawal_address in joined_desc
