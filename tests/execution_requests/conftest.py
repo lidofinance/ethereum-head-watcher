@@ -23,6 +23,7 @@ def user_validator_1(user_keys):
     )
     return random_validator
 
+
 @pytest.fixture
 def user_validator_2(user_keys):
     random_validator = TestValidator.random()
