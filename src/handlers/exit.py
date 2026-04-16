@@ -40,12 +40,6 @@ class ExitedOperatorValidators:
     validator_indexes: list[int]
 
 @dataclass
-class ValidatorsWithRequestedConsolidation:
-    module: int
-    operator: str
-    validator_indexes: list[int]
-
-@dataclass
 class ConsolidationBatchItem:
     source_pubkeys: list[str]
     target_pubkey: str
@@ -115,8 +109,8 @@ class ExitsHandler(WatcherHandler):
             by_operator_exits: defaultdict[tuple[int, int], ExitedOperatorValidators] = defaultdict(
                 lambda: ExitedOperatorValidators(module=0, operator='', validator_indexes=[])
             )
-            by_operator_consolidations: defaultdict[tuple[int, int], ValidatorsWithRequestedConsolidation] = defaultdict(
-                lambda: ValidatorsWithRequestedConsolidation(module=0, operator='', validator_indexes=[])
+            by_operator_consolidations: defaultdict[tuple[int, int], ExitedOperatorValidators] = defaultdict(
+                lambda: ExitedOperatorValidators(module=0, operator='', validator_indexes=[])
             )
 
             for user_exit in user_exits:
