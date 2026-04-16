@@ -174,7 +174,7 @@ class ExitsHandler(WatcherHandler):
                     f'\n\nslot: [{block.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{block.message.slot})'
                 )
                 alert = CommonAlert(name="HeadWatcherUserExitForRequestedConsolidation", severity="critical")
-                summary = f'🚨🚨🚨 Voluntary exit of validators for which consolidation was requested in ConsolidationBus'
+                summary = "🚨🚨🚨 Voluntary exit of validators for which consolidation was requested in ConsolidationBus"
                 self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
         if unknown_exits:
@@ -201,6 +201,7 @@ class ExitsHandler(WatcherHandler):
         if not watcher.keys_source.modules_operators_dict:
             return
 
+        # pylint: disable=duplicate-code
         exits_info = ValidatorExitsInfo(
             last_total_requests_processed=self.last_total_vebo_requests_processed,
             last_requested_exit_indexes=self.last_requested_exit_indexes,
@@ -260,4 +261,3 @@ class ExitsHandler(WatcherHandler):
         for cached_block in list(self.last_requested_consolidations.keys()):
             if cached_block < current_block_number - lookup_window:
                 del self.last_requested_consolidations[cached_block]
-

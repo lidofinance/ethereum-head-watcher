@@ -53,7 +53,7 @@ class ConsolidationHandler(WatcherHandler):
 
     @unsync
     @duration_meter()
-    def handle(self, watcher, head: FullBlockInfo):
+    def handle(self, watcher, head: FullBlockInfo): #pylint: disable=too-many-branches
         if not head.message.body.execution_requests or not head.message.body.execution_requests.consolidations:
             logger.info({"msg": f"No consolidation requests in block [{head.message.slot}]"})
             return
