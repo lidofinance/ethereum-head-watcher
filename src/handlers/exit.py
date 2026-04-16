@@ -2,8 +2,8 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Literal, Optional
-from eth_abi import decode
 
+from eth_abi import decode
 from unsync import unsync
 from web3 import Web3
 

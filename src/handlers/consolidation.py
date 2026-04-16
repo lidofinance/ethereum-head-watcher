@@ -1,13 +1,18 @@
 import logging
-
 from dataclasses import dataclass
+
 from unsync import unsync
 
 from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.handlers.helpers import beaconchain, validator_pubkey_link
 from src.metrics.prometheus.duration_meter import duration_meter
-from src.providers.consensus.typings import BlockDetailsResponse, ConsolidationRequest, FullBlockInfo, ValidatorStatus
+from src.providers.consensus.typings import (
+    BlockDetailsResponse,
+    ConsolidationRequest,
+    FullBlockInfo,
+    ValidatorStatus,
+)
 from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS
 
