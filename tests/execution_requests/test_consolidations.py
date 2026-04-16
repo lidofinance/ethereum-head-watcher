@@ -3,6 +3,7 @@ from src.providers.consensus.typings import ConsolidationRequest
 from tests.execution_requests.helpers import gen_random_pubkey, create_sample_block, gen_random_address
 from tests.execution_requests.stubs import TestValidator, WatcherStub
 
+
 def test_consolidation_foreign_source_and_target_pubkey_from_user_withdrawal_address(
     withdrawal_address: str, watcher: WatcherStub
 ):
@@ -193,7 +194,8 @@ def test_consolidation_foreign_withdrawal_address_user_source_pubkey(
     assert alert.labels.alertname.startswith('HeadWatcherConsolidationUserSourcePubkey')
     assert alert.labels.severity == 'info'
     assert (
-        alert.annotations.summary == "⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)"
+        alert.annotations.summary
+        == "⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)"
     )
     assert random_source_address in alert.annotations.description
     assert user_validator_1.pubkey in alert.annotations.description
@@ -226,7 +228,8 @@ def test_consolidation_foreign_withdrawal_address_user_target_pubkey(
     assert alert.labels.alertname.startswith('HeadWatcherConsolidationUserTargetPubkey')
     assert alert.labels.severity == 'info'
     assert (
-        alert.annotations.summary == "⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)"
+        alert.annotations.summary
+        == "⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)"
     )
     assert random_source_address in alert.annotations.description
     assert random_source_pubkey in alert.annotations.description
@@ -285,7 +288,8 @@ def test_group_similar_alerts(user_validator_1: TestValidator, watcher: WatcherS
     assert alert.labels.alertname.startswith('HeadWatcherConsolidationUserSourcePubkey')
     assert alert.labels.severity == 'info'
     assert (
-        alert.annotations.summary == "⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)"
+        alert.annotations.summary
+        == "⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)"
     )
     assert random_source_address in alert.annotations.description
     assert user_validator_1.pubkey in alert.annotations.description
