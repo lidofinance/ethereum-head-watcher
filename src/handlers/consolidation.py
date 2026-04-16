@@ -59,44 +59,44 @@ class ConsolidationHandler(WatcherHandler):
             return
 
         slot = head.message.slot
-        our_wa = []
-        our_wa_foreign_source_pubkey = []
-        our_wa_foreign_target_pubkey = []
-        our_wa_our_source_target_pubkey = []
-        foreign_wa_our_source_pubkey = []
-        foreign_wa_our_target_pubkey = []
+        user_wa = []
+        user_wa_foreign_source_pubkey = []
+        user_wa_foreign_target_pubkey = []
+        user_wa_user_source_target_pubkey = []
+        foreign_wa_user_source_pubkey = []
+        foreign_wa_user_target_pubkey = []
         for consolidation in head.message.body.execution_requests.consolidations:
             if consolidation.source_address in watcher.valid_withdrawal_addresses:
-                our_wa.append(consolidation)
+                user_wa.append(consolidation)
 
                 if consolidation.source_pubkey not in watcher.user_keys:
-                    our_wa_foreign_source_pubkey.append(consolidation)
+                    user_wa_foreign_source_pubkey.append(consolidation)
                 if consolidation.target_pubkey not in watcher.user_keys:
-                    our_wa_foreign_target_pubkey.append(consolidation)
+                    user_wa_foreign_target_pubkey.append(consolidation)
                 if consolidation.source_pubkey in watcher.user_keys and consolidation.target_pubkey in watcher.user_keys:
-                    our_wa_our_source_target_pubkey.append(consolidation)
+                    user_wa_user_source_target_pubkey.append(consolidation)
             else:
                 if consolidation.source_pubkey in watcher.user_keys:
-                    foreign_wa_our_source_pubkey.append(consolidation)
+                    foreign_wa_user_source_pubkey.append(consolidation)
                 if consolidation.target_pubkey in watcher.user_keys:
-                    foreign_wa_our_target_pubkey.append(consolidation)
+                    foreign_wa_user_target_pubkey.append(consolidation)
             # in the future we should check the type of validator WC:
             # if it is 0x02 and source_address == WCs of source validator - It's donation!
 
-        if our_wa:
-            self._send_withdrawals_address(watcher, slot, our_wa)
-        if our_wa_foreign_source_pubkey:
-            self._send_our_withdrawal_address_foreign_source_pubkey(watcher, slot, our_wa_foreign_source_pubkey)
-        if our_wa_foreign_target_pubkey:
-            self._send_our_withdrawal_address_foreign_target_pubkey(watcher, slot, our_wa_foreign_target_pubkey)
-        if foreign_wa_our_source_pubkey:
-            self._send_foreign_withdrawal_address_our_source_pubkey(watcher, slot, foreign_wa_our_source_pubkey)
-        if foreign_wa_our_target_pubkey:
-            self._send_foreign_withdrawal_address_our_target_pubkey(watcher, slot, foreign_wa_our_target_pubkey)
-        if our_wa_our_source_target_pubkey:
-            self._process_our_withdrawal_address_our_source_target_pubkey(watcher, head, our_wa_our_source_target_pubkey)
+        if user_wa:
+            self._send_withdrawals_address(watcher, slot, user_wa)
+        if user_wa_foreign_source_pubkey:
+            self._send_user_withdrawal_address_foreign_source_pubkey(watcher, slot, user_wa_foreign_source_pubkey)
+        if user_wa_foreign_target_pubkey:
+            self._send_user_withdrawal_address_foreign_target_pubkey(watcher, slot, user_wa_foreign_target_pubkey)
+        if foreign_wa_user_source_pubkey:
+            self._send_foreign_withdrawal_address_user_source_pubkey(watcher, slot, foreign_wa_user_source_pubkey)
+        if foreign_wa_user_target_pubkey:
+            self._send_foreign_withdrawal_address_user_target_pubkey(watcher, slot, foreign_wa_user_target_pubkey)
+        if user_wa_user_source_target_pubkey:
+            self._process_user_withdrawal_address_user_source_target_pubkey(watcher, head, user_wa_user_source_target_pubkey)
 
-    def _process_our_withdrawal_address_our_source_target_pubkey(
+    def _process_user_withdrawal_address_user_source_target_pubkey(
         self, watcher, block: FullBlockInfo, consolidations: list[ConsolidationRequest]
     ):
         slot = block.message.slot
@@ -178,28 +178,28 @@ class ConsolidationHandler(WatcherHandler):
         summary = "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address"
         self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
-    def _send_our_withdrawal_address_foreign_source_pubkey(
+    def _send_user_withdrawal_address_foreign_source_pubkey(
         self, watcher, slot, consolidations: list[ConsolidationRequest]
     ):
-        alert = CommonAlert(name="HeadWatcherConsolidationOurWithdrawalAddressForeignSourcePubkey", severity="critical")
+        alert = CommonAlert(name="HeadWatcherConsolidationUserWithdrawalAddressForeignSourcePubkey", severity="critical")
         summary = "🚨🚨🚨 Validator consolidation was requested for foreign source validator from Withdrawal Vault address"
         self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
-    def _send_our_withdrawal_address_foreign_target_pubkey(
+    def _send_user_withdrawal_address_foreign_target_pubkey(
         self, watcher, slot, consolidations: list[ConsolidationRequest]
     ):
-        alert = CommonAlert(name="HeadWatcherConsolidationOurWithdrawalAddressForeignTargetPubkey", severity="critical")
+        alert = CommonAlert(name="HeadWatcherConsolidationUserWithdrawalAddressForeignTargetPubkey", severity="critical")
         summary = "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault address to foreign target validator"
         self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
-    def _send_foreign_withdrawal_address_our_source_pubkey(
+    def _send_foreign_withdrawal_address_user_source_pubkey(
         self, watcher, slot, consolidations: list[ConsolidationRequest]
     ):
         alert = CommonAlert(name="HeadWatcherConsolidationUserSourcePubkey", severity="info")
         summary = "⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)"
         self._send_alert(watcher, slot, alert, summary, consolidations)
 
-    def _send_foreign_withdrawal_address_our_target_pubkey(
+    def _send_foreign_withdrawal_address_user_target_pubkey(
         self, watcher, slot, consolidations: list[ConsolidationRequest]
     ):
         alert = CommonAlert(name="HeadWatcherConsolidationUserTargetPubkey", severity="info")
