@@ -193,8 +193,6 @@ class ExitsHandler(WatcherHandler):
     @duration_meter()
     def _update_last_requested_exit_indexes(self, watcher, block: BlockDetailsResponse) -> None:
         """Update local cache with last validator indexes requested to exit by VEBO"""
-        if not watcher.keys_source.modules_operators_dict:
-            return
 
         # pylint: disable=duplicate-code
         exits_info = ValidatorExitsInfo(
