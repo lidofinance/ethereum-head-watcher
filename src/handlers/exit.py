@@ -39,9 +39,9 @@ class ExitedOperatorValidators:
     operator: str
     validator_indexes: list[int]
 
-@dataclass
+@dataclass(frozen=True)
 class ConsolidationBatchItem:
-    source_pubkeys: list[str]
+    source_pubkeys: tuple[str, ...]
     target_pubkey: str
 
 
@@ -243,7 +243,7 @@ class ExitsHandler(WatcherHandler):
             consolidation_group = decode([BATCH_TUPLE_TYPE], consolidation_group_bytes)[0]
 
             for batch in consolidation_group:
-                source_pubkeys = [pubkey.hex() for pubkey in batch[0]]
+                source_pubkeys = tuple(pubkey.hex() for pubkey in batch[0])
                 target_pubkey = batch[1].hex()
                 self.last_requested_consolidations[event['blockNumber']].add(
                     ConsolidationBatchItem(
