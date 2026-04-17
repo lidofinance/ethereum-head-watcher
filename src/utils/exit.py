@@ -15,6 +15,7 @@ class ValidatorExitsInfo:
     last_total_requests_processed: int
     last_requested_exit_indexes: dict[int, set[int]]
 
+
 def get_last_requested_validator_exit_indexes(
     watcher, block: BlockDetailsResponse, exits_info: ValidatorExitsInfo
 ) -> ValidatorExitsInfo:
@@ -39,6 +40,7 @@ def get_last_requested_validator_exit_indexes(
 
     logger.info({'msg': 'Getting last validator indexes requested to exit by VEBO'})
 
+    # pylint: disable=duplicate-code
     lookup_window = Web3.to_int(
         watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
             'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'

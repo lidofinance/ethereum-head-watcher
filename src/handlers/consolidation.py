@@ -208,7 +208,9 @@ class ConsolidationHandler(WatcherHandler):
         alert = CommonAlert(
             name="HeadWatcherConsolidationUserWithdrawalAddressForeignSourcePubkey", severity="critical"
         )
-        summary = "🚨🚨🚨 Validator consolidation was requested for foreign source validator from Withdrawal Vault address"
+        summary = (
+            "🚨🚨🚨 Validator consolidation was requested for foreign source validator from Withdrawal Vault address"
+        )
         self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_user_withdrawal_address_foreign_target_pubkey(
