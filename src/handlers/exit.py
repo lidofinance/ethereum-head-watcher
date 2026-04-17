@@ -14,8 +14,9 @@ from src.keys_source.base_source import SourceType
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
 from src.typings import BlockNumber
-from src.utils.events import get_events_in_range, hex_str_to_bytes
+from src.utils.events import get_events_in_range
 from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
+from src.utils.types import bytes_to_hex_str, hex_str_to_bytes
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
 
 logger = logging.getLogger()
@@ -243,8 +244,8 @@ class ExitsHandler(WatcherHandler):
             consolidation_group = decode([BATCH_TUPLE_TYPE], consolidation_group_bytes)[0]
 
             for batch in consolidation_group:
-                source_pubkeys = tuple(pubkey.hex() for pubkey in batch[0])
-                target_pubkey = batch[1].hex()
+                source_pubkeys = tuple(bytes_to_hex_str(pubkey) for pubkey in batch[0])
+                target_pubkey = bytes_to_hex_str(batch[1])
                 self.last_requested_consolidations[event['blockNumber']].add(
                     ConsolidationBatchItem(
                         source_pubkeys=source_pubkeys,
