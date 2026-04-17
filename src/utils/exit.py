@@ -17,7 +17,7 @@ class ValidatorExitsInfo:
 def get_last_requested_validator_exit_indexes(watcher, block: BlockDetailsResponse, exits_info: ValidatorExitsInfo) -> ValidatorExitsInfo:
     """Read last validator indexes requested to exit by VEBO"""
     if not watcher.keys_source.modules_operators_dict:
-        return
+        return exits_info
 
     current_block_number = int(block.message.body.execution_payload.block_number)
 
