@@ -18,5 +18,4 @@ class SourceType(Enum):
 
 class BaseSource(ABC):
     @abstractmethod
-    def update_keys(self) -> dict[str, NamedKey] | None:
-        ...
+    def update_keys(self) -> dict[str, NamedKey] | None: ...

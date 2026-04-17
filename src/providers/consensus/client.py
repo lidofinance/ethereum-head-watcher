@@ -125,7 +125,9 @@ class ConsensusClient(HTTPProvider):
             raise ValueError("Expected mapping response from getBlockV2")
         return BlockDetailsResponse.from_response(**data)
 
-    def get_validators(self, state_id: Union[SlotNumber, BlockRoot, LiteralState], validator_pubkeys: list[str]) -> list[Validator]:
+    def get_validators(
+        self, state_id: Union[SlotNumber, BlockRoot, LiteralState], validator_pubkeys: list[str]
+    ) -> list[Validator]:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidators"""
 
         data, _ = self.get(
@@ -142,7 +144,9 @@ class ConsensusClient(HTTPProvider):
             raise ValueError("Expected list response from getStateValidators")
         return list(Validator.from_response(**item) for item in data)
 
-    def get_pending_consolidations(self, state_id: Union[SlotNumber, BlockRoot, LiteralState]) -> list[PendingConsolidation]:
+    def get_pending_consolidations(
+        self, state_id: Union[SlotNumber, BlockRoot, LiteralState]
+    ) -> list[PendingConsolidation]:
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getPendingConsolidations"""
 
         data, _ = self.get(

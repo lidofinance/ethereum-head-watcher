@@ -80,11 +80,13 @@ class ConsolidationRequest(FromResponse):
     source_pubkey: str
     target_pubkey: str
 
+
 @dataclass
 class WithdrawalRequest(FromResponse):
     source_address: str
     validator_pubkey: str
     amount: str
+
 
 @dataclass
 class DepositRequest(FromResponse):
@@ -94,11 +96,13 @@ class DepositRequest(FromResponse):
     signature: str
     index: int
 
+
 @dataclass
 class ExecutionRequests(Nested, FromResponse):
     deposits: list[DepositRequest]
     withdrawals: list[WithdrawalRequest]
     consolidations: list[ConsolidationRequest]
+
 
 @dataclass
 class BlockBody(Nested, FromResponse):
@@ -124,10 +128,12 @@ class BlockDetailsResponse(Nested, FromResponse):
     message: BlockMessage
     signature: str
 
+
 @dataclass
 class PendingConsolidation(Nested, FromResponse):
     source_index: str
     target_index: str
+
 
 @dataclass
 class FullBlockInfo(BlockDetailsResponse, BlockHeaderResponseData):

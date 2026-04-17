@@ -9,12 +9,15 @@ from src.utils.events import get_events_in_range
 
 logger = logging.getLogger()
 
+
 @dataclass
 class ValidatorExitsInfo:
     last_total_requests_processed: int
     last_requested_exit_indexes: dict[int, set[int]]
 
-def get_last_requested_validator_exit_indexes(watcher, block: BlockDetailsResponse, exits_info: ValidatorExitsInfo) -> ValidatorExitsInfo:
+def get_last_requested_validator_exit_indexes(
+    watcher, block: BlockDetailsResponse, exits_info: ValidatorExitsInfo
+) -> ValidatorExitsInfo:
     """Read last validator indexes requested to exit by VEBO"""
     if not watcher.keys_source.modules_operators_dict:
         return exits_info
@@ -36,9 +39,11 @@ def get_last_requested_validator_exit_indexes(watcher, block: BlockDetailsRespon
 
     logger.info({'msg': 'Getting last validator indexes requested to exit by VEBO'})
 
-    lookup_window = Web3.to_int(watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
-        'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
-    ).call(block_identifier=current_block_number))
+    lookup_window = Web3.to_int(
+        watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
+            'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
+        ).call(block_identifier=current_block_number)
+    )
 
     last_cached_block = -1
     if exits_info.last_requested_exit_indexes:

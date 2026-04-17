@@ -12,6 +12,7 @@ def beaconchain(slot) -> str:
 def validator_link(title: str, pubkey: str) -> str:
     return BEACONCHAIN_VALIDATOR_URL_TEMPLATE.format(title, NETWORK_NAME, pubkey)
 
+
 def validator_pubkey_link(pubkey: str, keys: dict[str, NamedKey]) -> str:
     operator = keys[pubkey].operatorName if pubkey in keys else ''
     spacer = ' ' if operator else ''

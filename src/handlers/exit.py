@@ -25,6 +25,7 @@ Owner = Literal['user', 'other', 'unknown']
 
 BATCH_TUPLE_TYPE = 'tuple(bytes[] sourcePubkeys, bytes targetPubkey)[]'
 
+
 @dataclass
 class ExitInfo:
     index: str
@@ -34,11 +35,13 @@ class ExitInfo:
     operator_index: Optional[str] = None
     module_index: Optional[str] = None
 
+
 @dataclass
 class ExitedOperatorValidators:
     module: int
     operator: str
     validator_indexes: list[int]
+
 
 @dataclass(frozen=True)
 class ConsolidationBatchItem:
@@ -101,11 +104,13 @@ class ExitsHandler(WatcherHandler):
                 self._update_last_consolidations(watcher, block)
 
             all_expected = set().union(*self.last_requested_exit_indexes.values())
-            all_consolidation_pubkeys = set().union(*(
-                {item.target_pubkey, *item.source_pubkeys}
-                for batch_items in self.last_requested_consolidations.values()
-                for item in batch_items
-            ))
+            all_consolidation_pubkeys = set().union(
+                *(
+                    {item.target_pubkey, *item.source_pubkeys}
+                    for batch_items in self.last_requested_consolidations.values()
+                    for item in batch_items
+                )
+            )
 
             by_operator_exits: defaultdict[tuple[int, int], ExitedOperatorValidators] = defaultdict(
                 lambda: ExitedOperatorValidators(module=0, operator='', validator_indexes=[])
@@ -122,7 +127,10 @@ class ExitsHandler(WatcherHandler):
                     by_operator_consolidations[key].operator = user_exit.operator
                     by_operator_consolidations[key].validator_indexes.append(int(user_exit.index))
 
-                if int(user_exit.index) not in all_expected and str(user_exit.module_index) not in watcher.disable_unexpected_exit_alerts:
+                if (
+                    int(user_exit.index) not in all_expected
+                    and str(user_exit.module_index) not in watcher.disable_unexpected_exit_alerts
+                ):
                     by_operator_exits[key].module = int(user_exit.module_index)
                     by_operator_exits[key].operator = user_exit.operator
                     by_operator_exits[key].validator_indexes.append(int(user_exit.index))
@@ -169,7 +177,9 @@ class ExitsHandler(WatcherHandler):
                     f'\n\nslot: [{block.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{block.message.slot})'
                 )
                 alert = CommonAlert(name="HeadWatcherUserExitForRequestedConsolidation", severity="critical")
-                summary = "🚨🚨🚨 Voluntary exit of validators for which consolidation was requested in ConsolidationBus"
+                summary = (
+                    "🚨🚨🚨 Voluntary exit of validators for which consolidation was requested in ConsolidationBus"
+                )
                 self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
         if unknown_exits:
@@ -218,9 +228,11 @@ class ExitsHandler(WatcherHandler):
 
         logger.info({'msg': 'Getting last validator consolidations from ConsolidationBus'})
 
-        lookup_window = Web3.to_int(watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
-            'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
-        ).call(block_identifier=current_block_number))
+        lookup_window = Web3.to_int(
+            watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
+                'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
+            ).call(block_identifier=current_block_number)
+        )
 
         last_cached_block = -1
         if self.last_requested_consolidations:
