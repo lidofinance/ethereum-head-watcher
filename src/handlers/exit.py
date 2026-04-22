@@ -16,14 +16,14 @@ from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
 from src.typings import BlockNumber
 from src.utils.events import get_events_in_range
 from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
-from src.utils.types import bytes_to_hex_str, hex_str_to_bytes
+from src.utils.types import bytes_to_hex_str
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
 
 logger = logging.getLogger()
 
 Owner = Literal['user', 'other', 'unknown']
 
-BATCH_TUPLE_TYPE = 'tuple(bytes[] sourcePubkeys, bytes targetPubkey)[]'
+BATCH_TUPLE_TYPE = '(bytes[],bytes)[]'
 
 
 @dataclass
@@ -250,8 +250,7 @@ class ExitsHandler(WatcherHandler):
             if event['blockNumber'] not in self.last_requested_consolidations:
                 self.last_requested_consolidations[event['blockNumber']] = set()
 
-            consolidation_group_bytes = hex_str_to_bytes(event['args']['batchData'])
-            consolidation_group = decode([BATCH_TUPLE_TYPE], consolidation_group_bytes)[0]
+            consolidation_group = decode([BATCH_TUPLE_TYPE], event['args']['batchData'])[0]
 
             for batch in consolidation_group:
                 source_pubkeys = tuple(bytes_to_hex_str(pubkey) for pubkey in batch[0])
