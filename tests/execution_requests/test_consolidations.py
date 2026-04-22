@@ -13,7 +13,7 @@ from tests.execution_requests.stubs import TestValidator, WatcherStub
 
 
 def test_consolidation_foreign_source_and_target_pubkey_from_user_withdrawal_address(
-    withdrawal_address: str, watcher: WatcherStub
+    watcher: WatcherStub, withdrawal_address: str
 ):
     random_source_pubkey = gen_random_pubkey()
     random_target_pubkey = gen_random_pubkey()
@@ -76,7 +76,7 @@ def test_consolidation_foreign_source_and_target_pubkey_from_user_withdrawal_add
 
 
 def test_consolidation_foreign_source_pubkey_from_user_withdrawal_address(
-    withdrawal_address: str, user_validator_2: TestValidator, watcher: WatcherStub
+    user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     random_source_pubkey = gen_random_pubkey()
 
@@ -127,7 +127,7 @@ def test_consolidation_foreign_source_pubkey_from_user_withdrawal_address(
 
 
 def test_consolidation_foreign_target_pubkey_from_user_withdrawal_address(
-    withdrawal_address: str, user_validator_1: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     random_target_pubkey = gen_random_pubkey()
 
@@ -268,7 +268,7 @@ def test_absence_of_alerts_on_foreign_validators(watcher: WatcherStub):
 
 
 def test_over_deposit_consolidation(
-    withdrawal_address: str, user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         consolidations=[
@@ -286,13 +286,14 @@ def test_over_deposit_consolidation(
         effective_balance='1024000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     source_validator = Validator(
         index='1',
         balance='1024000000001',
-        status=ValidatorStatus.ACTIVE_ONGOING.value,
+        status=ValidatorStatus.ACTIVE_ONGOING,
         validator=source_validator_state,
     )
 
@@ -302,13 +303,14 @@ def test_over_deposit_consolidation(
         effective_balance='1024000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     target_validator = Validator(
        index='2',
        balance='1024000000001',
-       status=ValidatorStatus.ACTIVE_ONGOING.value,
+       status=ValidatorStatus.ACTIVE_ONGOING,
        validator=target_validator_state,
     )
 
@@ -372,7 +374,7 @@ def test_over_deposit_consolidation(
 
 
 def test_exiting_source_consolidation(
-    withdrawal_address: str, user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         consolidations=[
@@ -390,13 +392,14 @@ def test_exiting_source_consolidation(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000',
         withdrawable_epoch='2000',
     )
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_EXITING.value,
+        status=ValidatorStatus.ACTIVE_EXITING,
         validator=source_validator_state,
     )
 
@@ -406,13 +409,14 @@ def test_exiting_source_consolidation(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     target_validator = Validator(
         index='2',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING.value,
+        status=ValidatorStatus.ACTIVE_ONGOING,
         validator=target_validator_state,
     )
 
@@ -453,11 +457,11 @@ def test_exiting_source_consolidation(
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
     assert user_validator_1.pubkey in invalid_status_alert.annotations.description
-    assert source_validator.status in invalid_status_alert.annotations.description
+    assert source_validator.status.value in invalid_status_alert.annotations.description
     assert source_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert target_validator.index in invalid_status_alert.annotations.description
     assert user_validator_2.pubkey in invalid_status_alert.annotations.description
-    assert target_validator.status in invalid_status_alert.annotations.description
+    assert target_validator.status.value in invalid_status_alert.annotations.description
     assert target_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert block.message.slot in invalid_status_alert.annotations.description
 
@@ -473,7 +477,7 @@ def test_exiting_source_consolidation(
 
 
 def test_exiting_target_consolidation(
-    withdrawal_address: str, user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         consolidations=[
@@ -491,13 +495,14 @@ def test_exiting_target_consolidation(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING.value,
+        status=ValidatorStatus.ACTIVE_ONGOING,
         validator=source_validator_state,
     )
 
@@ -507,13 +512,14 @@ def test_exiting_target_consolidation(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000',
         withdrawable_epoch='2000'
     )
     target_validator = Validator(
         index='2',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_EXITING.value,
+        status=ValidatorStatus.ACTIVE_EXITING,
         validator=target_validator_state,
     )
 
@@ -554,11 +560,11 @@ def test_exiting_target_consolidation(
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
     assert user_validator_1.pubkey in invalid_status_alert.annotations.description
-    assert source_validator.status in invalid_status_alert.annotations.description
+    assert source_validator.status.value in invalid_status_alert.annotations.description
     assert source_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert target_validator.index in invalid_status_alert.annotations.description
     assert user_validator_2.pubkey in invalid_status_alert.annotations.description
-    assert target_validator.status in invalid_status_alert.annotations.description
+    assert target_validator.status.value in invalid_status_alert.annotations.description
     assert target_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert block.message.slot in invalid_status_alert.annotations.description
 
@@ -574,7 +580,7 @@ def test_exiting_target_consolidation(
 
 
 def test_slashed_source_consolidation(
-    withdrawal_address: str, user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         consolidations=[
@@ -592,13 +598,14 @@ def test_slashed_source_consolidation(
         effective_balance='32000000000',
         slashed=True,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000',
         withdrawable_epoch='2000',
     )
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_SLASHED.value,
+        status=ValidatorStatus.ACTIVE_SLASHED,
         validator=source_validator_state,
     )
 
@@ -608,13 +615,14 @@ def test_slashed_source_consolidation(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     target_validator = Validator(
         index='2',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING.value,
+        status=ValidatorStatus.ACTIVE_ONGOING,
         validator=target_validator_state,
     )
 
@@ -655,11 +663,11 @@ def test_slashed_source_consolidation(
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
     assert user_validator_1.pubkey in invalid_status_alert.annotations.description
-    assert source_validator.status in invalid_status_alert.annotations.description
+    assert source_validator.status.value in invalid_status_alert.annotations.description
     assert source_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert target_validator.index in invalid_status_alert.annotations.description
     assert user_validator_2.pubkey in invalid_status_alert.annotations.description
-    assert target_validator.status in invalid_status_alert.annotations.description
+    assert target_validator.status.value in invalid_status_alert.annotations.description
     assert target_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert block.message.slot in invalid_status_alert.annotations.description
 
@@ -675,7 +683,7 @@ def test_slashed_source_consolidation(
 
 
 def test_slashed_target_consolidation(
-    withdrawal_address: str, user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         consolidations=[
@@ -693,13 +701,14 @@ def test_slashed_target_consolidation(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING.value,
+        status=ValidatorStatus.ACTIVE_ONGOING,
         validator=source_validator_state,
     )
 
@@ -709,13 +718,14 @@ def test_slashed_target_consolidation(
         effective_balance='32000000000',
         slashed=True,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000',
         withdrawable_epoch='2000',
     )
     target_validator = Validator(
         index='2',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_SLASHED.value,
+        status=ValidatorStatus.ACTIVE_SLASHED,
         validator=target_validator_state,
     )
 
@@ -756,11 +766,11 @@ def test_slashed_target_consolidation(
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
     assert user_validator_1.pubkey in invalid_status_alert.annotations.description
-    assert source_validator.status in invalid_status_alert.annotations.description
+    assert source_validator.status.value in invalid_status_alert.annotations.description
     assert source_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert target_validator.index in invalid_status_alert.annotations.description
     assert user_validator_2.pubkey in invalid_status_alert.annotations.description
-    assert target_validator.status in invalid_status_alert.annotations.description
+    assert target_validator.status.value in invalid_status_alert.annotations.description
     assert target_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert block.message.slot in invalid_status_alert.annotations.description
 
@@ -776,7 +786,7 @@ def test_slashed_target_consolidation(
 
 
 def test_rejected_consolidation(
-    withdrawal_address: str, user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         consolidations=[
@@ -794,13 +804,14 @@ def test_rejected_consolidation(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000',
         withdrawable_epoch='2000',
     )
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_EXITING.value,
+        status=ValidatorStatus.ACTIVE_EXITING,
         validator=source_validator_state,
     )
 
@@ -810,13 +821,14 @@ def test_rejected_consolidation(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     target_validator = Validator(
         index='2',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING.value,
+        status=ValidatorStatus.ACTIVE_ONGOING,
         validator=target_validator_state,
     )
 
@@ -871,7 +883,7 @@ def test_rejected_consolidation(
 
 
 def no_rejected_consolidation_alert_for_accepted_consolidations(
-    withdrawal_address: str, user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
         consolidations=[
@@ -889,13 +901,14 @@ def no_rejected_consolidation_alert_for_accepted_consolidations(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING.value,
+        status=ValidatorStatus.ACTIVE_ONGOING,
         validator=source_validator_state,
     )
 
@@ -905,13 +918,14 @@ def no_rejected_consolidation_alert_for_accepted_consolidations(
         effective_balance='32000000000',
         slashed=False,
         activation_eligibility_epoch='2048',
+        activation_epoch='2048',
         exit_epoch='1000000000',
         withdrawable_epoch='1000000000',
     )
     target_validator = Validator(
         index='2',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING.value,
+        status=ValidatorStatus.ACTIVE_ONGOING,
         validator=target_validator_state,
     )
 

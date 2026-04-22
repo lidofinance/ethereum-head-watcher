@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from web3 import Web3
 
+from src.keys_source.keys_api_source import KeysApiSource
 from src.providers.consensus.typings import BlockDetailsResponse
 from src.typings import BlockNumber
 from src.utils.events import get_events_in_range
@@ -20,7 +21,7 @@ def get_last_requested_validator_exit_indexes(
     watcher, block: BlockDetailsResponse, exits_info: ValidatorExitsInfo
 ) -> ValidatorExitsInfo:
     """Read last validator indexes requested to exit by VEBO"""
-    if not watcher.keys_source.modules_operators_dict:
+    if not isinstance(watcher.keys_source, KeysApiSource):
         return exits_info
 
     current_block_number = int(block.message.body.execution_payload.block_number)
