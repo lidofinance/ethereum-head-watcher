@@ -308,10 +308,10 @@ def test_over_deposit_consolidation(
         withdrawable_epoch='1000000000',
     )
     target_validator = Validator(
-       index='2',
-       balance='1024000000001',
-       status=ValidatorStatus.ACTIVE_ONGOING,
-       validator=target_validator_state,
+        index='2',
+        balance='1024000000001',
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        validator=target_validator_state,
     )
 
     watcher.consensus.get_validators = MagicMock(return_value=[source_validator, target_validator])
@@ -451,8 +451,7 @@ def test_exiting_source_consolidation(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -514,7 +513,7 @@ def test_exiting_target_consolidation(
         activation_eligibility_epoch='2048',
         activation_epoch='2048',
         exit_epoch='1000',
-        withdrawable_epoch='2000'
+        withdrawable_epoch='2000',
     )
     target_validator = Validator(
         index='2',
@@ -554,8 +553,7 @@ def test_exiting_target_consolidation(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -657,8 +655,7 @@ def test_slashed_source_consolidation(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -760,8 +757,7 @@ def test_slashed_target_consolidation(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -872,10 +868,7 @@ def test_rejected_consolidation(
     )
     assert rejected_consolidation_alert is not None
     assert rejected_consolidation_alert.labels.severity == 'critical'
-    assert (
-        rejected_consolidation_alert.annotations.summary
-        == "🚨🚨🚨 Validator consolidation was rejected on CL"
-    )
+    assert rejected_consolidation_alert.annotations.summary == "🚨🚨🚨 Validator consolidation was rejected on CL"
     assert withdrawal_address in rejected_consolidation_alert.annotations.description
     assert user_validator_1.pubkey in rejected_consolidation_alert.annotations.description
     assert user_validator_2.pubkey in rejected_consolidation_alert.annotations.description
