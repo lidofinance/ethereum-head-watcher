@@ -958,6 +958,196 @@ def no_rejected_consolidation_alert_for_accepted_consolidations(
     assert rejected_consolidation_alert is None
 
 
+def test_consolidation_for_source_requested_to_exit_by_vebo(
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
+):
+    block = create_sample_block(
+        consolidations=[
+            ConsolidationRequest(
+                source_address=withdrawal_address,
+                source_pubkey=user_validator_1.pubkey,
+                target_pubkey=user_validator_2.pubkey,
+            )
+        ]
+    )
+
+    source_validator_state = ValidatorState(
+        pubkey=user_validator_1.pubkey,
+        withdrawal_credentials=withdrawal_address,
+        effective_balance='32000000000',
+        slashed=False,
+        activation_eligibility_epoch='2048',
+        activation_epoch='2048',
+        exit_epoch='1000000000',
+        withdrawable_epoch='1000000000',
+    )
+    source_validator = Validator(
+        index='1',
+        balance='32000000000',
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        validator=source_validator_state,
+    )
+
+    target_validator_state = ValidatorState(
+        pubkey=user_validator_2.pubkey,
+        withdrawal_credentials=withdrawal_address,
+        effective_balance='32000000000',
+        slashed=False,
+        activation_eligibility_epoch='2048',
+        activation_epoch='2048',
+        exit_epoch='1000000000',
+        withdrawable_epoch='1000000000',
+    )
+    target_validator = Validator(
+        index='2',
+        balance='32000000000',
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        validator=target_validator_state,
+    )
+
+    watcher.consensus.get_validators = MagicMock(return_value=[source_validator, target_validator])
+
+    pending_consolidation = PendingConsolidation(
+        source_index='1',
+        target_index='2',
+    )
+    watcher.consensus.get_pending_consolidations = MagicMock(return_value=[pending_consolidation])
+
+    handler = ConsolidationHandler()
+    handler.last_requested_exit_indexes = {1000: set()}
+    handler.last_requested_exit_indexes.add(1)
+
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) >= 2
+
+    user_wa_alert = next(
+        (
+            alert
+            for alert in watcher.alertmanager.sent_alerts
+            if alert.labels.alertname.startswith('HeadWatcherConsolidationSourceWithdrawalAddress')
+        ),
+        None,
+    )
+    assert user_wa_alert is not None
+
+    requested_to_exit_consolidation_alert = next(
+        (
+            alert
+            for alert in watcher.alertmanager.sent_alerts
+            if alert.labels.alertname.startswith('HeadWatcherConsolidationRequestedToExit')
+        ),
+        None,
+    )
+    assert requested_to_exit_consolidation_alert is not None
+    assert requested_to_exit_consolidation_alert.labels.severity == 'critical'
+    assert (
+        requested_to_exit_consolidation_alert.annotations.summary
+        == "⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO"
+    )
+    assert withdrawal_address in requested_to_exit_consolidation_alert.annotations.description
+    assert source_validator.index in requested_to_exit_consolidation_alert.annotations.description
+    assert user_validator_1.pubkey in requested_to_exit_consolidation_alert.annotations.description
+    assert target_validator.index in requested_to_exit_consolidation_alert.annotations.description
+    assert user_validator_2.pubkey in requested_to_exit_consolidation_alert.annotations.description
+
+
+def test_consolidation_for_target_requested_to_exit_by_vebo(
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
+):
+    block = create_sample_block(
+        consolidations=[
+            ConsolidationRequest(
+                source_address=withdrawal_address,
+                source_pubkey=user_validator_1.pubkey,
+                target_pubkey=user_validator_2.pubkey,
+            )
+        ]
+    )
+
+    source_validator_state = ValidatorState(
+        pubkey=user_validator_1.pubkey,
+        withdrawal_credentials=withdrawal_address,
+        effective_balance='32000000000',
+        slashed=False,
+        activation_eligibility_epoch='2048',
+        activation_epoch='2048',
+        exit_epoch='1000000000',
+        withdrawable_epoch='1000000000',
+    )
+    source_validator = Validator(
+        index='1',
+        balance='32000000000',
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        validator=source_validator_state,
+    )
+
+    target_validator_state = ValidatorState(
+        pubkey=user_validator_2.pubkey,
+        withdrawal_credentials=withdrawal_address,
+        effective_balance='32000000000',
+        slashed=False,
+        activation_eligibility_epoch='2048',
+        activation_epoch='2048',
+        exit_epoch='1000000000',
+        withdrawable_epoch='1000000000',
+    )
+    target_validator = Validator(
+        index='2',
+        balance='32000000000',
+        status=ValidatorStatus.ACTIVE_ONGOING,
+        validator=target_validator_state,
+    )
+
+    watcher.consensus.get_validators = MagicMock(return_value=[source_validator, target_validator])
+
+    pending_consolidation = PendingConsolidation(
+        source_index='1',
+        target_index='2',
+    )
+    watcher.consensus.get_pending_consolidations = MagicMock(return_value=[pending_consolidation])
+
+    handler = ConsolidationHandler()
+    handler.last_requested_exit_indexes = {1000: set()}
+    handler.last_requested_exit_indexes.add(2)
+
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) >= 2
+
+    user_wa_alert = next(
+        (
+            alert
+            for alert in watcher.alertmanager.sent_alerts
+            if alert.labels.alertname.startswith('HeadWatcherConsolidationSourceWithdrawalAddress')
+        ),
+        None,
+    )
+    assert user_wa_alert is not None
+
+    requested_to_exit_consolidation_alert = next(
+        (
+            alert
+            for alert in watcher.alertmanager.sent_alerts
+            if alert.labels.alertname.startswith('HeadWatcherConsolidationRequestedToExit')
+        ),
+        None,
+    )
+    assert requested_to_exit_consolidation_alert is not None
+    assert requested_to_exit_consolidation_alert.labels.severity == 'critical'
+    assert (
+        requested_to_exit_consolidation_alert.annotations.summary
+        == "⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO"
+    )
+    assert withdrawal_address in requested_to_exit_consolidation_alert.annotations.description
+    assert source_validator.index in requested_to_exit_consolidation_alert.annotations.description
+    assert user_validator_1.pubkey in requested_to_exit_consolidation_alert.annotations.description
+    assert target_validator.index in requested_to_exit_consolidation_alert.annotations.description
+    assert user_validator_2.pubkey in requested_to_exit_consolidation_alert.annotations.description
+
+
 def test_group_similar_alerts(user_validator_1: TestValidator, watcher: WatcherStub):
     random_source_address = gen_random_address()
     random_target_pubkey_1 = gen_random_pubkey()
