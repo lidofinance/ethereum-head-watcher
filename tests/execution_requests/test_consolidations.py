@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 from unittest.mock import MagicMock
 
 from src.handlers.consolidation import ConsolidationHandler
