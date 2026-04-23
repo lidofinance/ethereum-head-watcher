@@ -456,11 +456,11 @@ def test_exiting_source_consolidation(
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
     assert user_validator_1.pubkey in invalid_status_alert.annotations.description
-    assert source_validator.status.value in invalid_status_alert.annotations.description
+    assert source_validator.status in invalid_status_alert.annotations.description
     assert source_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert target_validator.index in invalid_status_alert.annotations.description
     assert user_validator_2.pubkey in invalid_status_alert.annotations.description
-    assert target_validator.status.value in invalid_status_alert.annotations.description
+    assert target_validator.status in invalid_status_alert.annotations.description
     assert target_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert block.message.slot in invalid_status_alert.annotations.description
 
@@ -558,11 +558,11 @@ def test_exiting_target_consolidation(
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
     assert user_validator_1.pubkey in invalid_status_alert.annotations.description
-    assert source_validator.status.value in invalid_status_alert.annotations.description
+    assert source_validator.status in invalid_status_alert.annotations.description
     assert source_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert target_validator.index in invalid_status_alert.annotations.description
     assert user_validator_2.pubkey in invalid_status_alert.annotations.description
-    assert target_validator.status.value in invalid_status_alert.annotations.description
+    assert target_validator.status in invalid_status_alert.annotations.description
     assert target_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert block.message.slot in invalid_status_alert.annotations.description
 
@@ -660,11 +660,11 @@ def test_slashed_source_consolidation(
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
     assert user_validator_1.pubkey in invalid_status_alert.annotations.description
-    assert source_validator.status.value in invalid_status_alert.annotations.description
+    assert source_validator.status in invalid_status_alert.annotations.description
     assert source_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert target_validator.index in invalid_status_alert.annotations.description
     assert user_validator_2.pubkey in invalid_status_alert.annotations.description
-    assert target_validator.status.value in invalid_status_alert.annotations.description
+    assert target_validator.status in invalid_status_alert.annotations.description
     assert target_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert block.message.slot in invalid_status_alert.annotations.description
 
@@ -762,11 +762,11 @@ def test_slashed_target_consolidation(
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
     assert user_validator_1.pubkey in invalid_status_alert.annotations.description
-    assert source_validator.status.value in invalid_status_alert.annotations.description
+    assert source_validator.status in invalid_status_alert.annotations.description
     assert source_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert target_validator.index in invalid_status_alert.annotations.description
     assert user_validator_2.pubkey in invalid_status_alert.annotations.description
-    assert target_validator.status.value in invalid_status_alert.annotations.description
+    assert target_validator.status in invalid_status_alert.annotations.description
     assert target_validator.validator.exit_epoch in invalid_status_alert.annotations.description
     assert block.message.slot in invalid_status_alert.annotations.description
 

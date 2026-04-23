@@ -149,8 +149,8 @@ class ConsolidationHandler(WatcherHandler):
                 )
 
             if (
-                source_validator.status != ValidatorStatus.ACTIVE_ONGOING.value
-                or target_validator.status != ValidatorStatus.ACTIVE_ONGOING.value
+                source_validator.status != ValidatorStatus.ACTIVE_ONGOING
+                or target_validator.status != ValidatorStatus.ACTIVE_ONGOING
             ):
                 invalid_status_consolidations.append(
                     InvalidStatusConsolidation(
@@ -316,11 +316,11 @@ class ConsolidationHandler(WatcherHandler):
                 f'Request source address: {consolidation.source_address}',
                 f'Source index: {consolidation.source_index}',
                 f'Source pubkey: {validator_pubkey_link(consolidation.source_pubkey, keys)}',
-                f'Source status: {consolidation.source_status.value}',
+                f'Source status: {consolidation.source_status}',
                 f'Source exit epoch: {consolidation.source_exit_epoch}',
                 f'Target index: {consolidation.target_index}',
                 f'Target pubkey: {validator_pubkey_link(consolidation.target_pubkey, keys)}',
-                f'Target status: {consolidation.target_status.value}',
+                f'Target status: {consolidation.target_status}',
                 f'Target exit epoch: {consolidation.target_exit_epoch}',
             ]
         )

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Optional
 
 from src.typings import BlockRoot, StateRoot
@@ -149,7 +149,7 @@ class ChainReorgEvent(FromResponse):
     new_head_block: BlockRoot
 
 
-class ValidatorStatus(Enum):
+class ValidatorStatus(StrEnum):
     PENDING_INITIALIZED = 'pending_initialized'
     PENDING_QUEUED = 'pending_queued'
 
