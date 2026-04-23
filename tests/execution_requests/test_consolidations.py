@@ -1015,7 +1015,7 @@ def test_consolidation_for_source_requested_to_exit_by_vebo(
 
     handler = ConsolidationHandler()
     handler.last_requested_exit_indexes = {1000: set()}
-    handler.last_requested_exit_indexes.add(1)
+    handler.last_requested_exit_indexes[1000].add(1)
 
     task = handler.handle(watcher, block)
     task.result()
@@ -1110,7 +1110,7 @@ def test_consolidation_for_target_requested_to_exit_by_vebo(
 
     handler = ConsolidationHandler()
     handler.last_requested_exit_indexes = {1000: set()}
-    handler.last_requested_exit_indexes.add(2)
+    handler.last_requested_exit_indexes[1000].add(2)
 
     task = handler.handle(watcher, block)
     task.result()
