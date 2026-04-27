@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Optional
 
 from src.typings import BlockRoot, StateRoot
@@ -80,11 +80,13 @@ class ConsolidationRequest(FromResponse):
     source_pubkey: str
     target_pubkey: str
 
+
 @dataclass
 class WithdrawalRequest(FromResponse):
     source_address: str
     validator_pubkey: str
     amount: str
+
 
 @dataclass
 class DepositRequest(FromResponse):
@@ -94,11 +96,13 @@ class DepositRequest(FromResponse):
     signature: str
     index: int
 
+
 @dataclass
 class ExecutionRequests(Nested, FromResponse):
     deposits: list[DepositRequest]
     withdrawals: list[WithdrawalRequest]
     consolidations: list[ConsolidationRequest]
+
 
 @dataclass
 class BlockBody(Nested, FromResponse):
@@ -126,6 +130,12 @@ class BlockDetailsResponse(Nested, FromResponse):
 
 
 @dataclass
+class PendingConsolidation(Nested, FromResponse):
+    source_index: str
+    target_index: str
+
+
+@dataclass
 class FullBlockInfo(BlockDetailsResponse, BlockHeaderResponseData):
     pass
 
@@ -139,7 +149,7 @@ class ChainReorgEvent(FromResponse):
     new_head_block: BlockRoot
 
 
-class ValidatorStatus(Enum):
+class ValidatorStatus(StrEnum):
     PENDING_INITIALIZED = 'pending_initialized'
     PENDING_QUEUED = 'pending_queued'
 

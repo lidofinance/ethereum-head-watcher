@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from unittest.mock import MagicMock
 
-from src.keys_source.base_source import NamedKey
+from src.keys_source.base_source import BaseSource, NamedKey
 from src.providers.alertmanager.typings import AlertBody
 from tests.execution_requests.helpers import gen_random_address, gen_random_pubkey
 
@@ -26,19 +27,30 @@ class AlertmanagerStub:
         self.sent_alerts.extend(alerts)
 
 
+class ConsensusClientStub:
+    def __init__(self):
+        self.get_validators = MagicMock(return_value=[])
+        self.get_pending_consolidations = MagicMock(return_value=[])
+
+
 class WatcherStub:
     alertmanager: AlertmanagerStub
+    consensus: ConsensusClientStub
     user_keys: dict[str, NamedKey]
     indexed_validators_keys: dict[str, str]
     valid_withdrawal_addresses: set[str]
+    keys_source: BaseSource
 
     def __init__(
         self,
         user_keys: dict[str, NamedKey] = None,
         indexed_validators_keys: dict[str, str] = None,
         valid_withdrawal_addresses: set[str] = None,
+        keys_source: BaseSource = None,
     ):
         self.alertmanager = AlertmanagerStub()
+        self.consensus = ConsensusClientStub()
         self.user_keys = user_keys or {}
         self.indexed_validators_keys = indexed_validators_keys or {}
         self.valid_withdrawal_addresses = valid_withdrawal_addresses or set()
+        self.keys_source = keys_source or {}

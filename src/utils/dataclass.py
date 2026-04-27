@@ -66,7 +66,7 @@ class FromResponse:
 
 
 def list_of_dataclasses(
-    _dataclass_factory: Callable[..., T]
+    _dataclass_factory: Callable[..., T],
 ) -> Callable[[Callable[..., Sequence]], Callable[..., list[T]]]:
     """Decorator to transform list of dicts from func response to list of dataclasses"""
 

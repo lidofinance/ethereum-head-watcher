@@ -58,7 +58,10 @@ class KeysAPIClient(HTTPProvider):
     @staticmethod
     def parse_modules(
         data: TransientStreamingJSONList,
-    ) -> tuple[dict[tuple[str, str], tuple[str, str]], dict[str, list[str]],]:
+    ) -> tuple[
+        dict[tuple[str, str], tuple[str, str]],
+        dict[str, list[str]],
+    ]:
         module_operators: dict[str, list[str]] = {}
         module_operator_name: dict[tuple[str, str], tuple[str, str]] = {}
         for module in data.persistent():

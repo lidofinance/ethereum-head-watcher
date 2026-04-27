@@ -63,7 +63,7 @@ def main():
         ExitsHandler(),
         # FinalityHandler(), ???
         ConsolidationHandler(),
-        ElTriggeredExitHandler()
+        ElTriggeredExitHandler(),
     ]
     Watcher(handlers, keys_source, web3).run()
 
