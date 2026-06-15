@@ -35,6 +35,7 @@ from src.web3py.typings import Web3
 logger = logging.getLogger()
 
 KEEP_MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
+MAX_VALIDATORS_INDEX_FETCH_REQUESTS = 50
 
 
 class Watcher:
@@ -125,6 +126,17 @@ class Watcher:
         if self.indexed_validators_keys and slot % SLOTS_PER_EPOCH != 0:
             return
         logger.info({'msg': 'Updating indexed validators keys'})
+        if variables.VALIDATORS_INDEX_INCREMENTAL and self.indexed_validators_keys:
+            updated = self._update_validators_incremental()
+        else:
+            updated = self._update_validators_full()
+        if not updated:
+            return
+
+        logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
+        VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
+
+    def _update_validators_full(self) -> bool:
         try:
             stream = self.consensus.get_validators_stream('head')
             self.indexed_validators_keys = ConsensusClient.parse_validators(
@@ -132,10 +144,51 @@ class Watcher:
             )
         except Exception as e:  # pylint: disable=broad-except
             logger.error({'msg': f'Error while getting validators: {e}'})
-            return
+            return False
+        return True
 
-        logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
-        VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
+    def _update_validators_incremental(self) -> bool:
+        """
+        The validator registry is append-only (index and pubkey immutable once assigned),
+        so we only fetch unknown indexes, plus re-fetch a small tail of recent indexes to handle reorgs near the head.
+        """
+        try:
+            max_known = max((int(index) for index in self.indexed_validators_keys), default=-1)
+            if len(self.indexed_validators_keys) != max_known + 1:
+                # Holes below max_known (e.g. interrupted full scan) would never be healed by the windowed fetch
+                logger.warning({'msg': 'Validators index is not contiguous. Fall back to full scan'})
+            else:
+                # Start a tail below the head: one contiguous pass both re-fetches the
+                # recent tail (reorg protection) and discovers new validators.
+                tail = max(variables.VALIDATORS_INDEX_REFETCH_TAIL, 0)
+                self._fetch_validators_from(max(0, max_known + 1 - tail))
+                return True
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning({'msg': f'Error while incremental validators update: {e}. Fall back to full scan'})
+        return self._update_validators_full()
+
+    def _fetch_validators_from(self, start_index: int):
+        """
+        Fetch validators from start_index in chunks until the first short or empty page (= end of registry).
+        """
+        chunk_size = max(variables.VALIDATORS_INDEX_CHUNK_SIZE, 1)
+        next_index = start_index
+        for _ in range(MAX_VALIDATORS_INDEX_FETCH_REQUESTS):
+            validator_ids = [str(index) for index in range(next_index, next_index + chunk_size)]
+            validators = self.consensus.post_validators_by_ids('head', validator_ids)
+            if len(validators) > chunk_size:
+                raise RuntimeError(
+                    f'postStateValidators returned {len(validators)} rows for {chunk_size} requested ids '
+                    f'from index {next_index}; node is ignoring the id filter'
+                )
+            self.indexed_validators_keys.update((v.index, v.validator.pubkey) for v in validators)
+            if len(validators) < chunk_size:
+                return
+            next_index += chunk_size
+        raise RuntimeError(
+            f'Validators index scan exceeded {MAX_VALIDATORS_INDEX_FETCH_REQUESTS} requests '
+            f'from index {start_index}; node may be ignoring the id filter'
+        )
 
     @unsync
     @duration_meter()
