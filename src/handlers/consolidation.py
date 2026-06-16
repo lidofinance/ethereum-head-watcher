@@ -149,7 +149,7 @@ class ConsolidationHandler(WatcherHandler):
                 )
 
             if (
-                source_validator.status != ValidatorStatus.ACTIVE_ONGOING
+                source_validator.status != ValidatorStatus.ACTIVE_EXITING
                 or target_validator.status != ValidatorStatus.ACTIVE_ONGOING
             ):
                 invalid_status_consolidations.append(

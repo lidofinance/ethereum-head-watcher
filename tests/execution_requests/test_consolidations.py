@@ -294,7 +294,7 @@ def test_over_deposit_consolidation(
     source_validator = Validator(
         index='1',
         balance='1024000000001',
-        status=ValidatorStatus.ACTIVE_ONGOING,
+        status=ValidatorStatus.ACTIVE_EXITING,
         validator=source_validator_state,
     )
 
@@ -374,7 +374,7 @@ def test_over_deposit_consolidation(
     assert rejected_consolidation_alert is None
 
 
-def test_exiting_source_consolidation(
+def test_invalid_source_consolidation_status(
     user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
@@ -400,7 +400,7 @@ def test_exiting_source_consolidation(
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_EXITING,
+        status=ValidatorStatus.PENDING_INITIALIZED,
         validator=source_validator_state,
     )
 
@@ -476,7 +476,7 @@ def test_exiting_source_consolidation(
     assert rejected_consolidation_alert is not None
 
 
-def test_exiting_target_consolidation(
+def test_invalid_target_consolidation_status(
     user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
@@ -502,7 +502,7 @@ def test_exiting_target_consolidation(
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING,
+        status=ValidatorStatus.ACTIVE_EXITING,
         validator=source_validator_state,
     )
 
@@ -808,7 +808,7 @@ def test_rejected_consolidation(
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_EXITING,
+        status=ValidatorStatus.PENDING_INITIALIZED,
         validator=source_validator_state,
     )
 
@@ -902,7 +902,7 @@ def no_rejected_consolidation_alert_for_accepted_consolidations(
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING,
+        status=ValidatorStatus.ACTIVE_EXITING,
         validator=source_validator_state,
     )
 
@@ -985,7 +985,7 @@ def test_consolidation_for_source_requested_to_exit_by_vebo(
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING,
+        status=ValidatorStatus.ACTIVE_EXITING,
         validator=source_validator_state,
     )
 
@@ -1080,7 +1080,7 @@ def test_consolidation_for_target_requested_to_exit_by_vebo(
     source_validator = Validator(
         index='1',
         balance='32000000000',
-        status=ValidatorStatus.ACTIVE_ONGOING,
+        status=ValidatorStatus.ACTIVE_EXITING,
         validator=source_validator_state,
     )
 
