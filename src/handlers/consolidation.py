@@ -256,7 +256,7 @@ class ConsolidationHandler(WatcherHandler):
 
     def _send_invalid_status(self, watcher, slot: str, consolidations: list[InvalidStatusConsolidation]):
         alert = CommonAlert(name="HeadWatcherConsolidationInvalidStatus", severity="critical")
-        summary = "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        summary = "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
         description = '\n\n'.join(
             self._describe_invalid_status_consolidation(c, watcher.user_keys) for c in consolidations
         )

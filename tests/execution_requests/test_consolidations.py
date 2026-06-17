@@ -452,7 +452,7 @@ def test_invalid_source_consolidation_status(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -554,7 +554,7 @@ def test_invalid_target_consolidation_status(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -656,7 +656,7 @@ def test_slashed_source_consolidation(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -758,7 +758,7 @@ def test_slashed_target_consolidation(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators whose status is not active"
+        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -876,7 +876,7 @@ def test_rejected_consolidation(
     assert block.message.slot in rejected_consolidation_alert.annotations.description
 
 
-def no_rejected_consolidation_alert_for_accepted_consolidations(
+def test_no_rejected_consolidation_alert_for_accepted_consolidations(
     user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     block = create_sample_block(
