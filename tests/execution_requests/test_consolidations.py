@@ -452,7 +452,8 @@ def test_invalid_source_consolidation_status(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
+        invalid_status_alert.annotations.summary
+        == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -554,7 +555,8 @@ def test_invalid_target_consolidation_status(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
+        invalid_status_alert.annotations.summary
+        == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -656,7 +658,8 @@ def test_slashed_source_consolidation(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
+        invalid_status_alert.annotations.summary
+        == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -758,7 +761,8 @@ def test_slashed_target_consolidation(
     assert invalid_status_alert is not None
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
-        invalid_status_alert.annotations.summary == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
+        invalid_status_alert.annotations.summary
+        == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
