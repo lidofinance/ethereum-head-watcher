@@ -135,7 +135,7 @@ class ConsolidationHandler(WatcherHandler):
             if target_validator is None:
                 raise ValueError(f'Unknown target validator pubkey: {consolidation.target_pubkey}')
 
-            if int(source_validator.balance) + int(target_validator.balance) > 2048000000000:
+            if int(source_validator.balance) + int(target_validator.balance) > 2049000000000:
                 over_deposit_consolidations.append(
                     OverDepositConsolidation(
                         source_address=consolidation.source_address,
@@ -247,7 +247,7 @@ class ConsolidationHandler(WatcherHandler):
 
     def _send_over_deposit(self, watcher, slot: str, consolidations: list[OverDepositConsolidation]):
         alert = CommonAlert(name="HeadWatcherConsolidationOverDeposit", severity="critical")
-        summary = "⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2048 ETH"
+        summary = "⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2049 ETH"
         description = '\n\n'.join(
             self._describe_over_deposit_consolidation(c, watcher.user_keys) for c in consolidations
         )

@@ -293,7 +293,7 @@ def test_over_deposit_consolidation(
     )
     source_validator = Validator(
         index='1',
-        balance='1024000000001',
+        balance='1025000000001',
         status=ValidatorStatus.ACTIVE_EXITING,
         validator=source_validator_state,
     )
@@ -352,7 +352,7 @@ def test_over_deposit_consolidation(
     assert over_deposit_consolidation_alert.labels.severity == 'critical'
     assert (
         over_deposit_consolidation_alert.annotations.summary
-        == "⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2048 ETH"
+        == "⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2049 ETH"
     )
     assert withdrawal_address in over_deposit_consolidation_alert.annotations.description
     assert source_validator.index in over_deposit_consolidation_alert.annotations.description
