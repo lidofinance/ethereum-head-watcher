@@ -144,6 +144,21 @@ class ConsensusClient(HTTPProvider):
             raise ValueError("Expected list response from getStateValidators")
         return list(Validator.from_response(**item) for item in data)
 
+    def post_validators_by_ids(
+        self, state_id: Union[SlotNumber, BlockRoot, LiteralState], validator_ids: list[str]
+    ) -> list[Validator]:
+        """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/postStateValidators"""
+
+        data, _ = self.post(
+            self.API_GET_VALIDATORS,
+            path_params=(state_id,),
+            query_body={'ids': validator_ids},
+            force_raise=self.__raise_last_missed_slot_error,
+        )
+        if not isinstance(data, list):
+            raise ValueError("Expected list response from postStateValidators")
+        return list(Validator.from_response(**item) for item in data)
+
     def get_pending_consolidations(
         self, state_id: Union[SlotNumber, BlockRoot, LiteralState]
     ) -> list[PendingConsolidation]:

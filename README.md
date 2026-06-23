@@ -127,6 +127,18 @@ Currently it supports:
 * **Default:** 5
 * **Note:** This variable don't change timeout for requests to blocks for keeping in sync with Ethereum head
 ---
+`VALIDATORS_INDEX_INCREMENTAL` - Refresh the validators index incrementally. After the initial full scan only validators with unknown indexes are fetched on every epoch (the validator registry is append-only). If `false`, the full validator set is downloaded and parsed on every epoch (legacy behavior)
+* **Required:** false
+* **Default:** true
+---
+`VALIDATORS_INDEX_CHUNK_SIZE` - Pagination page size for the incremental refresh: validator indexes requested per page.
+* **Required:** false
+* **Default:** 8192
+---
+`VALIDATORS_INDEX_REFETCH_TAIL` - Number of the most recent known validator indexes re-fetched on every incremental refresh to protect the index against reorgs near the head. `0` disables the tail re-fetch
+* **Required:** false
+* **Default:** 256
+---
 `EL_REQUEST_TIMEOUT` - Execution layer request timeout in seconds
 * **Required:** false
 * **Default:** 5
