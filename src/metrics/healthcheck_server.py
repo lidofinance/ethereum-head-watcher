@@ -44,6 +44,6 @@ def start_pulse_server():
     If bot didn't call pulse for a while (5 minutes but should be changed individually)
     healthcheck in docker returns 1 and bot will be restarted
     """
-    server = HTTPServer(('localhost', variables.HEALTHCHECK_SERVER_PORT), RequestHandlerClass=PulseRequestHandler)
+    server = HTTPServer((variables.HEALTHCHECK_SERVER_HOST, variables.HEALTHCHECK_SERVER_PORT), RequestHandlerClass=PulseRequestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
