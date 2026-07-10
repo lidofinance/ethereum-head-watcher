@@ -16,10 +16,19 @@ def validator():
 
 
 @pytest.fixture
-def user_validator(user_keys):
+def user_validator_1(user_keys):
     random_validator = TestValidator.random()
     user_keys[random_validator.pubkey] = NamedKey(
-        key=random_validator.pubkey, operatorName='Test operator', operatorIndex='1', moduleIndex='1'
+        key=random_validator.pubkey, operatorName='Test operator 1', operatorIndex='1', moduleIndex='1'
+    )
+    return random_validator
+
+
+@pytest.fixture
+def user_validator_2(user_keys):
+    random_validator = TestValidator.random()
+    user_keys[random_validator.pubkey] = NamedKey(
+        key=random_validator.pubkey, operatorName='Test operator 2', operatorIndex='2', moduleIndex='2'
     )
     return random_validator
 

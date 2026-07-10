@@ -178,7 +178,9 @@ class HTTPProvider(ABC):
 
         for host in self.hosts:
             try:
-                return self._post_without_fallbacks(host, endpoint, should_parse_json_response, path_params, query_body, timeout, retry_strategy)
+                return self._post_without_fallbacks(
+                    host, endpoint, should_parse_json_response, path_params, query_body, timeout, retry_strategy
+                )
             except Exception as e:  # pylint: disable=W0703
                 errors.append(e)
 

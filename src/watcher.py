@@ -168,7 +168,7 @@ class Watcher:
             slot, force_use_fallback_callback if slot == 'head' else lambda _: False
         )
         if len(self.handled_headers) > 0 and int(current_head.header.message.slot) == int(
-                self.handled_headers[-1].header.message.slot
+            self.handled_headers[-1].header.message.slot
         ):
             return None
         current_block = self.consensus.get_block_details(current_head.root)
@@ -193,7 +193,5 @@ class Watcher:
     def valid_withdrawal_addresses(self):
         addresses = set(variables.VALID_WITHDRAWAL_ADDRESSES)
         if not addresses and self.execution:
-            addresses = {
-                self.execution.lido_contracts.lido_locator.functions.withdrawalVault().call().lower()
-            }
+            addresses = {self.execution.lido_contracts.lido_locator.functions.withdrawalVault().call().lower()}
         return addresses

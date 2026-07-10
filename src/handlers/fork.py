@@ -40,10 +40,7 @@ class ForkHandler(WatcherHandler):
     def _send_reorg_alert(self, watcher, chain_reorg: ChainReorgEvent):
         alert = CommonAlert(name="UnhandledChainReorg", severity="info")
         links = "\n".join(
-            [
-                beaconchain(s)
-                for s in range(int(chain_reorg.slot) - int(chain_reorg.depth), int(chain_reorg.slot) + 1)
-            ]
+            [beaconchain(s) for s in range(int(chain_reorg.slot) - int(chain_reorg.depth), int(chain_reorg.slot) + 1)]
         )
         summary = "🔗‍🔀 Unhandled slots after chain reorganization"
         description = f"Reorg depth is {chain_reorg.depth} slots.\nPlease, check possible unhandled slots: {links}"

@@ -9,6 +9,7 @@ from src.variables import EVENTS_SEARCH_STEP
 
 logger = logging.getLogger()
 
+
 class InconsistentEvents(Exception):
     pass
 
