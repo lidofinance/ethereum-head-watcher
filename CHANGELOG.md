@@ -1,4 +1,44 @@
-# [0.5.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.4.0...0.5.0) (2025-12-30)
+# [0.6.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.5.0...0.6.0) (2026-07-13)
+
+
+### Bug Fixes
+
+* check existence of modules-operators dict ([5860317](https://github.com/lidofinance/ethereum-head-watcher/commit/58603171048aab219419d07f03ae972304ae48ad))
+* description of alert about incorrect status ([ddf230f](https://github.com/lidofinance/ethereum-head-watcher/commit/ddf230f40e9b6de1b3304f7c6059d36e3454a496))
+* elements in `ConsolidationBatchItem` class ([143a31a](https://github.com/lidofinance/ethereum-head-watcher/commit/143a31a51148ffc1102efb418fc44883a9cc31b9))
+* imports order ([fd22632](https://github.com/lidofinance/ethereum-head-watcher/commit/fd226325beea6364f156950877570287bcd3687a))
+* incorrect consolidation batch parsing ([9c2fc9d](https://github.com/lidofinance/ethereum-head-watcher/commit/9c2fc9d2b3d595d7b3a3b82c010cd536da459645))
+* invalid consolidation status alert ([beff8f8](https://github.com/lidofinance/ethereum-head-watcher/commit/beff8f84bfe06e88a95e547f0377b0d24e90bad5))
+* issue in conversion of bytes pubkeys ([4bb2825](https://github.com/lidofinance/ethereum-head-watcher/commit/4bb282554d5ef2ca680d0b3cc2af4bd7bee30074))
+* issues in last unit tests ([cb36a65](https://github.com/lidofinance/ethereum-head-watcher/commit/cb36a65d05d25d907274216018247e4a41c79367))
+* linter errors ([19f4354](https://github.com/lidofinance/ethereum-head-watcher/commit/19f43542af69b8494313d1a348d5b15030e5dc23))
+* linter issues ([e430d5e](https://github.com/lidofinance/ethereum-head-watcher/commit/e430d5e411707973ae68b2a91481fec864f6b1f8))
+* linter issues ([2ba6c92](https://github.com/lidofinance/ethereum-head-watcher/commit/2ba6c92ac3031b666fd9cfe82927a86b0f5f6156))
+* linter issues ([2778618](https://github.com/lidofinance/ethereum-head-watcher/commit/277861813804ecb5fed1c07e9f34dcfb7100ca09))
+* linter issues ([8599ebf](https://github.com/lidofinance/ethereum-head-watcher/commit/8599ebf5782fe0ce8a3ddee12d68223d278e75cf))
+* linter issues ([a4b7ea0](https://github.com/lidofinance/ethereum-head-watcher/commit/a4b7ea05dce3bcdca1adfd4bf3cf36264f56c5dd))
+* linter issues ([cd2ee00](https://github.com/lidofinance/ethereum-head-watcher/commit/cd2ee00628fa424cc493e2c7d9467fdbef890f18))
+* linter issues ([6a06b3f](https://github.com/lidofinance/ethereum-head-watcher/commit/6a06b3f416232e8435ced6256195d5ab5935e90c))
+* migrate ValidatorStatus to StrEnum ([54f773d](https://github.com/lidofinance/ethereum-head-watcher/commit/54f773daa85e80e1bf242c29777c607de5c71d65))
+* minor issue in utils method ([92306c8](https://github.com/lidofinance/ethereum-head-watcher/commit/92306c8947767c41b777651a621a69907b29c7e3))
+* minor issues in unit tests ([b480054](https://github.com/lidofinance/ethereum-head-watcher/commit/b4800542e5303414d46f3bed761621f5d4ceabc2))
+* name of test validator ([544f272](https://github.com/lidofinance/ethereum-head-watcher/commit/544f2729748485995e7a3b48716c1d1807afbeef))
+* remove unnecessary type ([e15a87c](https://github.com/lidofinance/ethereum-head-watcher/commit/e15a87ce1eb023ad4a9d45fe6f2f6492db0cee53))
+* unexpected exit tests ([227a8da](https://github.com/lidofinance/ethereum-head-watcher/commit/227a8da48869d2f13037e4e7a7d7126516bd7ff0))
+
+
+### Features
+
+* alert for consolidation with requested exit ([2079cd4](https://github.com/lidofinance/ethereum-head-watcher/commit/2079cd45beccbba22a937e4f8290806799a1cd8e))
+* alert for exits with requested consolidation ([39cdb2a](https://github.com/lidofinance/ethereum-head-watcher/commit/39cdb2ad928bdad9cd34b7aa3cbcd68e648126d9))
+* consolidation alerts from our WA ([e2d8f0d](https://github.com/lidofinance/ethereum-head-watcher/commit/e2d8f0d03e574d05d5a82eb72f0e66728717c888))
+* invalid statuses consolidation alert ([28c4d2f](https://github.com/lidofinance/ethereum-head-watcher/commit/28c4d2febadb1e7d27f959fe2584b8455e9b0c71))
+* over deposit consolidation alert ([1e6fe3c](https://github.com/lidofinance/ethereum-head-watcher/commit/1e6fe3c161be837b8c6eb3fdb730866dfa6b5459))
+* rejected consolidation alert ([d1bcd61](https://github.com/lidofinance/ethereum-head-watcher/commit/d1bcd61a826e77a110ba9f5d92b2dffc24b346b6))
+
+
+
+# [0.5.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.4.0...0.5.0) (2025-12-31)
 
 
 ### Bug Fixes
