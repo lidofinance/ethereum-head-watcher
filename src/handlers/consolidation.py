@@ -114,9 +114,10 @@ class ConsolidationHandler(WatcherHandler):
         self, watcher, block: FullBlockInfo, consolidations: list[ConsolidationRequest]
     ):
         slot = block.message.slot
+        state_root = block.message.state_root
         pubkeys = list({pk for c in consolidations for pk in (c.source_pubkey, c.target_pubkey)})
-        validators = watcher.consensus.get_validators(slot, pubkeys)
-        pending_consolidations = watcher.consensus.get_pending_consolidations(slot)
+        validators = watcher.consensus.get_validators(state_root, pubkeys)
+        pending_consolidations = watcher.consensus.get_pending_consolidations(state_root)
         self._update_last_requested_exit_indexes(watcher, block)
 
         all_exit_indexes = set().union(*self.last_requested_exit_indexes.values())
