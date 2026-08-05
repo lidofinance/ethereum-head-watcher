@@ -1,6 +1,17 @@
 import json
 import os
 
+
+def parse_enabled_handlers(value: str | None) -> list[str] | None:
+    """Parse handler names, using ``None`` to represent the default handler set."""
+    if value is None or not value.strip():
+        return None
+    handlers = [handler.strip() for handler in value.split(',') if handler.strip()]
+    if not handlers:
+        raise ValueError('ENABLED_HANDLERS must contain at least one handler name')
+    return handlers
+
+
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
 # - Providers-
@@ -48,6 +59,8 @@ LIDO_CONSOLIDATION_BUS_ADDRESS = os.getenv('LIDO_CONSOLIDATION_BUS_ADDRESS', '')
 VALID_WITHDRAWAL_ADDRESSES = [x.lower() for x in os.getenv('VALID_WITHDRAWAL_ADDRESSES', '').split(',') if x]
 
 DISABLE_UNEXPECTED_EXIT_ALERTS = [x.strip() for x in os.getenv('DISABLE_UNEXPECTED_EXIT_ALERTS', '').split(',') if x]
+
+ENABLED_HANDLERS = parse_enabled_handlers(os.getenv('ENABLED_HANDLERS'))
 
 # - Metrics -
 PROMETHEUS_PORT = int(os.getenv('PROMETHEUS_PORT', 9000))
