@@ -42,13 +42,13 @@ class ForkHandler(WatcherHandler):
         links = "\n".join(
             [beaconchain(s) for s in range(int(chain_reorg.slot) - int(chain_reorg.depth), int(chain_reorg.slot) + 1)]
         )
-        summary = "🔗‍🔀 Unhandled slots after chain reorganization"
+        summary = "**🔗‍🔀 Unhandled slots after chain reorganization**"
         description = f"Reorg depth is {chain_reorg.depth} slots.\nPlease, check possible unhandled slots: {links}"
         self.send_alert(watcher, alert.build_body(summary, description))
 
     def _send_unhandled_head_alert(self, watcher, head: BlockHeaderResponseData):
         alert = CommonAlert(name="UnhandledHead", severity="info")
-        summary = "🫳🐦 Unhandled chain slot"
+        summary = "**🫳🐦 Unhandled chain slot**"
         additional_msg = ""
         diff = int(head.header.message.slot) - int(watcher.handled_headers[-1].header.message.slot) - 2
         if diff > 0:

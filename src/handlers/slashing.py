@@ -82,13 +82,13 @@ class SlashingHandler(WatcherHandler):
         unknown_slashings = [s for s in slashings if s.owner == 'unknown']
         other_slashings = [s for s in slashings if s.owner == 'other']
         if user_slashings:
-            summary = f'🚨🚨🚨 {len(user_slashings)} Our validators were slashed! 🚨🚨🚨'
+            summary = f'**🚨🚨🚨 {len(user_slashings)} Our validators were slashed! 🚨🚨🚨**'
             description = ''
             by_operator: dict[str, list] = defaultdict(list)
             for slashing in user_slashings:
                 by_operator[str(slashing.operator)].append(slashing)
             for operator, operator_slashing in by_operator.items():
-                description += f'\n{operator} -'
+                description += f'\n- {operator} -'
                 by_duty: dict[str, list] = defaultdict(list)
                 for slashing in operator_slashing:
                     by_duty[slashing.duty].append(slashing)
@@ -110,7 +110,7 @@ class SlashingHandler(WatcherHandler):
             alert = CommonAlert(name="HeadWatcherUserSlashing", severity="critical")
             self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
         if unknown_slashings:
-            summary = f'🚨 {len(unknown_slashings)} unknown validators were slashed!'
+            summary = f'**🚨 {len(unknown_slashings)} unknown validators were slashed!**'
             description = ''
             by_duty = {}
             for slashing in unknown_slashings:
@@ -133,7 +133,7 @@ class SlashingHandler(WatcherHandler):
             alert = CommonAlert(name="HeadWatcherUnknownSlashing", severity="critical")
             self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
         if other_slashings:
-            summary = f'ℹ️ {len(other_slashings)} other validators were slashed'
+            summary = f'**ℹ️ {len(other_slashings)} other validators were slashed**'
             description = ''
             by_duty = {}
             for slashing in other_slashings:
