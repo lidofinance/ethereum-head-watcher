@@ -6,6 +6,7 @@ from src.handlers.consolidation import ConsolidationHandler
 from src.handlers.el_triggered_exit import ElTriggeredExitHandler
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
+from src.handlers.handler import WatcherHandler
 from src.handlers.slashing import SlashingHandler
 from src.keys_source.base_source import SourceType
 from src.keys_source.file_source import FileSource
@@ -21,8 +22,39 @@ from src.web3py.typings import Web3
 
 logger = logging.getLogger()
 
+CONFIGURABLE_HANDLER_TYPES: dict[str, type[WatcherHandler]] = {
+    'slashing': SlashingHandler,
+    'exits': ExitsHandler,
+    'consolidation': ConsolidationHandler,
+    'el_triggered_exit': ElTriggeredExitHandler,
+}
+
+
+def build_handlers(enabled_handlers: list[str] | None = None) -> list[WatcherHandler]:
+    handler_names = list(CONFIGURABLE_HANDLER_TYPES) if enabled_handlers is None else enabled_handlers
+    if not handler_names:
+        raise ValueError('ENABLED_HANDLERS must contain at least one handler name')
+
+    duplicate_handlers = sorted({name for name in handler_names if handler_names.count(name) > 1})
+    if duplicate_handlers:
+        raise ValueError(f'Duplicate handlers in ENABLED_HANDLERS: {", ".join(duplicate_handlers)}')
+
+    unknown_handlers = sorted(set(handler_names) - CONFIGURABLE_HANDLER_TYPES.keys())
+    if unknown_handlers:
+        available_handlers = ', '.join(CONFIGURABLE_HANDLER_TYPES)
+        raise ValueError(
+            f'Unknown handlers in ENABLED_HANDLERS: {", ".join(unknown_handlers)}. '
+            f'Available handlers: {available_handlers}'
+        )
+
+    handlers: list[WatcherHandler] = [ForkHandler()]
+    handlers.extend(CONFIGURABLE_HANDLER_TYPES[name]() for name in handler_names)
+    return handlers
+
 
 def main():
+    handlers = build_handlers(variables.parse_enabled_handlers(variables.ENABLED_HANDLERS))
+
     BUILD_INFO.info(get_build_info())
 
     logger.info({'msg': 'Ethereum head watcher startup.'})
@@ -57,14 +89,6 @@ def main():
     if variables.DRY_RUN:
         logger.warning({'msg': 'Dry run mode enabled! No alerts will be sent.'})
 
-    handlers = [
-        SlashingHandler(),
-        ForkHandler(),
-        ExitsHandler(),
-        # FinalityHandler(), ???
-        ConsolidationHandler(),
-        ElTriggeredExitHandler(),
-    ]
     Watcher(handlers, keys_source, web3).run()
 
 

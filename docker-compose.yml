@@ -33,6 +33,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL}
       - DRY_RUN=${DRY_RUN}
       - DISABLE_UNEXPECTED_EXIT_ALERTS=${DISABLE_UNEXPECTED_EXIT_ALERTS}
+      - ENABLED_HANDLERS
 
   prometheus:
     image: prom/prometheus:latest

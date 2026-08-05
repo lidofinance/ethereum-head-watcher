@@ -42,6 +42,10 @@ Currently it supports:
 * **Required:** false
 * **Default:** false
 ---
+`ENABLED_HANDLERS` - Comma-separated list of configurable handlers enabled for this instance. Available handlers: `slashing`, `exits`, `consolidation`, `el_triggered_exit`. Chain reorganization monitoring is always enabled
+* **Required:** false
+* **Default:** all available handlers
+---
 `KEYS_SOURCE` - Keys source. If `keys_api` - application will fetch keys from Keys API, if `file` - application will fetch keys from `KEYS_FILE_PATH`
 * **Required:** false
 * **Default:** keys_api
