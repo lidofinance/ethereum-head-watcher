@@ -13,8 +13,6 @@ from src.variables import parse_enabled_handlers
     ('value', 'expected'),
     [
         (None, None),
-        ('', None),
-        ('  ', None),
         ('fork', ['fork']),
         (' slashing, exits ', ['slashing', 'exits']),
     ],
@@ -23,7 +21,7 @@ def test_parse_enabled_handlers(value, expected):
     assert parse_enabled_handlers(value) == expected
 
 
-@pytest.mark.parametrize('value', [',', ', ,'])
+@pytest.mark.parametrize('value', ['', '  ', ',', ', ,'])
 def test_parse_enabled_handlers_rejects_lists_without_names(value):
     with pytest.raises(ValueError, match='ENABLED_HANDLERS must contain at least one handler name'):
         parse_enabled_handlers(value)
@@ -47,10 +45,9 @@ def test_build_handlers_uses_selected_handlers_and_mandatory_fork_handler():
     assert [type(handler) for handler in handlers] == [ForkHandler, ExitsHandler]
 
 
-def test_build_handlers_keeps_fork_handler_when_no_configurable_handlers_are_selected():
-    handlers = build_handlers([])
-
-    assert [type(handler) for handler in handlers] == [ForkHandler]
+def test_build_handlers_rejects_empty_handler_list():
+    with pytest.raises(ValueError, match='ENABLED_HANDLERS must contain at least one handler name'):
+        build_handlers([])
 
 
 def test_build_handlers_rejects_unknown_handler():

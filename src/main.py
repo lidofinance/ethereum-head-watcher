@@ -32,6 +32,8 @@ CONFIGURABLE_HANDLER_TYPES: dict[str, type[WatcherHandler]] = {
 
 def build_handlers(enabled_handlers: list[str] | None = None) -> list[WatcherHandler]:
     handler_names = list(CONFIGURABLE_HANDLER_TYPES) if enabled_handlers is None else enabled_handlers
+    if not handler_names:
+        raise ValueError('ENABLED_HANDLERS must contain at least one handler name')
 
     duplicate_handlers = sorted({name for name in handler_names if handler_names.count(name) > 1})
     if duplicate_handlers:
@@ -51,7 +53,7 @@ def build_handlers(enabled_handlers: list[str] | None = None) -> list[WatcherHan
 
 
 def main():
-    handlers = build_handlers(variables.ENABLED_HANDLERS)
+    handlers = build_handlers(variables.parse_enabled_handlers(variables.ENABLED_HANDLERS))
 
     BUILD_INFO.info(get_build_info())
 

@@ -4,7 +4,7 @@ import os
 
 def parse_enabled_handlers(value: str | None) -> list[str] | None:
     """Parse handler names, using ``None`` to represent the default handler set."""
-    if value is None or not value.strip():
+    if value is None:
         return None
     handlers = [handler.strip() for handler in value.split(',') if handler.strip()]
     if not handlers:
@@ -60,7 +60,7 @@ VALID_WITHDRAWAL_ADDRESSES = [x.lower() for x in os.getenv('VALID_WITHDRAWAL_ADD
 
 DISABLE_UNEXPECTED_EXIT_ALERTS = [x.strip() for x in os.getenv('DISABLE_UNEXPECTED_EXIT_ALERTS', '').split(',') if x]
 
-ENABLED_HANDLERS = parse_enabled_handlers(os.getenv('ENABLED_HANDLERS'))
+ENABLED_HANDLERS = os.getenv('ENABLED_HANDLERS')
 
 # - Metrics -
 PROMETHEUS_PORT = int(os.getenv('PROMETHEUS_PORT', 9000))
