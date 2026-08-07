@@ -1,4 +1,18 @@
-# [0.6.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.5.0...0.6.0) (2026-07-13)
+# [0.7.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.6.0...0.7.0) (2026-08-07)
+
+
+### Bug Fixes
+
+* defer enabled handler validation to startup ([40d8016](https://github.com/lidofinance/ethereum-head-watcher/commit/40d80164414b26100f95f343463862e0028cd009))
+
+
+### Features
+
+* add configurable handler selection ([e0e8e18](https://github.com/lidofinance/ethereum-head-watcher/commit/e0e8e18e29f19118258c9e5c9f91bd1caf64d961))
+
+
+
+# [0.6.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.5.0...0.6.0) (2026-07-14)
 
 
 ### Bug Fixes
