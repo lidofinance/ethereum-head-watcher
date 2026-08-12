@@ -1,14 +1,18 @@
 import logging
 from dataclasses import dataclass
+from typing import Optional
 
 from unsync import unsync
 
 from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
-from src.handlers.helpers import beaconchain, validator_pubkey_link
+from src.handlers.helpers import (
+    beaconchain,
+    execution_requests_are_external,
+    validator_pubkey_link,
+)
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import (
-    BlockDetailsResponse,
     ConsolidationRequest,
     FullBlockInfo,
     ValidatorStatus,
@@ -63,7 +67,18 @@ class ConsolidationHandler(WatcherHandler):
     @unsync
     @duration_meter()
     def handle(self, watcher, head: FullBlockInfo):  # pylint: disable=too-many-branches
-        if not head.message.body.execution_requests or not head.message.body.execution_requests.consolidations:
+        body = head.message.body
+
+        if execution_requests_are_external(body):
+            logger.warning(
+                {
+                    "msg": f"Execution requests are not a part of block [{head.message.slot}] "
+                    f"(fork: {head.version or 'unknown'}), consolidations are not checked"
+                }
+            )
+            return
+
+        if not body.execution_requests or not body.execution_requests.consolidations:
             logger.info({"msg": f"No consolidation requests in block [{head.message.slot}]"})
             return
 
@@ -74,7 +89,7 @@ class ConsolidationHandler(WatcherHandler):
         user_wa_user_source_target_pubkey = []
         foreign_wa_user_source_pubkey = []
         foreign_wa_user_target_pubkey = []
-        for consolidation in head.message.body.execution_requests.consolidations:
+        for consolidation in body.execution_requests.consolidations:
             if consolidation.source_address in watcher.valid_withdrawal_addresses:
                 user_wa.append(consolidation)
 
@@ -117,7 +132,7 @@ class ConsolidationHandler(WatcherHandler):
         pubkeys = list({pk for c in consolidations for pk in (c.source_pubkey, c.target_pubkey)})
         validators = watcher.consensus.get_validators(slot, pubkeys)
         pending_consolidations = watcher.consensus.get_pending_consolidations(slot)
-        self._update_last_requested_exit_indexes(watcher, block)
+        self._update_last_requested_exit_indexes(watcher, block.message.body.el_block_number)
 
         all_exit_indexes = set().union(*self.last_requested_exit_indexes.values())
 
@@ -338,7 +353,7 @@ class ConsolidationHandler(WatcherHandler):
         )
 
     @duration_meter()
-    def _update_last_requested_exit_indexes(self, watcher, block: BlockDetailsResponse) -> None:
+    def _update_last_requested_exit_indexes(self, watcher, el_block_number: Optional[int]) -> None:
         """Update local cache with last validator indexes requested to exit by VEBO"""
 
         exits_info = ValidatorExitsInfo(
@@ -346,7 +361,7 @@ class ConsolidationHandler(WatcherHandler):
             last_requested_exit_indexes=self.last_requested_exit_indexes,
         )
 
-        updated_exits_info = get_last_requested_validator_exit_indexes(watcher, block, exits_info)
+        updated_exits_info = get_last_requested_validator_exit_indexes(watcher, el_block_number, exits_info)
 
         self.last_total_vebo_requests_processed = updated_exits_info.last_total_requests_processed
         self.last_requested_exit_indexes = updated_exits_info.last_requested_exit_indexes

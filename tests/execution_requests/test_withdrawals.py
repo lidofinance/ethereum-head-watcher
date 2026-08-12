@@ -1,7 +1,7 @@
 from src.handlers.el_triggered_exit import ElTriggeredExitHandler
 from src.keys_source.base_source import NamedKey
 from src.providers.consensus.typings import WithdrawalRequest
-from tests.execution_requests.helpers import create_sample_block, gen_random_address
+from tests.execution_requests.helpers import create_sample_block, create_sample_gloas_block, gen_random_address
 from tests.execution_requests.stubs import WatcherStub, TestValidator
 
 
@@ -129,6 +129,17 @@ def test_from_user_withdrawal_address_for_foreign_validator_triggers_alert(
 def test_no_withdrawals_produce_no_alerts(watcher: WatcherStub):
     handler = ElTriggeredExitHandler()
     block = create_sample_block()
+
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) == 0
+
+
+def test_gloas_block_is_handled_without_alerts(watcher: WatcherStub):
+    """Requests are not a part of a Glamsterdam (EIP-7732) block, handling it must not fail"""
+    handler = ElTriggeredExitHandler()
+    block = create_sample_gloas_block()
 
     task = handler.handle(watcher, block)
     task.result()

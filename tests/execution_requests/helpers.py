@@ -7,7 +7,9 @@ from src.providers.consensus.typings import (
     BlockMessage,
     BlockBody,
     BlockExecutionPayload,
+    ExecutionPayloadBid,
     ExecutionRequests,
+    SignedExecutionPayloadBid,
     WithdrawalRequest,
     ConsolidationRequest,
 )
@@ -63,4 +65,26 @@ def create_sample_block(
         deposits=[], withdrawals=withdrawals or [], consolidations=consolidations or []
     )
     block.message.body.execution_requests = execution_requests
+    return block
+
+
+def create_sample_gloas_block() -> FullBlockInfo:
+    """
+    Block shaped as after Glamsterdam (EIP-7732): the body commits to an execution payload bid,
+    while the payload itself and the execution requests are revealed in a separate envelope.
+    """
+    block = create_sample_block()
+    block.version = 'gloas'
+    block.message.body.execution_payload = None
+    block.message.body.signed_execution_payload_bid = SignedExecutionPayloadBid(
+        message=ExecutionPayloadBid(
+            block_hash=random_hex(32),
+            parent_block_hash=random_hex(32),
+            parent_block_root=block.message.parent_root,
+            builder_index='7',
+            slot=block.message.slot,
+            value='1000',
+        ),
+        signature=random_hex(96),
+    )
     return block

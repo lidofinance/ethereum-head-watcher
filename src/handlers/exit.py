@@ -12,7 +12,7 @@ from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.keys_source.base_source import SourceType
 from src.metrics.prometheus.duration_meter import duration_meter
-from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
+from src.providers.consensus.typings import FullBlockInfo
 from src.typings import BlockNumber
 from src.utils.events import get_events_in_range
 from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
@@ -100,8 +100,9 @@ class ExitsHandler(WatcherHandler):
         unknown_exits = [s for s in exits if s.owner == 'unknown']
         if user_exits:
             if variables.KEYS_SOURCE == SourceType.KEYS_API.value:
-                self._update_last_requested_exit_indexes(watcher, block)
-                self._update_last_consolidations(watcher, block)
+                el_block_number = block.message.body.el_block_number
+                self._update_last_requested_exit_indexes(watcher, el_block_number)
+                self._update_last_consolidations(watcher, el_block_number)
 
             all_expected = set().union(*self.last_requested_exit_indexes.values())
             all_consolidation_pubkeys = set().union(
@@ -201,7 +202,7 @@ class ExitsHandler(WatcherHandler):
             self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
     @duration_meter()
-    def _update_last_requested_exit_indexes(self, watcher, block: BlockDetailsResponse) -> None:
+    def _update_last_requested_exit_indexes(self, watcher, el_block_number: Optional[int]) -> None:
         """Update local cache with last validator indexes requested to exit by VEBO"""
 
         # pylint: disable=duplicate-code
@@ -210,13 +211,13 @@ class ExitsHandler(WatcherHandler):
             last_requested_exit_indexes=self.last_requested_exit_indexes,
         )
 
-        updated_exits_info = get_last_requested_validator_exit_indexes(watcher, block, exits_info)
+        updated_exits_info = get_last_requested_validator_exit_indexes(watcher, el_block_number, exits_info)
 
         self.last_total_vebo_requests_processed = updated_exits_info.last_total_requests_processed
         self.last_requested_exit_indexes = updated_exits_info.last_requested_exit_indexes
 
     @duration_meter()
-    def _update_last_consolidations(self, watcher, block: BlockDetailsResponse) -> None:
+    def _update_last_consolidations(self, watcher, el_block_number: Optional[int]) -> None:
         """Update local cache with information about last validator consolidations in ConsolidationBus"""
         if not watcher.keys_source.modules_operators_dict:
             return
@@ -224,26 +225,30 @@ class ExitsHandler(WatcherHandler):
         if not watcher.execution.lido_contracts.consolidation_bus:
             return
 
-        current_block_number = int(block.message.body.execution_payload.block_number)
+        if el_block_number is None:
+            # Since Gloas (EIP-7732) the EL block number is not a part of the block body anymore: it
+            # comes with the payload envelope of the previous block, which is not read yet.
+            logger.warning({'msg': 'No EL block number for the head block, skipping ConsolidationBus lookup'})
+            return
 
         logger.info({'msg': 'Getting last validator consolidations from ConsolidationBus'})
 
         lookup_window = Web3.to_int(
             watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
                 'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
-            ).call(block_identifier=current_block_number)
+            ).call(block_identifier=el_block_number)
         )
 
         last_cached_block = -1
         if self.last_requested_consolidations:
             last_cached_block = max(self.last_requested_consolidations)
 
-        l_block = max(last_cached_block + 1, current_block_number - lookup_window)
+        l_block = max(last_cached_block + 1, el_block_number - lookup_window)
 
         events = get_events_in_range(
             watcher.execution.lido_contracts.consolidation_bus.events.RequestsAdded,
             l_block=BlockNumber(l_block),
-            r_block=BlockNumber(current_block_number),
+            r_block=BlockNumber(el_block_number),
         )
 
         for event in events:
@@ -263,5 +268,5 @@ class ExitsHandler(WatcherHandler):
                 )
 
         for cached_block in list(self.last_requested_consolidations.keys()):
-            if cached_block < current_block_number - lookup_window:
+            if cached_block < el_block_number - lookup_window:
                 del self.last_requested_consolidations[cached_block]

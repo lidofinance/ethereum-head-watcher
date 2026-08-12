@@ -4,7 +4,11 @@ from unsync import unsync
 
 from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
-from src.handlers.helpers import beaconchain, validator_pubkey_link
+from src.handlers.helpers import (
+    beaconchain,
+    execution_requests_are_external,
+    validator_pubkey_link,
+)
 from src.keys_source.base_source import NamedKey
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import FullBlockInfo, WithdrawalRequest
@@ -17,12 +21,23 @@ class ElTriggeredExitHandler(WatcherHandler):
     @unsync
     @duration_meter()
     def handle(self, watcher, head: FullBlockInfo):
-        if not head.message.body.execution_requests or not head.message.body.execution_requests.withdrawals:
+        body = head.message.body
+
+        if execution_requests_are_external(body):
+            logger.warning(
+                {
+                    "msg": f"Execution requests are not a part of block [{head.message.slot}] "
+                    f"(fork: {head.version or 'unknown'}), withdrawal requests are not checked"
+                }
+            )
+            return
+
+        if not body.execution_requests or not body.execution_requests.withdrawals:
             logger.debug({"msg": f"No withdrawal requests in block [{head.message.slot}]"})
             return
 
         slot = head.message.slot
-        withdrawals = head.message.body.execution_requests.withdrawals
+        withdrawals = body.execution_requests.withdrawals
         valid_withdrawal_addresses = watcher.valid_withdrawal_addresses
 
         user_withdrawals = [

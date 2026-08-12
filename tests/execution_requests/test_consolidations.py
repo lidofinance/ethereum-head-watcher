@@ -9,7 +9,12 @@ from src.providers.consensus.typings import (
     ValidatorState,
     ValidatorStatus,
 )
-from tests.execution_requests.helpers import gen_random_pubkey, create_sample_block, gen_random_address
+from tests.execution_requests.helpers import (
+    gen_random_pubkey,
+    create_sample_block,
+    create_sample_gloas_block,
+    gen_random_address,
+)
 from tests.execution_requests.stubs import TestValidator, WatcherStub
 
 
@@ -244,6 +249,17 @@ def test_consolidation_foreign_withdrawal_address_user_target_pubkey(
     assert random_source_pubkey in alert.annotations.description
     assert user_validator_2.pubkey in alert.annotations.description
     assert block.message.slot in alert.annotations.description
+
+
+def test_gloas_block_is_handled_without_alerts(watcher: WatcherStub):
+    """Requests are not a part of a Glamsterdam (EIP-7732) block, handling it must not fail"""
+    block = create_sample_gloas_block()
+    handler = ConsolidationHandler()
+
+    task = handler.handle(watcher, block)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) == 0
 
 
 def test_absence_of_alerts_on_foreign_validators(watcher: WatcherStub):

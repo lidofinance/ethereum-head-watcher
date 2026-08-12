@@ -1,10 +1,10 @@
 import logging
 from dataclasses import dataclass
+from typing import Optional
 
 from web3 import Web3
 
 from src.keys_source.keys_api_source import KeysApiSource
-from src.providers.consensus.typings import BlockDetailsResponse
 from src.typings import BlockNumber
 from src.utils.events import get_events_in_range
 
@@ -18,13 +18,17 @@ class ValidatorExitsInfo:
 
 
 def get_last_requested_validator_exit_indexes(
-    watcher, block: BlockDetailsResponse, exits_info: ValidatorExitsInfo
+    watcher, el_block_number: Optional[int], exits_info: ValidatorExitsInfo
 ) -> ValidatorExitsInfo:
     """Read last validator indexes requested to exit by VEBO"""
     if not isinstance(watcher.keys_source, KeysApiSource):
         return exits_info
 
-    current_block_number = int(block.message.body.execution_payload.block_number)
+    if el_block_number is None:
+        # Since Gloas (EIP-7732) the EL block number is not a part of the block body anymore: it
+        # comes with the payload envelope of the previous block, which is not read yet.
+        logger.warning({'msg': 'No EL block number for the head block, skipping VEBO exit requests lookup'})
+        return exits_info
 
     # todo:
     #  should we look at the refSlot for report?
@@ -32,7 +36,7 @@ def get_last_requested_validator_exit_indexes(
     #  instead of getting total_requests_processed every block with lido exits
     total_requests_processed = (
         watcher.execution.lido_contracts.validators_exit_bus_oracle.functions.getTotalRequestsProcessed().call(
-            block_identifier=current_block_number
+            block_identifier=el_block_number
         )
     )
 
@@ -45,19 +49,19 @@ def get_last_requested_validator_exit_indexes(
     lookup_window = Web3.to_int(
         watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
             'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
-        ).call(block_identifier=current_block_number)
+        ).call(block_identifier=el_block_number)
     )
 
     last_cached_block = -1
     if exits_info.last_requested_exit_indexes:
         last_cached_block = max(exits_info.last_requested_exit_indexes)
 
-    l_block = max(last_cached_block + 1, current_block_number - lookup_window)
+    l_block = max(last_cached_block + 1, el_block_number - lookup_window)
 
     events = get_events_in_range(
         watcher.execution.lido_contracts.validators_exit_bus_oracle.events.ValidatorExitRequest,
         l_block=BlockNumber(l_block),
-        r_block=BlockNumber(current_block_number),
+        r_block=BlockNumber(el_block_number),
     )
 
     for event in events:
@@ -66,7 +70,7 @@ def get_last_requested_validator_exit_indexes(
         exits_info.last_requested_exit_indexes[event['blockNumber']].add(event['args']['validatorIndex'])
 
     for cached_block in list(exits_info.last_requested_exit_indexes.keys()):
-        if cached_block < current_block_number - lookup_window:
+        if cached_block < el_block_number - lookup_window:
             del exits_info.last_requested_exit_indexes[cached_block]
 
     exits_info.last_total_requests_processed = total_requests_processed

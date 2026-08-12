@@ -112,7 +112,7 @@ class ConsensusClient(HTTPProvider):
         """Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2"""
         # Set special timeout and retry params for this method.
         # It is used for `head` request
-        data, _ = self.get(
+        data, meta = self.get(
             self.API_GET_BLOCK_DETAILS,
             path_params=(state_id,),
             force_raise=self.__raise_last_missed_slot_error,
@@ -123,7 +123,8 @@ class ConsensusClient(HTTPProvider):
         )
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getBlockV2")
-        return BlockDetailsResponse.from_response(**data)
+        # The fork name is returned next to `data`, not inside it
+        return BlockDetailsResponse.from_response(**{**data, 'version': meta.get('version', '')})
 
     def get_validators(
         self, state_id: Union[SlotNumber, BlockRoot, LiteralState], validator_pubkeys: list[str]
