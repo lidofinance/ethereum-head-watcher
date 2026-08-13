@@ -1,5 +1,5 @@
 from src.keys_source.base_source import NamedKey
-from src.providers.consensus.typings import BlockBody
+from src.utils.execution_requests import ExecutionRequestsContext
 from src.variables import NETWORK_NAME
 
 BEACONCHAIN_URL_TEMPLATE = "[{0}](https://{1}.beaconcha.in/slot/{0})"
@@ -21,13 +21,13 @@ def validator_pubkey_link(pubkey: str, keys: dict[str, NamedKey]) -> str:
     return validator_link(title, pubkey)
 
 
-def execution_requests_are_external(body: BlockBody) -> bool:
+def slot_description(ctx: ExecutionRequestsContext) -> str:
     """
-    Whether the execution requests of a block have to be read from outside of the block body.
+    Slot line of an alert description.
 
-    Since Gloas (EIP-7732) the block commits to a payload bid only, while the payload and the
-    execution requests are revealed by the builder in a separate envelope and are applied to the
-    beacon state one block later. Handlers can not read them from the block anymore, and an empty
-    `execution_requests` must not be mistaken for a block without requests.
+    Since Gloas (EIP-7732) a request is published one block earlier than the state that reflects it,
+    so both slots are shown: the one to look the request up in and the one it was applied at.
     """
-    return body.execution_payload is None and body.execution_requests is None
+    if ctx.request_slot == ctx.state_slot:
+        return f'Slot: {beaconchain(ctx.request_slot)}'
+    return f'Slot: {beaconchain(ctx.request_slot)} (applied at {beaconchain(ctx.state_slot)})'

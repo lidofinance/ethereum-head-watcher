@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Callable, Literal, Union
+from typing import Callable, Literal, Optional, Union
 
 from json_stream.base import TransientStreamingJSONList
 from requests import Response
@@ -12,6 +12,7 @@ from src.providers.consensus.typings import (
     BlockDetailsResponse,
     BlockHeaderResponseData,
     BlockRootResponse,
+    ExecutionPayloadEnvelope,
     GenesisResponse,
     PendingConsolidation,
     Validator,
@@ -48,6 +49,8 @@ class ConsensusClient(HTTPProvider):
     API_GET_BLOCK_ROOT = 'eth/v1/beacon/blocks/{}/root'
     API_GET_BLOCK_HEADER = 'eth/v1/beacon/headers/{}'
     API_GET_BLOCK_DETAILS = 'eth/v2/beacon/blocks/{}'
+    # Gloas (EIP-7732). The path is not settled in beacon-APIs yet, keep it in one place
+    API_GET_EXECUTION_PAYLOAD_ENVELOPE = 'eth/v1/beacon/blocks/{}/execution_payload_envelope'
     API_GET_VALIDATORS = 'eth/v1/beacon/states/{}/validators'
     API_GET_PENDING_CONSOLIDATIONS = 'eth/v1/beacon/states/{}/pending_consolidations'
     API_GET_SPEC = 'eth/v1/config/spec'
@@ -125,6 +128,34 @@ class ConsensusClient(HTTPProvider):
             raise ValueError("Expected mapping response from getBlockV2")
         # The fork name is returned next to `data`, not inside it
         return BlockDetailsResponse.from_response(**{**data, 'version': meta.get('version', '')})
+
+    def get_execution_payload_envelope(
+        self, state_id: Union[SlotNumber, BlockRoot, LiteralState]
+    ) -> Optional[ExecutionPayloadEnvelope]:
+        """
+        Execution payload revealed for the block since Gloas (EIP-7732).
+
+        Returns None if the builder did not reveal the payload, so the block has no envelope at all.
+        """
+        try:
+            data, _ = self.get(
+                self.API_GET_EXECUTION_PAYLOAD_ENVELOPE,
+                path_params=(state_id,),
+                force_raise=self.__raise_last_missed_slot_error,
+                timeout=1.5,
+                retry_strategy=Retry(
+                    total=1, backoff_factor=0.5, status_forcelist=self.HTTP_REQUEST_RETRY_STATUS_FORCELIST
+                ),
+            )
+        except NotOkResponse as error:
+            if error.status == HTTPStatus.NOT_FOUND:
+                return None
+            raise
+
+        if not isinstance(data, dict):
+            raise ValueError("Expected mapping response from getExecutionPayloadEnvelope")
+        # The endpoint is expected to return a signed envelope, but accept a bare one as well
+        return ExecutionPayloadEnvelope.from_response(**data.get('message', data))
 
     def get_validators(
         self, state_id: Union[SlotNumber, BlockRoot, LiteralState], validator_pubkeys: list[str]

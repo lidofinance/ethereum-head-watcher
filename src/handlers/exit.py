@@ -100,7 +100,9 @@ class ExitsHandler(WatcherHandler):
         unknown_exits = [s for s in exits if s.owner == 'unknown']
         if user_exits:
             if variables.KEYS_SOURCE == SourceType.KEYS_API.value:
-                el_block_number = block.message.body.el_block_number
+                # Since Gloas (EIP-7732) the head block has no payload of its own, so the latest EL
+                # block applied to the state is the one revealed for the parent block
+                el_block_number = watcher.execution_requests(block).el_block_number
                 self._update_last_requested_exit_indexes(watcher, el_block_number)
                 self._update_last_consolidations(watcher, el_block_number)
 

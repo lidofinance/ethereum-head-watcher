@@ -1,7 +1,13 @@
 from src.handlers.el_triggered_exit import ElTriggeredExitHandler
 from src.keys_source.base_source import NamedKey
 from src.providers.consensus.typings import WithdrawalRequest
-from tests.execution_requests.helpers import create_sample_block, create_sample_gloas_block, gen_random_address
+from tests.execution_requests.helpers import (
+    GLOAS_HEAD_SLOT,
+    GLOAS_PARENT_SLOT,
+    create_gloas_head_with_envelope,
+    create_sample_block,
+    gen_random_address,
+)
 from tests.execution_requests.stubs import WatcherStub, TestValidator
 
 
@@ -136,15 +142,30 @@ def test_no_withdrawals_produce_no_alerts(watcher: WatcherStub):
     assert len(watcher.alertmanager.sent_alerts) == 0
 
 
-def test_gloas_block_is_handled_without_alerts(watcher: WatcherStub):
-    """Requests are not a part of a Glamsterdam (EIP-7732) block, handling it must not fail"""
+def test_gloas_alerts_are_built_from_the_parent_envelope(
+    user_validator_1: TestValidator, watcher: WatcherStub, withdrawal_address: str
+):
+    """After Glamsterdam (EIP-7732) the same requests must produce the same alerts"""
     handler = ElTriggeredExitHandler()
-    block = create_sample_gloas_block()
+    head = create_gloas_head_with_envelope(
+        watcher,
+        withdrawals=[
+            WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=user_validator_1.pubkey, amount='0')
+        ],
+    )
 
-    task = handler.handle(watcher, block)
+    task = handler.handle(watcher, head)
     task.result()
 
-    assert len(watcher.alertmanager.sent_alerts) == 0
+    assert len(watcher.alertmanager.sent_alerts) == 1
+    alert = watcher.alertmanager.sent_alerts[0]
+    assert alert.labels.alertname.startswith('HeadWatcherFullELWithdrawalObserved')
+    assert alert.annotations.summary == "**⚠️ Full withdrawal (exit) requested for our validator(s)**"
+    assert user_validator_1.pubkey in alert.annotations.description
+    assert withdrawal_address in alert.annotations.description
+    # The request was published in the parent slot and applied at the head slot, both are shown
+    assert f'Slot: [{GLOAS_PARENT_SLOT}]' in alert.annotations.description
+    assert f'applied at [{GLOAS_HEAD_SLOT}]' in alert.annotations.description
 
 
 def test_absense_of_alerts_for_foreign_validator():

@@ -6,17 +6,14 @@ from unsync import unsync
 
 from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
-from src.handlers.helpers import (
-    beaconchain,
-    execution_requests_are_external,
-    validator_pubkey_link,
-)
+from src.handlers.helpers import slot_description, validator_pubkey_link
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import (
     ConsolidationRequest,
     FullBlockInfo,
     ValidatorStatus,
 )
+from src.utils.execution_requests import ExecutionRequestsContext
 from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS
 
@@ -67,29 +64,21 @@ class ConsolidationHandler(WatcherHandler):
     @unsync
     @duration_meter()
     def handle(self, watcher, head: FullBlockInfo):  # pylint: disable=too-many-branches
-        body = head.message.body
+        ctx = watcher.execution_requests(head)
 
-        if execution_requests_are_external(body):
-            logger.warning(
-                {
-                    "msg": f"Execution requests are not a part of block [{head.message.slot}] "
-                    f"(fork: {head.version or 'unknown'}), consolidations are not checked"
-                }
+        if not ctx.consolidations:
+            logger.info(
+                {"msg": f"No consolidation requests applied at block [{head.message.slot}] (source: {ctx.source})"}
             )
             return
 
-        if not body.execution_requests or not body.execution_requests.consolidations:
-            logger.info({"msg": f"No consolidation requests in block [{head.message.slot}]"})
-            return
-
-        slot = head.message.slot
         user_wa = []
         user_wa_foreign_source_pubkey = []
         user_wa_foreign_target_pubkey = []
         user_wa_user_source_target_pubkey = []
         foreign_wa_user_source_pubkey = []
         foreign_wa_user_target_pubkey = []
-        for consolidation in body.execution_requests.consolidations:
+        for consolidation in ctx.consolidations:
             if consolidation.source_address in watcher.valid_withdrawal_addresses:
                 user_wa.append(consolidation)
 
@@ -111,28 +100,29 @@ class ConsolidationHandler(WatcherHandler):
             # if it is 0x02 and source_address == WCs of source validator - It's donation!
 
         if user_wa:
-            self._send_withdrawals_address(watcher, slot, user_wa)
+            self._send_withdrawals_address(watcher, ctx, user_wa)
         if user_wa_foreign_source_pubkey:
-            self._send_user_withdrawal_address_foreign_source_pubkey(watcher, slot, user_wa_foreign_source_pubkey)
+            self._send_user_withdrawal_address_foreign_source_pubkey(watcher, ctx, user_wa_foreign_source_pubkey)
         if user_wa_foreign_target_pubkey:
-            self._send_user_withdrawal_address_foreign_target_pubkey(watcher, slot, user_wa_foreign_target_pubkey)
+            self._send_user_withdrawal_address_foreign_target_pubkey(watcher, ctx, user_wa_foreign_target_pubkey)
         if foreign_wa_user_source_pubkey:
-            self._send_foreign_withdrawal_address_user_source_pubkey(watcher, slot, foreign_wa_user_source_pubkey)
+            self._send_foreign_withdrawal_address_user_source_pubkey(watcher, ctx, foreign_wa_user_source_pubkey)
         if foreign_wa_user_target_pubkey:
-            self._send_foreign_withdrawal_address_user_target_pubkey(watcher, slot, foreign_wa_user_target_pubkey)
+            self._send_foreign_withdrawal_address_user_target_pubkey(watcher, ctx, foreign_wa_user_target_pubkey)
         if user_wa_user_source_target_pubkey:
             self._process_user_withdrawal_address_user_source_target_pubkey(
-                watcher, head, user_wa_user_source_target_pubkey
+                watcher, ctx, user_wa_user_source_target_pubkey
             )
 
     def _process_user_withdrawal_address_user_source_target_pubkey(
-        self, watcher, block: FullBlockInfo, consolidations: list[ConsolidationRequest]
+        self, watcher, ctx: ExecutionRequestsContext, consolidations: list[ConsolidationRequest]
     ):
-        slot = block.message.slot
+        # The state of `state_slot` is the first one where the requests are applied: it is the only
+        # place where validator statuses and the pending consolidations queue mean what we check for
         pubkeys = list({pk for c in consolidations for pk in (c.source_pubkey, c.target_pubkey)})
-        validators = watcher.consensus.get_validators(slot, pubkeys)
-        pending_consolidations = watcher.consensus.get_pending_consolidations(slot)
-        self._update_last_requested_exit_indexes(watcher, block.message.body.el_block_number)
+        validators = watcher.consensus.get_validators(ctx.state_slot, pubkeys)
+        pending_consolidations = watcher.consensus.get_pending_consolidations(ctx.state_slot)
+        self._update_last_requested_exit_indexes(watcher, ctx.el_block_number)
 
         all_exit_indexes = set().union(*self.last_requested_exit_indexes.values())
 
@@ -204,21 +194,21 @@ class ConsolidationHandler(WatcherHandler):
                 )
 
         if over_deposit_consolidations:
-            self._send_over_deposit(watcher, slot, over_deposit_consolidations)
+            self._send_over_deposit(watcher, ctx, over_deposit_consolidations)
         if invalid_status_consolidations:
-            self._send_invalid_status(watcher, slot, invalid_status_consolidations)
+            self._send_invalid_status(watcher, ctx, invalid_status_consolidations)
         if rejected_consolidations:
-            self._send_rejected(watcher, slot, rejected_consolidations)
+            self._send_rejected(watcher, ctx, rejected_consolidations)
         if requested_to_exit_consolidations:
-            self._send_requested_to_exit(watcher, slot, requested_to_exit_consolidations)
+            self._send_requested_to_exit(watcher, ctx, requested_to_exit_consolidations)
 
-    def _send_withdrawals_address(self, watcher, slot, consolidations: list[ConsolidationRequest]):
+    def _send_withdrawals_address(self, watcher, ctx, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationSourceWithdrawalAddress", severity="critical")
         summary = "**🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address**"
-        self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
+        self._send_alert(watcher, ctx, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_user_withdrawal_address_foreign_source_pubkey(
-        self, watcher, slot, consolidations: list[ConsolidationRequest]
+        self, watcher, ctx, consolidations: list[ConsolidationRequest]
     ):
         alert = CommonAlert(
             name="HeadWatcherConsolidationUserWithdrawalAddressForeignSourcePubkey", severity="critical"
@@ -226,10 +216,10 @@ class ConsolidationHandler(WatcherHandler):
         summary = (
             "**🚨🚨🚨 Validator consolidation was requested for foreign source validator from Withdrawal Vault address**"
         )
-        self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
+        self._send_alert(watcher, ctx, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_user_withdrawal_address_foreign_target_pubkey(
-        self, watcher, slot, consolidations: list[ConsolidationRequest]
+        self, watcher, ctx, consolidations: list[ConsolidationRequest]
     ):
         alert = CommonAlert(
             name="HeadWatcherConsolidationUserWithdrawalAddressForeignTargetPubkey", severity="critical"
@@ -237,67 +227,73 @@ class ConsolidationHandler(WatcherHandler):
         summary = (
             "**🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault address to foreign target validator**"
         )
-        self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
+        self._send_alert(watcher, ctx, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_foreign_withdrawal_address_user_source_pubkey(
-        self, watcher, slot, consolidations: list[ConsolidationRequest]
+        self, watcher, ctx, consolidations: list[ConsolidationRequest]
     ):
         alert = CommonAlert(name="HeadWatcherConsolidationUserSourcePubkey", severity="info")
         summary = "**⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)**"
-        self._send_alert(watcher, slot, alert, summary, consolidations)
+        self._send_alert(watcher, ctx, alert, summary, consolidations)
 
     def _send_foreign_withdrawal_address_user_target_pubkey(
-        self, watcher, slot, consolidations: list[ConsolidationRequest]
+        self, watcher, ctx, consolidations: list[ConsolidationRequest]
     ):
         alert = CommonAlert(name="HeadWatcherConsolidationUserTargetPubkey", severity="info")
         summary = (
             "**⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)**"
         )
-        self._send_alert(watcher, slot, alert, summary, consolidations)
+        self._send_alert(watcher, ctx, alert, summary, consolidations)
 
-    def _send_rejected(self, watcher, slot, consolidations: list[ConsolidationRequest]):
+    def _send_rejected(self, watcher, ctx, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationCLRejected", severity="critical")
         summary = "**🚨🚨🚨 Validator consolidation was rejected on CL**"
-        self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
+        self._send_alert(watcher, ctx, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
-    def _send_over_deposit(self, watcher, slot: str, consolidations: list[OverDepositConsolidation]):
+    def _send_over_deposit(
+        self, watcher, ctx: ExecutionRequestsContext, consolidations: list[OverDepositConsolidation]
+    ):
         alert = CommonAlert(name="HeadWatcherConsolidationOverDeposit", severity="critical")
         summary = "**⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2049 ETH**"
         description = '\n\n'.join(
             self._describe_over_deposit_consolidation(c, watcher.user_keys) for c in consolidations
         )
-        description += f'\n\nSlot: {beaconchain(slot)}'
+        description += f'\n\n{slot_description(ctx)}'
         self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
-    def _send_invalid_status(self, watcher, slot: str, consolidations: list[InvalidStatusConsolidation]):
+    def _send_invalid_status(
+        self, watcher, ctx: ExecutionRequestsContext, consolidations: list[InvalidStatusConsolidation]
+    ):
         alert = CommonAlert(name="HeadWatcherConsolidationInvalidStatus", severity="critical")
         summary = "**⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)**"
         description = '\n\n'.join(
             self._describe_invalid_status_consolidation(c, watcher.user_keys) for c in consolidations
         )
-        description += f'\n\nSlot: {beaconchain(slot)}'
+        description += f'\n\n{slot_description(ctx)}'
         self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
-    def _send_requested_to_exit(self, watcher, slot: str, consolidations: list[RequestedToExitConsolidation]):
+    def _send_requested_to_exit(
+        self, watcher, ctx: ExecutionRequestsContext, consolidations: list[RequestedToExitConsolidation]
+    ):
         alert = CommonAlert(name="HeadWatcherConsolidationRequestedToExit", severity="critical")
         summary = "**⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO**"
         description = '\n\n'.join(
             self._describe_requested_to_exit_consolidation(c, watcher.user_keys) for c in consolidations
         )
-        description += f'\n\nSlot: {beaconchain(slot)}'
+        description += f'\n\n{slot_description(ctx)}'
         self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
     def _send_alert(
         self,
         watcher,
-        slot: str,
+        ctx: ExecutionRequestsContext,
         alert: CommonAlert,
         summary: str,
         consolidations: list[ConsolidationRequest],
         additional_labels=None,
     ) -> None:
         description = '\n\n'.join(self._describe_consolidation(c, watcher.user_keys) for c in consolidations)
-        description += f'\n\nSlot: {beaconchain(slot)}'
+        description += f'\n\n{slot_description(ctx)}'
         self.send_alert(watcher, alert.build_body(summary, description, additional_labels))
 
     @staticmethod

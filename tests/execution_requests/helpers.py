@@ -1,4 +1,5 @@
 from secrets import token_hex
+from unittest.mock import MagicMock
 
 from src.providers.consensus.typings import (
     FullBlockInfo,
@@ -8,12 +9,20 @@ from src.providers.consensus.typings import (
     BlockBody,
     BlockExecutionPayload,
     ExecutionPayloadBid,
+    ExecutionPayloadEnvelope,
     ExecutionRequests,
     SignedExecutionPayloadBid,
+    Validator,
+    ValidatorState,
+    ValidatorStatus,
     WithdrawalRequest,
     ConsolidationRequest,
 )
 from src.typings import StateRoot, BlockRoot
+
+GLOAS_PARENT_SLOT = '32'
+GLOAS_HEAD_SLOT = '33'
+GLOAS_EL_BLOCK_NUMBER = '31'
 
 
 def gen_random_pubkey():
@@ -68,23 +77,91 @@ def create_sample_block(
     return block
 
 
-def create_sample_gloas_block() -> FullBlockInfo:
+def create_sample_gloas_block(
+    slot: str = GLOAS_HEAD_SLOT,
+    parent_root: str = None,
+    payload_block_hash: str = None,
+    parent_payload_block_hash: str = None,
+) -> FullBlockInfo:
     """
     Block shaped as after Glamsterdam (EIP-7732): the body commits to an execution payload bid,
     while the payload itself and the execution requests are revealed in a separate envelope.
     """
     block = create_sample_block()
     block.version = 'gloas'
+    block.root = BlockRoot(random_hex(32))
+    block.message.slot = slot
+    block.header.message.slot = slot
+    if parent_root is not None:
+        block.message.parent_root = parent_root
+        block.header.message.parent_root = BlockRoot(parent_root)
     block.message.body.execution_payload = None
     block.message.body.signed_execution_payload_bid = SignedExecutionPayloadBid(
         message=ExecutionPayloadBid(
-            block_hash=random_hex(32),
-            parent_block_hash=random_hex(32),
+            block_hash=payload_block_hash or random_hex(32),
+            parent_block_hash=parent_payload_block_hash or random_hex(32),
             parent_block_root=block.message.parent_root,
             builder_index='7',
-            slot=block.message.slot,
+            slot=slot,
             value='1000',
         ),
         signature=random_hex(96),
     )
     return block
+
+
+def create_gloas_head_with_envelope(
+    watcher,
+    withdrawals: list[WithdrawalRequest] = None,
+    consolidations: list[ConsolidationRequest] = None,
+) -> FullBlockInfo:
+    """
+    Head block of the Glamsterdam (EIP-7732) shape whose parent revealed an envelope with the given
+    execution requests, with the consensus stub wired to serve that parent block and that envelope.
+
+    The bid of the head is built on the payload of the parent, so the requests of the parent envelope
+    are applied while the head is being processed.
+    """
+    parent_payload_block_hash = random_hex(32)
+
+    parent = create_sample_gloas_block(slot=GLOAS_PARENT_SLOT, payload_block_hash=parent_payload_block_hash)
+    head = create_sample_gloas_block(
+        slot=GLOAS_HEAD_SLOT, parent_root=parent.root, parent_payload_block_hash=parent_payload_block_hash
+    )
+
+    envelope = ExecutionPayloadEnvelope(
+        payload=BlockExecutionPayload(block_number=GLOAS_EL_BLOCK_NUMBER, block_hash=parent_payload_block_hash),
+        execution_requests=ExecutionRequests(
+            deposits=[], withdrawals=withdrawals or [], consolidations=consolidations or []
+        ),
+        beacon_block_root=parent.root,
+        builder_index='7',
+    )
+
+    watcher.consensus.get_block_details = MagicMock(return_value=parent)
+    watcher.consensus.get_execution_payload_envelope = MagicMock(return_value=envelope)
+    return head
+
+
+def create_validator(
+    index: str,
+    pubkey: str,
+    status: ValidatorStatus,
+    balance: str = '32000000000',
+    exit_epoch: str = '1000000000',
+) -> Validator:
+    return Validator(
+        index=index,
+        balance=balance,
+        status=status,
+        validator=ValidatorState(
+            pubkey=pubkey,
+            withdrawal_credentials=random_hex(32),
+            effective_balance='32000000000',
+            slashed=False,
+            activation_eligibility_epoch='2048',
+            activation_epoch='2048',
+            exit_epoch=exit_epoch,
+            withdrawable_epoch=exit_epoch,
+        ),
+    )

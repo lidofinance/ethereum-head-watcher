@@ -10,10 +10,15 @@ from src.providers.consensus.typings import (
     ValidatorStatus,
 )
 from tests.execution_requests.helpers import (
+    GLOAS_EL_BLOCK_NUMBER,
+    GLOAS_HEAD_SLOT,
+    GLOAS_PARENT_SLOT,
     gen_random_pubkey,
+    create_gloas_head_with_envelope,
     create_sample_block,
-    create_sample_gloas_block,
+    create_validator,
     gen_random_address,
+    random_hex,
 )
 from tests.execution_requests.stubs import TestValidator, WatcherStub
 
@@ -251,12 +256,164 @@ def test_consolidation_foreign_withdrawal_address_user_target_pubkey(
     assert block.message.slot in alert.annotations.description
 
 
-def test_gloas_block_is_handled_without_alerts(watcher: WatcherStub):
-    """Requests are not a part of a Glamsterdam (EIP-7732) block, handling it must not fail"""
-    block = create_sample_gloas_block()
+def test_gloas_alerts_are_built_from_the_parent_envelope(watcher: WatcherStub, withdrawal_address: str):
+    """After Glamsterdam (EIP-7732) the same requests must produce the same alerts"""
+    random_source_pubkey = gen_random_pubkey()
+    random_target_pubkey = gen_random_pubkey()
+
+    head = create_gloas_head_with_envelope(
+        watcher,
+        consolidations=[
+            ConsolidationRequest(
+                source_address=withdrawal_address,
+                source_pubkey=random_source_pubkey,
+                target_pubkey=random_target_pubkey,
+            )
+        ],
+    )
     handler = ConsolidationHandler()
 
-    task = handler.handle(watcher, block)
+    task = handler.handle(watcher, head)
+    task.result()
+
+    alert_names = [alert.labels.alertname for alert in watcher.alertmanager.sent_alerts]
+    assert any(name.startswith('HeadWatcherConsolidationSourceWithdrawalAddress') for name in alert_names)
+    assert any(
+        name.startswith('HeadWatcherConsolidationUserWithdrawalAddressForeignSourcePubkey') for name in alert_names
+    )
+    assert any(
+        name.startswith('HeadWatcherConsolidationUserWithdrawalAddressForeignTargetPubkey') for name in alert_names
+    )
+
+    description = watcher.alertmanager.sent_alerts[0].annotations.description
+    assert withdrawal_address in description
+    assert random_source_pubkey in description
+    assert random_target_pubkey in description
+    # The request was published in the parent slot and applied at the head slot, both are shown
+    assert f'Slot: [{GLOAS_PARENT_SLOT}]' in description
+    assert f'applied at [{GLOAS_HEAD_SLOT}]' in description
+
+
+def test_gloas_validator_state_is_read_at_the_slot_the_requests_were_applied_at(
+    user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
+):
+    """
+    A consolidation moves its source to `active_exiting` and gets queued only when it is applied,
+    which happens one block after it was published. Reading the state of the parent slot instead
+    would report every accepted consolidation as invalid and rejected.
+    """
+    head = create_gloas_head_with_envelope(
+        watcher,
+        consolidations=[
+            ConsolidationRequest(
+                source_address=withdrawal_address,
+                source_pubkey=user_validator_1.pubkey,
+                target_pubkey=user_validator_2.pubkey,
+            )
+        ],
+    )
+
+    watcher.consensus.get_validators = MagicMock(
+        return_value=[
+            create_validator('1', user_validator_1.pubkey, ValidatorStatus.ACTIVE_EXITING),
+            create_validator('2', user_validator_2.pubkey, ValidatorStatus.ACTIVE_ONGOING),
+        ]
+    )
+    watcher.consensus.get_pending_consolidations = MagicMock(
+        return_value=[PendingConsolidation(source_index='1', target_index='2')]
+    )
+
+    handler = ConsolidationHandler()
+
+    task = handler.handle(watcher, head)
+    task.result()
+
+    assert watcher.consensus.get_validators.call_args.args[0] == GLOAS_HEAD_SLOT
+    assert watcher.consensus.get_pending_consolidations.call_args.args[0] == GLOAS_HEAD_SLOT
+
+    alert_names = [alert.labels.alertname for alert in watcher.alertmanager.sent_alerts]
+    assert not any(name.startswith('HeadWatcherConsolidationInvalidStatus') for name in alert_names)
+    assert not any(name.startswith('HeadWatcherConsolidationCLRejected') for name in alert_names)
+
+
+def test_gloas_vebo_lookup_uses_the_el_block_number_of_the_parent_envelope(
+    user_validator_1: TestValidator,
+    user_validator_2: TestValidator,
+    watcher: WatcherStub,
+    withdrawal_address: str,
+    monkeypatch,
+):
+    head = create_gloas_head_with_envelope(
+        watcher,
+        consolidations=[
+            ConsolidationRequest(
+                source_address=withdrawal_address,
+                source_pubkey=user_validator_1.pubkey,
+                target_pubkey=user_validator_2.pubkey,
+            )
+        ],
+    )
+
+    watcher.consensus.get_validators = MagicMock(
+        return_value=[
+            create_validator('1', user_validator_1.pubkey, ValidatorStatus.ACTIVE_EXITING),
+            create_validator('2', user_validator_2.pubkey, ValidatorStatus.ACTIVE_ONGOING),
+        ]
+    )
+    watcher.consensus.get_pending_consolidations = MagicMock(
+        return_value=[PendingConsolidation(source_index='1', target_index='2')]
+    )
+
+    lookup = MagicMock(side_effect=lambda _watcher, _el_block_number, exits_info: exits_info)
+    monkeypatch.setattr('src.handlers.consolidation.get_last_requested_validator_exit_indexes', lookup)
+
+    handler = ConsolidationHandler()
+
+    task = handler.handle(watcher, head)
+    task.result()
+
+    assert lookup.call_args.args[1] == int(GLOAS_EL_BLOCK_NUMBER)
+
+
+def test_gloas_not_revealed_parent_payload_produces_no_alerts(watcher: WatcherStub, withdrawal_address: str):
+    """The head is built on the branch without the parent payload, so its requests were not applied"""
+    head = create_gloas_head_with_envelope(
+        watcher,
+        consolidations=[
+            ConsolidationRequest(
+                source_address=withdrawal_address,
+                source_pubkey=gen_random_pubkey(),
+                target_pubkey=gen_random_pubkey(),
+            )
+        ],
+    )
+    head.message.body.signed_execution_payload_bid.message.parent_block_hash = random_hex(32)
+
+    handler = ConsolidationHandler()
+
+    task = handler.handle(watcher, head)
+    task.result()
+
+    assert len(watcher.alertmanager.sent_alerts) == 0
+    watcher.consensus.get_execution_payload_envelope.assert_not_called()
+
+
+def test_gloas_unreadable_envelope_produces_no_alerts(watcher: WatcherStub, withdrawal_address: str):
+    head = create_gloas_head_with_envelope(
+        watcher,
+        consolidations=[
+            ConsolidationRequest(
+                source_address=withdrawal_address,
+                source_pubkey=gen_random_pubkey(),
+                target_pubkey=gen_random_pubkey(),
+            )
+        ],
+    )
+    watcher.consensus.get_execution_payload_envelope = MagicMock(return_value=None)
+
+    handler = ConsolidationHandler()
+
+    task = handler.handle(watcher, head)
     task.result()
 
     assert len(watcher.alertmanager.sent_alerts) == 0
