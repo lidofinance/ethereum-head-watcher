@@ -14,6 +14,7 @@ from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
 from src.handlers.handler import WatcherHandler
 from src.keys_source.base_source import BaseSource, NamedKey
+from src.metrics.healthcheck_server import pulse
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
     KEYS_SOURCE_SLOT_NUMBER,
@@ -77,6 +78,9 @@ class Watcher:
             self._handle_head(current_head)
 
             SLOT_NUMBER.set(current_head.header.message.slot)
+            # Only a handled head counts as progress, so that an error loop can not keep the
+            # container alive: the head cycle swallows its exceptions and would retry forever
+            pulse()
             logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
             time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
