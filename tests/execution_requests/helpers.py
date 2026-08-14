@@ -114,6 +114,8 @@ def create_gloas_head_with_envelope(
     watcher,
     withdrawals: list[WithdrawalRequest] = None,
     consolidations: list[ConsolidationRequest] = None,
+    slot: str = GLOAS_HEAD_SLOT,
+    parent_slot: str = GLOAS_PARENT_SLOT,
 ) -> FullBlockInfo:
     """
     Head block of the Glamsterdam (EIP-7732) shape whose parent revealed an envelope with the given
@@ -124,9 +126,9 @@ def create_gloas_head_with_envelope(
     """
     parent_payload_block_hash = random_hex(32)
 
-    parent = create_sample_gloas_block(slot=GLOAS_PARENT_SLOT, payload_block_hash=parent_payload_block_hash)
+    parent = create_sample_gloas_block(slot=parent_slot, payload_block_hash=parent_payload_block_hash)
     head = create_sample_gloas_block(
-        slot=GLOAS_HEAD_SLOT, parent_root=parent.root, parent_payload_block_hash=parent_payload_block_hash
+        slot=slot, parent_root=parent.root, parent_payload_block_hash=parent_payload_block_hash
     )
 
     envelope = ExecutionPayloadEnvelope(

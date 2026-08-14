@@ -2,6 +2,7 @@ import pytest
 
 from src.handlers.consolidation import ConsolidationHandler
 from src.handlers.el_triggered_exit import ElTriggeredExitHandler
+from src.handlers.execution_requests import ExecutionRequestsHandler
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
@@ -36,6 +37,7 @@ def test_build_handlers_defaults_to_all_handlers():
         ExitsHandler,
         ConsolidationHandler,
         ElTriggeredExitHandler,
+        ExecutionRequestsHandler,
     ]
 
 

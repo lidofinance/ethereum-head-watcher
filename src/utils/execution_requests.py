@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Optional
 
+from src.metrics.prometheus.watcher import EXECUTION_REQUESTS_SOURCE
 from src.providers.consensus.typings import (
     BlockDetailsResponse,
     ConsolidationRequest,
@@ -60,6 +61,12 @@ class ExecutionRequestsContext:
 
 def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequestsContext:
     """Find the execution requests that were applied to the state while `head` was being processed"""
+    ctx = _resolve(watcher, head)
+    EXECUTION_REQUESTS_SOURCE.labels(source=ctx.source.value).inc()
+    return ctx
+
+
+def _resolve(watcher, head: FullBlockInfo) -> ExecutionRequestsContext:
     head_slot = head.message.slot
     body = head.message.body
 

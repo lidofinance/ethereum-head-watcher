@@ -4,6 +4,7 @@ from web3.middleware import simple_cache_middleware
 from src import variables
 from src.handlers.consolidation import ConsolidationHandler
 from src.handlers.el_triggered_exit import ElTriggeredExitHandler
+from src.handlers.execution_requests import ExecutionRequestsHandler
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
 from src.handlers.handler import WatcherHandler
@@ -27,6 +28,7 @@ CONFIGURABLE_HANDLER_TYPES: dict[str, type[WatcherHandler]] = {
     'exits': ExitsHandler,
     'consolidation': ConsolidationHandler,
     'el_triggered_exit': ElTriggeredExitHandler,
+    'execution_requests': ExecutionRequestsHandler,
 }
 
 

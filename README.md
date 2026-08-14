@@ -42,7 +42,7 @@ Currently it supports:
 * **Required:** false
 * **Default:** false
 ---
-`ENABLED_HANDLERS` - Comma-separated list of configurable handlers enabled for this instance. Available handlers: `slashing`, `exits`, `consolidation`, `el_triggered_exit`. Chain reorganization monitoring is always enabled
+`ENABLED_HANDLERS` - Comma-separated list of configurable handlers enabled for this instance. Available handlers: `slashing`, `exits`, `consolidation`, `el_triggered_exit`, `execution_requests` (alerts when execution requests can not be read, so `consolidation` and `el_triggered_exit` are silently blind). Chain reorganization monitoring is always enabled
 * **Required:** false
 * **Default:** all available handlers
 ---
