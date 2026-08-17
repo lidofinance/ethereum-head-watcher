@@ -43,6 +43,7 @@ def test_pre_gloas_requests_come_from_the_block_itself(watcher: WatcherStub):
     assert ctx.source == ExecutionRequestsSource.BLOCK
     assert ctx.request_slot == block.message.slot
     assert ctx.state_slot == block.message.slot
+    assert ctx.state_root == block.message.state_root
     assert ctx.consolidations == [consolidation]
     assert ctx.el_block_number == 31
     watcher.consensus.get_block_details.assert_not_called()
@@ -59,6 +60,8 @@ def test_gloas_requests_come_from_the_parent_envelope(watcher: WatcherStub):
     assert ctx.source == ExecutionRequestsSource.ENVELOPE
     assert ctx.request_slot == GLOAS_PARENT_SLOT
     assert ctx.state_slot == GLOAS_HEAD_SLOT
+    # The requests are published by the parent but only observable in the state left by the head
+    assert ctx.state_root == head.message.state_root
     assert ctx.consolidations == [consolidation]
     assert ctx.el_block_number == int(GLOAS_EL_BLOCK_NUMBER)
     assert watcher.consensus.get_execution_payload_envelope.call_args.args[0] == head.message.parent_root

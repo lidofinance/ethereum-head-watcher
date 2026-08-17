@@ -117,11 +117,12 @@ class ConsolidationHandler(WatcherHandler):
     def _process_user_withdrawal_address_user_source_target_pubkey(
         self, watcher, ctx: ExecutionRequestsContext, consolidations: list[ConsolidationRequest]
     ):
-        # The state of `state_slot` is the first one where the requests are applied: it is the only
-        # place where validator statuses and the pending consolidations queue mean what we check for
+        # `state_root` is the state of the slot the requests were applied at: the only one where
+        # validator statuses and the pending consolidations queue mean what is checked here, taken by
+        # root so that a reorg can not answer for another branch of the chain
         pubkeys = list({pk for c in consolidations for pk in (c.source_pubkey, c.target_pubkey)})
-        validators = watcher.consensus.get_validators(ctx.state_slot, pubkeys)
-        pending_consolidations = watcher.consensus.get_pending_consolidations(ctx.state_slot)
+        validators = watcher.consensus.get_validators(ctx.state_root, pubkeys)
+        pending_consolidations = watcher.consensus.get_pending_consolidations(ctx.state_root)
         self._update_last_requested_exit_indexes(watcher, ctx.el_block_number)
 
         all_exit_indexes = set().union(*self.last_requested_exit_indexes.values())

@@ -92,6 +92,8 @@ def create_sample_gloas_block(
     block.root = BlockRoot(random_hex(32))
     block.message.slot = slot
     block.header.message.slot = slot
+    block.message.state_root = StateRoot(random_hex(32))
+    block.header.message.state_root = block.message.state_root
     if parent_root is not None:
         block.message.parent_root = parent_root
         block.header.message.parent_root = BlockRoot(parent_root)

@@ -294,13 +294,14 @@ def test_gloas_alerts_are_built_from_the_parent_envelope(watcher: WatcherStub, w
     assert f'applied at [{GLOAS_HEAD_SLOT}]' in description
 
 
-def test_gloas_validator_state_is_read_at_the_slot_the_requests_were_applied_at(
+def test_gloas_validator_state_is_read_at_the_state_the_requests_were_applied_to(
     user_validator_1: TestValidator, user_validator_2: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     """
     A consolidation moves its source to `active_exiting` and gets queued only when it is applied,
-    which happens one block after it was published. Reading the state of the parent slot instead
-    would report every accepted consolidation as invalid and rejected.
+    which happens one block after it was published, so the state to ask is the one left behind by
+    the head. Reading the state of the parent instead would report every accepted consolidation as
+    invalid and rejected.
     """
     head = create_gloas_head_with_envelope(
         watcher,
@@ -328,8 +329,8 @@ def test_gloas_validator_state_is_read_at_the_slot_the_requests_were_applied_at(
     task = handler.handle(watcher, head)
     task.result()
 
-    assert watcher.consensus.get_validators.call_args.args[0] == GLOAS_HEAD_SLOT
-    assert watcher.consensus.get_pending_consolidations.call_args.args[0] == GLOAS_HEAD_SLOT
+    assert watcher.consensus.get_validators.call_args.args[0] == head.message.state_root
+    assert watcher.consensus.get_pending_consolidations.call_args.args[0] == head.message.state_root
 
     alert_names = [alert.labels.alertname for alert in watcher.alertmanager.sent_alerts]
     assert not any(name.startswith('HeadWatcherConsolidationInvalidStatus') for name in alert_names)

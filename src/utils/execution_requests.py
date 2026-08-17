@@ -11,6 +11,7 @@ from src.providers.consensus.typings import (
     FullBlockInfo,
     WithdrawalRequest,
 )
+from src.typings import StateRoot
 
 logger = logging.getLogger()
 
@@ -37,15 +38,20 @@ class ExecutionRequestsContext:
     while the head block is being processed: they were published in `request_slot` (the parent slot)
     but are only observable in the state of `state_slot` (the head slot).
 
-    Reading validator states and pending consolidations by `state_slot` is what keeps the checks
-    meaningful: a consolidation moves its source validator to `active_exiting` and appends an entry
-    to the pending consolidations queue exactly when it is applied. Reading them by `request_slot`
-    would report every accepted consolidation as invalid and rejected.
+    Reading validator states and pending consolidations by the state of `state_slot` is what keeps
+    the checks meaningful: a consolidation moves its source validator to `active_exiting` and appends
+    an entry to the pending consolidations queue exactly when it is applied. Reading them by the
+    state of `request_slot` would report every accepted consolidation as invalid and rejected.
+
+    That state is addressed by `state_root` rather than by `state_slot`, so that a reorg can not
+    silently answer the questions about a slot from another branch of the chain. `state_slot` is left
+    for the alerts to point a human at.
     """
 
     source: ExecutionRequestsSource
     request_slot: str
     state_slot: str
+    state_root: StateRoot
     requests: Optional[ExecutionRequests] = None
     el_block_number: Optional[int] = None
 
@@ -61,6 +67,9 @@ class ExecutionRequestsContext:
 def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequestsContext:
     """Find the execution requests that were applied to the state while `head` was being processed"""
     head_slot = head.message.slot
+    # Whichever branch below is taken, the state that has the requests applied is the one the head
+    # block leaves behind, so the same root addresses it every time
+    head_state_root = head.message.state_root
     body = head.message.body
 
     if body.execution_payload is not None:
@@ -68,6 +77,7 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
             source=ExecutionRequestsSource.BLOCK,
             request_slot=head_slot,
             state_slot=head_slot,
+            state_root=head_state_root,
             requests=body.execution_requests,
             el_block_number=body.el_block_number,
         )
@@ -81,6 +91,7 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
             source=ExecutionRequestsSource.UNAVAILABLE,
             request_slot=head_slot,
             state_slot=head_slot,
+            state_root=head_state_root,
             el_block_number=_applied_el_block_number(watcher, head),
         )
 
@@ -92,6 +103,7 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
             source=ExecutionRequestsSource.NOTHING_APPLIED,
             request_slot=head_slot,
             state_slot=head_slot,
+            state_root=head_state_root,
             el_block_number=parent.message.body.el_block_number,
         )
 
@@ -106,6 +118,7 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
             source=ExecutionRequestsSource.NOTHING_APPLIED,
             request_slot=parent.message.slot,
             state_slot=head_slot,
+            state_root=head_state_root,
             el_block_number=_applied_el_block_number(watcher, head),
         )
 
@@ -121,6 +134,7 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
             source=ExecutionRequestsSource.UNAVAILABLE,
             request_slot=parent.message.slot,
             state_slot=head_slot,
+            state_root=head_state_root,
             el_block_number=_applied_el_block_number(watcher, head),
         )
 
@@ -128,6 +142,7 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
         source=ExecutionRequestsSource.ENVELOPE,
         request_slot=parent.message.slot,
         state_slot=head_slot,
+        state_root=head_state_root,
         requests=envelope.execution_requests,
         el_block_number=int(envelope.payload.block_number),
     )
