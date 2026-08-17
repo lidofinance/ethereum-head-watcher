@@ -14,6 +14,7 @@ from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
 from src.handlers.handler import WatcherHandler
 from src.keys_source.base_source import BaseSource, NamedKey
+from src.metrics.healthcheck_server import record_pulse
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
     KEYS_SOURCE_SLOT_NUMBER,
@@ -60,6 +61,10 @@ class Watcher:
         def _run(slot_to_handle='head'):
             current_head = self._get_header_full_info(slot_to_handle)
             if not current_head:
+                # A cycle that saw no new head is still a completed cycle: the consensus node
+                # answered. Recording it here is what makes the healthcheck report on the
+                # watcher rather than on the HTTP server serving the healthcheck.
+                record_pulse()
                 logger.debug({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
                 time.sleep(CYCLE_SLEEP_IN_SECONDS)
                 return
@@ -76,6 +81,7 @@ class Watcher:
             self._handle_head(current_head)
 
             SLOT_NUMBER.set(current_head.header.message.slot)
+            record_pulse()
             logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
             time.sleep(CYCLE_SLEEP_IN_SECONDS)
 

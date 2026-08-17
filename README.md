@@ -100,10 +100,32 @@ Currently it supports:
 * **Required:** false
 * **Default:** 9010
 ---
+`HEALTHCHECK_SERVER_HOST` - Healthcheck server bind address. Kubernetes probes arrive on the
+pod IP, so binding to `localhost` makes them unreachable.
+* **Required:** false
+* **Default:** 0.0.0.0
+---
 `MAX_CYCLE_LIFETIME_IN_SECONDS` - Max cycle lifetime in seconds for healthcheck
 * **Required:** false
 * **Default:** 3000
 ---
+
+### Healthcheck endpoints
+
+The healthcheck server serves three paths:
+
+| Path | Reports | Used by |
+|---|---|---|
+| `/pulse/` | last cycle is newer than `MAX_CYCLE_LIFETIME_IN_SECONDS`. A GET also *records* a cycle, so it cannot be used as a probe | Docker `HEALTHCHECK` |
+| `/healthz` | this process is up and serving. Read-only | Kubernetes liveness |
+| `/readyz` | the watcher has finished its first cycle. Read-only, one-way | Kubernetes startup and readiness |
+
+Neither `/healthz` nor `/readyz` reports staleness. A liveness failure would restart the pod
+and cost a full re-read of the validator set and of every Lido key; a readiness failure would
+take the pod out of Prometheus' targets, turning a flat metric into an absent one. A stuck
+watcher is an alert on the metrics (`HeadBlockIsNotChanging`, `EHWStuckBotProcessing`), not a
+kubelet decision.
+
 `KEYS_API_REQUEST_TIMEOUT` - Keys API request timeout in seconds
 * **Required:** false
 * **Default:** 180
