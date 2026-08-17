@@ -48,13 +48,13 @@ def test_readyz_does_not_record_a_cycle(health_server):
     requests.get(f'{health_server}/readyz', timeout=5)
     requests.get(f'{health_server}/readyz', timeout=5)
 
-    assert healthcheck_server._last_pulse is None
+    assert healthcheck_server.last_pulse() is None
 
 
 def test_healthz_does_not_record_a_cycle(health_server):
     requests.get(f'{health_server}/healthz', timeout=5)
 
-    assert healthcheck_server._last_pulse is None
+    assert healthcheck_server.last_pulse() is None
 
 
 def test_readyz_is_ready_after_a_cycle(health_server):
@@ -89,7 +89,7 @@ def test_pulse_endpoint_still_records_a_cycle(health_server):
     response = requests.get(f'{health_server}/pulse/', timeout=5)
 
     assert response.status_code == 200
-    assert healthcheck_server._last_pulse is not None
+    assert healthcheck_server.last_pulse() is not None
 
 
 def test_pulse_endpoint_reports_a_stale_cycle(health_server, monkeypatch):

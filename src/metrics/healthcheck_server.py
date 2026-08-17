@@ -15,6 +15,11 @@ def record_pulse():
     _last_pulse = datetime.now()
 
 
+def last_pulse() -> datetime | None:
+    """When the watcher last completed a cycle, or None if it has not yet."""
+    return _last_pulse
+
+
 def _pulse_is_fresh() -> bool:
     if _last_pulse is None:
         return False
