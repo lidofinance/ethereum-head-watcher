@@ -1,7 +1,7 @@
 def test_processing(watcher):
     watcher.run("6213851-6213858")
 
-    assert [h.header.message.slot for h in watcher.handled_headers] == [str(s) for s in range(6213851, 6213859)]
+    assert [h.header.message.slot for h in watcher.handled_blocks] == [str(s) for s in range(6213851, 6213859)]
 
     assert watcher.keys_updater.done(), "Keys updater should be done"
     assert watcher.validators_updater.done(), "Validators updater should be done"

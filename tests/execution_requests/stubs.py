@@ -3,6 +3,11 @@ from unittest.mock import MagicMock
 
 from src.keys_source.base_source import BaseSource, NamedKey
 from src.providers.alertmanager.typings import AlertBody
+from src.providers.consensus.typings import FullBlockInfo
+from src.utils.execution_requests import (
+    ExecutionRequestsContext,
+    resolve_execution_requests,
+)
 from tests.execution_requests.helpers import gen_random_address, gen_random_pubkey
 
 
@@ -31,6 +36,8 @@ class ConsensusClientStub:
     def __init__(self):
         self.get_validators = MagicMock(return_value=[])
         self.get_pending_consolidations = MagicMock(return_value=[])
+        self.get_block_details = MagicMock(return_value=None)
+        self.get_execution_payload_envelope = MagicMock(return_value=None)
 
 
 class WatcherStub:
@@ -40,6 +47,8 @@ class WatcherStub:
     indexed_validators_keys: dict[str, str]
     valid_withdrawal_addresses: set[str]
     keys_source: BaseSource
+    handled_blocks: list
+    execution: object
 
     def __init__(
         self,
@@ -54,3 +63,9 @@ class WatcherStub:
         self.indexed_validators_keys = indexed_validators_keys or {}
         self.valid_withdrawal_addresses = valid_withdrawal_addresses or set()
         self.keys_source = keys_source or {}
+        self.handled_blocks = []
+        self.execution = None
+
+    def execution_requests(self, head: FullBlockInfo) -> ExecutionRequestsContext:
+        """Resolved the same way the real watcher does, so handler tests cover the resolution too"""
+        return resolve_execution_requests(self, head)

@@ -61,6 +61,30 @@ class BlockHeaderFullResponse(Nested, FromResponse):
 @dataclass
 class BlockExecutionPayload(FromResponse):
     block_number: str
+    block_hash: str = ''
+
+
+@dataclass
+class ExecutionPayloadBid(FromResponse):
+    """
+    Commitment to an execution payload the proposer puts into the block since Gloas (EIP-7732).
+
+    The field set is not settled in the specs yet, so every field here is optional: an unexpected
+    shape must reduce the amount of data we have, not break block parsing.
+    """
+
+    block_hash: str = ''
+    parent_block_hash: str = ''
+    parent_block_root: str = ''
+    builder_index: str = ''
+    slot: str = ''
+    value: str = ''
+
+
+@dataclass
+class SignedExecutionPayloadBid(Nested, FromResponse):
+    message: ExecutionPayloadBid
+    signature: str = ''
 
 
 @dataclass
@@ -105,12 +129,43 @@ class ExecutionRequests(Nested, FromResponse):
 
 
 @dataclass
+class ExecutionPayloadEnvelope(Nested, FromResponse):
+    """
+    Execution payload revealed by the builder since Gloas (EIP-7732).
+
+    It carries the execution requests that used to be a part of the block body. The envelope of block
+    N is applied to the beacon state while block N+1 is being processed, so its requests affect the
+    state one block later than they are published (later still if the slots in between are empty).
+    """
+
+    payload: BlockExecutionPayload
+    execution_requests: ExecutionRequests
+    beacon_block_root: str = ''
+    builder_index: str = ''
+
+
+@dataclass
+class SignedExecutionPayloadEnvelope(Nested, FromResponse):
+    message: ExecutionPayloadEnvelope
+    signature: str = ''
+
+
+@dataclass
 class BlockBody(Nested, FromResponse):
-    execution_payload: BlockExecutionPayload
     voluntary_exits: list[BlockVoluntaryExit]
     proposer_slashings: list
     attester_slashings: list
+    # Up to Fulu the block body carries the execution payload and the execution requests inline.
+    # Since Gloas (EIP-7732) it commits to a payload bid instead, while the payload itself, together
+    # with the execution requests, is revealed by the builder in a separate envelope.
+    execution_payload: Optional[BlockExecutionPayload] = None
     execution_requests: Optional[ExecutionRequests] = None
+    signed_execution_payload_bid: Optional[SignedExecutionPayloadBid] = None
+
+    @property
+    def el_block_number(self) -> Optional[int]:
+        """Number of the EL block included in this block, None if the payload is not a part of it."""
+        return int(self.execution_payload.block_number) if self.execution_payload else None
 
 
 @dataclass
@@ -127,6 +182,9 @@ class BlockDetailsResponse(Nested, FromResponse):
     # https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2
     message: BlockMessage
     signature: str
+    # Name of the fork the block belongs to ("electra", "fulu", "gloas", ...). It is a part of the
+    # response envelope rather than of `data`, so the client fills it in explicitly.
+    version: str = ''
 
 
 @dataclass

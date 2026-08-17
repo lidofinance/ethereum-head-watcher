@@ -39,9 +39,13 @@ class Nested:
             elif is_dataclass(field.type) and not is_dataclass(getattr(self, field.name)):
                 factory = self.__get_dataclass_factory(field.type)
                 setattr(self, field.name, factory(**getattr(self, field.name)))
-            elif getattr(self, field.name) and (underlying := try_extract_underlying_type_from_optional(field.type)):
+            elif (
+                (value := getattr(self, field.name))
+                and not is_dataclass(value)
+                and (underlying := try_extract_underlying_type_from_optional(field.type))
+            ):
                 factory = self.__get_dataclass_factory(underlying)
-                setattr(self, field.name, factory(**getattr(self, field.name)))
+                setattr(self, field.name, factory(**value))
 
     @staticmethod
     def __get_dataclass_factory(field_type):
