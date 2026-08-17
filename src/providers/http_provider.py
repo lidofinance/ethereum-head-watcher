@@ -115,7 +115,7 @@ class HTTPProvider(ABC):
         """
         errors: list[Exception] = []
 
-        for host in self.hosts:
+        for index, host in enumerate(self.hosts):
             try:
                 result: tuple[dict | list, dict] = self._get_without_fallbacks(
                     host, endpoint, path_params, query_params, timeout, retry_strategy
@@ -137,9 +137,9 @@ class HTTPProvider(ABC):
 
                 logger.warning(
                     {
-                        'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
+                        'msg': f'[{self.__class__.__name__}] Provider {index + 1} of {len(self.hosts)} '
+                        'responded with error',
                         'error': mask_urls_in(str(e)),
-                        'provider': urlparse(host).netloc,
                     }
                 )
 
@@ -162,7 +162,7 @@ class HTTPProvider(ABC):
         """
         errors: list[Exception] = []
 
-        for host in self.hosts:
+        for index, host in enumerate(self.hosts):
             try:
                 return self._get_stream_without_fallbacks(
                     host, endpoint, path_params, query_params, timeout, retry_strategy, headers
@@ -176,9 +176,9 @@ class HTTPProvider(ABC):
 
                 logger.warning(
                     {
-                        'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
+                        'msg': f'[{self.__class__.__name__}] Provider {index + 1} of {len(self.hosts)} '
+                        'responded with error',
                         'error': mask_urls_in(str(e)),
-                        'provider': urlparse(host).netloc,
                     }
                 )
 
@@ -204,7 +204,7 @@ class HTTPProvider(ABC):
         """
         errors: list[Exception] = []
 
-        for host in self.hosts:
+        for index, host in enumerate(self.hosts):
             try:
                 return self._post_without_fallbacks(
                     host, endpoint, should_parse_json_response, path_params, query_body, timeout, retry_strategy
@@ -218,9 +218,9 @@ class HTTPProvider(ABC):
 
                 logger.warning(
                     {
-                        'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
+                        'msg': f'[{self.__class__.__name__}] Provider {index + 1} of {len(self.hosts)} '
+                        'responded with error',
                         'error': mask_urls_in(str(e)),
-                        'provider': urlparse(host).netloc,
                     }
                 )
 
@@ -268,7 +268,7 @@ class HTTPProvider(ABC):
             )
 
             if response.status_code != HTTPStatus.OK:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
 
@@ -312,14 +312,14 @@ class HTTPProvider(ABC):
             )
 
             if response.status_code != HTTPStatus.OK:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
 
             try:
                 json_response = response.json()
             except Exception as error:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise error
 
@@ -371,7 +371,7 @@ class HTTPProvider(ABC):
             )
 
             if response.status_code != HTTPStatus.OK:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
 
@@ -381,7 +381,7 @@ class HTTPProvider(ABC):
             try:
                 json_response = response.json()
             except Exception as error:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise error
 
