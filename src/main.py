@@ -13,7 +13,8 @@ from src.keys_source.file_source import FileSource
 from src.keys_source.keys_api_source import KeysApiSource
 from src.metrics.healthcheck_server import start_pulse_server
 from src.metrics.logging import logging
-from src.metrics.prometheus.basic import BUILD_INFO
+from src.metrics.prometheus.basic import BUILD_INFO, SECRETS_RELOADS, Status
+from src.secrets import SecretsWatcher
 from src.utils.build import get_build_info
 from src.watcher import Watcher
 from src.web3py.extensions import FallbackProviderModule, LidoContracts
@@ -50,6 +51,57 @@ def build_handlers(enabled_handlers: list[str] | None = None) -> list[WatcherHan
     handlers: list[WatcherHandler] = [ForkHandler()]
     handlers.extend(CONFIGURABLE_HANDLER_TYPES[name]() for name in handler_names)
     return handlers
+
+
+def apply_rotated_secrets(values: dict[str, str], watcher: Watcher) -> list[str]:
+    """
+    Swap in endpoints from a rotated secrets file, without a restart. Returns what changed.
+
+    A restart would work and is what an environment-variable delivery would force, but it costs a
+    full re-read of the validator set and of every Lido key — minutes with nothing watched, on
+    every rotation. Each client here keeps its endpoints in a plain list that it walks per
+    request, so replacing the list is enough; the execution layer needs its provider rebuilt,
+    which leaves the Web3 instance, its middlewares and the contracts bound to it in place.
+    """
+    changed = []
+
+    consensus_uri = _split(values.get('CONSENSUS_CLIENT_URI'))
+    if consensus_uri and consensus_uri != watcher.consensus.hosts:
+        watcher.consensus.hosts = consensus_uri
+        changed.append('CONSENSUS_CLIENT_URI')
+
+    alertmanager_uri = _split(values.get('ALERTMANAGER_URI'))
+    if alertmanager_uri and alertmanager_uri != watcher.alertmanager.hosts:
+        watcher.alertmanager.hosts = alertmanager_uri
+        changed.append('ALERTMANAGER_URI')
+
+    keys_api = getattr(watcher.keys_source, 'keys_api', None)
+    keys_api_uri = _split(values.get('KEYS_API_URI'))
+    if keys_api is not None and keys_api_uri and keys_api_uri != keys_api.hosts:
+        keys_api.hosts = keys_api_uri
+        changed.append('KEYS_API_URI')
+
+    execution_uri = _split(values.get('EXECUTION_CLIENT_URI'))
+    if watcher.execution is not None and execution_uri and execution_uri != variables.EXECUTION_CLIENT_URI:
+        # `Web3.provider` is read-only in web3 6.x; the manager's is the settable one. The
+        # middlewares (metrics, cache) live on the manager too, so they survive the swap, and the
+        # contracts hold a reference to the Web3 instance rather than to the provider.
+        watcher.execution.manager.provider = FallbackProviderModule(
+            execution_uri, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT}
+        )
+        variables.EXECUTION_CLIENT_URI = execution_uri
+        changed.append('EXECUTION_CLIENT_URI')
+
+    if changed:
+        logger.info({'msg': f'Applied rotated secrets: {", ".join(changed)}'})
+        SECRETS_RELOADS.labels(Status.SUCCESS.value).inc()
+    return changed
+
+
+def _split(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [entry for entry in (part.strip() for part in value.split(',')) if entry]
 
 
 def main():
@@ -89,7 +141,16 @@ def main():
     if variables.DRY_RUN:
         logger.warning({'msg': 'Dry run mode enabled! No alerts will be sent.'})
 
-    Watcher(handlers, keys_source, web3).run()
+    watcher = Watcher(handlers, keys_source, web3)
+
+    SecretsWatcher(
+        variables.SECRETS_FILE_PATH,
+        on_change=lambda values: apply_rotated_secrets(values, watcher),
+        interval=variables.SECRETS_POLL_INTERVAL_IN_SECONDS,
+        on_error=lambda: SECRETS_RELOADS.labels(Status.FAILURE.value).inc(),
+    ).start()
+
+    watcher.run()
 
 
 if __name__ == "__main__":

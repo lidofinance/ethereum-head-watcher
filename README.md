@@ -31,8 +31,32 @@ Currently it supports:
 
 > If you want to use another path, specify it in `KEYS_FILE_PATH` env variable
 
+## Configuration sources
+
+Every setting below is read from the environment, and — when it exists — from a JSON file whose
+values take precedence. The file is how deployments that hold credentials in a secret store deliver
+them: on Kubernetes the OpenBao agent writes `/vault/secrets/config`, and the application re-reads
+it when it changes, so a rotated node endpoint is picked up **without a restart**. That matters
+because a restart re-reads the whole validator set and every Lido key — minutes during which
+nothing is watched.
+
+The file is polled by path rather than watched: the agent replaces it with an atomic rename, so a
+watcher attached to the file itself would go silent after the first rotation. A reload emits one log
+line and increments `ethereum_head_watcher_secrets_reloads_total{status="success"}`; a file that
+changed but cannot be applied leaves the previous values in place and increments the same counter
+with `status="failure"`.
+
 ## Application Env variables
 
+---
+`SECRETS_FILE_PATH` - Path to a JSON file of settings that override the environment. Absent is
+normal — it means every setting comes from the environment
+* **Required:** false
+* **Default:** /vault/secrets/config
+---
+`SECRETS_POLL_INTERVAL_IN_SECONDS` - How often the secrets file is checked for a change
+* **Required:** false
+* **Default:** 10
 ---
 `LOG_LEVEL` - Application log level
 * **Required:** false

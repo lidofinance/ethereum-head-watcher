@@ -1,6 +1,6 @@
 from enum import Enum
 
-from prometheus_client import Histogram, Info
+from prometheus_client import Counter, Histogram, Info
 
 from src.variables import PROMETHEUS_PREFIX
 
@@ -13,6 +13,15 @@ class Status(Enum):
 BUILD_INFO = Info(
     'build',
     'Build info',
+    namespace=PROMETHEUS_PREFIX,
+)
+
+# Rotating a node endpoint is invisible otherwise: the old URL keeps answering until the provider
+# revokes it, so "the new key never reached the process" and "everything is fine" look identical.
+SECRETS_RELOADS = Counter(
+    'secrets_reloads',
+    'Rotated secrets picked up from the secrets file',
+    ['status'],
     namespace=PROMETHEUS_PREFIX,
 )
 
