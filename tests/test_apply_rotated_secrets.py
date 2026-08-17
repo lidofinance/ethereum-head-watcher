@@ -70,10 +70,13 @@ def test_execution_endpoints_are_swapped(execution_uri_restored):
     watcher = WatcherStub(execution=web3)
     variables.EXECUTION_CLIENT_URI = ['https://el-old']
 
+    old_provider = web3.provider
+
     changed = apply_rotated_secrets({'EXECUTION_CLIENT_URI': 'https://el-new'}, watcher)
 
     assert changed == ['EXECUTION_CLIENT_URI']
-    assert web3.provider._hosts_uri == ['https://el-new']
+    assert web3.provider is not old_provider
+    assert web3.provider.endpoint_uri == 'https://el-new'
     assert variables.EXECUTION_CLIENT_URI == ['https://el-new']
 
 
@@ -98,7 +101,7 @@ def test_unchanged_values_are_not_reapplied():
 
     changed = apply_rotated_secrets({'CONSENSUS_CLIENT_URI': 'https://cl-old'}, watcher)
 
-    assert changed == []
+    assert not changed
 
 
 def test_missing_and_empty_keys_are_left_alone():
@@ -108,7 +111,7 @@ def test_missing_and_empty_keys_are_left_alone():
 
     # An empty value in a rendered secret is a rotation gone wrong, not an instruction to point a
     # client at nothing — the previous endpoints stay.
-    assert changed == []
+    assert not changed
     assert watcher.consensus.hosts == ['https://cl-old']
     assert watcher.keys_source.keys_api.hosts == ['http://kapi-old:3000']
 
@@ -118,7 +121,7 @@ def test_file_keys_source_has_no_keys_api_to_swap():
 
     changed = apply_rotated_secrets({'KEYS_API_URI': 'http://kapi-new:3000'}, watcher)
 
-    assert changed == []
+    assert not changed
 
 
 def test_split_trims_and_drops_empties():

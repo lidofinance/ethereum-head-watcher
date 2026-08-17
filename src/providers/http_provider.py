@@ -1,4 +1,5 @@
 import logging
+import re
 from abc import ABC
 from http import HTTPStatus
 from typing import Callable, Optional, Sequence, Tuple
@@ -12,6 +13,33 @@ from urllib3 import Retry
 from src.typings import InfinityType
 
 logger = logging.getLogger(__name__)
+
+
+URL_IN_TEXT = re.compile(r'https?://[^\s\'"]+')
+
+
+def mask_url(url: str) -> str:
+    """
+    Host and scheme, nothing else.
+
+    Provider credentials live in the parts this drops: dRPC carries the key as `?dkey=`, Alchemy
+    and the beacon endpoints carry it as a path segment. The host is worth keeping — it says which
+    provider failed — and is not a secret.
+    """
+    parsed = urlparse(url)
+    if not parsed.netloc:
+        return url
+    return f'{parsed.scheme}://{parsed.netloc}'
+
+
+def mask_urls_in(text: str) -> str:
+    """
+    The same masking for text that is not a URL but contains one.
+
+    Exception strings from `requests` embed the URL they failed on, so an endpoint error is how a
+    provider key reaches the log — from a line that never mentions a credential.
+    """
+    return URL_IN_TEXT.sub(lambda match: mask_url(match.group()), text)
 
 
 class NoHostsProvided(Exception):
@@ -110,7 +138,7 @@ class HTTPProvider(ABC):
                 logger.warning(
                     {
                         'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
-                        'error': str(e),
+                        'error': mask_urls_in(str(e)),
                         'provider': urlparse(host).netloc,
                     }
                 )
@@ -149,7 +177,7 @@ class HTTPProvider(ABC):
                 logger.warning(
                     {
                         'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
-                        'error': str(e),
+                        'error': mask_urls_in(str(e)),
                         'provider': urlparse(host).netloc,
                     }
                 )
@@ -191,7 +219,7 @@ class HTTPProvider(ABC):
                 logger.warning(
                     {
                         'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
-                        'error': str(e),
+                        'error': mask_urls_in(str(e)),
                         'provider': urlparse(host).netloc,
                     }
                 )
@@ -225,7 +253,7 @@ class HTTPProvider(ABC):
                     headers=headers,
                 )
             except Exception as error:
-                logger.debug({'msg': str(error)})
+                logger.debug({'msg': mask_urls_in(str(error))})
                 t.labels(
                     endpoint=endpoint,
                     code=0,
@@ -269,7 +297,7 @@ class HTTPProvider(ABC):
                     timeout=None if isinstance(timeout, InfinityType) else timeout or self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
-                logger.debug({'msg': str(error)})
+                logger.debug({'msg': mask_urls_in(str(error))})
                 t.labels(
                     endpoint=endpoint,
                     code=0,
@@ -328,7 +356,7 @@ class HTTPProvider(ABC):
                     timeout=None if isinstance(timeout, InfinityType) else timeout or self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
-                logger.debug({'msg': str(error)})
+                logger.debug({'msg': mask_urls_in(str(error))})
                 t.labels(
                     endpoint=endpoint,
                     code=0,

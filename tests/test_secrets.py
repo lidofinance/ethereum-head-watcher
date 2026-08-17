@@ -52,7 +52,7 @@ def test_no_change_is_not_reported(secrets_path):
     watcher = SecretsWatcher(secrets_path, on_change=seen.append)
 
     assert watcher.check_once() is False
-    assert seen == []
+    assert not seen
 
 
 def test_rotation_is_picked_up_across_the_rename(secrets_path):
@@ -78,7 +78,7 @@ def test_a_rotation_that_renders_to_nothing_is_not_applied(secrets_path):
     os.utime(secrets_path, ns=(2_000_000_000, 2_000_000_000))
 
     assert watcher.check_once() is False
-    assert seen == []
+    assert not seen
     assert errors == [1]
 
 
