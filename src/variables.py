@@ -9,6 +9,10 @@ SECRETS_FILE_PATH = os.getenv('SECRETS_FILE_PATH', '/vault/secrets/config')
 SECRETS_POLL_INTERVAL_IN_SECONDS = int(os.getenv('SECRETS_POLL_INTERVAL_IN_SECONDS', DEFAULT_POLL_INTERVAL_IN_SECONDS))
 
 _secrets = read_secrets_file(SECRETS_FILE_PATH)
+# Whether that file was there, for main() to report. This module is imported before logging is
+# configured, so anything read_secrets_file logs at import time is dropped — and "where did this
+# process get its endpoints" is the first question when a rotated key does not seem to have landed.
+SECRETS_FILE_LOADED = bool(_secrets)
 
 
 def setting(name: str, default: str = '') -> str:

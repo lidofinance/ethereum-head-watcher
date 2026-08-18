@@ -111,6 +111,13 @@ def main():
 
     logger.info({'msg': 'Ethereum head watcher startup.'})
 
+    if variables.SECRETS_FILE_LOADED:
+        logger.info({'msg': f'Configuration: {variables.SECRETS_FILE_PATH} over the environment'})
+    else:
+        logger.info(
+            {'msg': f'Configuration: the environment (no secrets file at {variables.SECRETS_FILE_PATH})'}
+        )
+
     logger.info({'msg': f'Start healthcheck server for Docker container on port {variables.HEALTHCHECK_SERVER_PORT}'})
     start_pulse_server()
 
