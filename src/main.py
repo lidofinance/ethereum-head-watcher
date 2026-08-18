@@ -1,3 +1,5 @@
+import signal
+
 from prometheus_client import start_http_server
 from web3.middleware import simple_cache_middleware
 
@@ -104,6 +106,24 @@ def _split(value: str | None) -> list[str]:
     return [entry for entry in (part.strip() for part in value.split(',')) if entry]
 
 
+def install_signal_handlers():
+    """
+    Make SIGTERM and SIGHUP stop the watcher the way Ctrl-C does.
+
+    Python installs a disposition for SIGINT only, and this process is PID 1 in its container --
+    the kernel does not apply a default action to a signal PID 1 has no handler for. So SIGTERM,
+    which is what a pod termination is, would be dropped: the kubelet would wait out
+    terminationGracePeriodSeconds and then SIGKILL, on every rollout and every node drain. The
+    30 seconds are not the cost. The cost is that the last thing a SIGKILLed watcher does is
+    unpredictable, while the SIGINT path unwinds the cycle it is in.
+
+    Routed onto SIGINT rather than given a handler of their own because the loop already unwinds
+    on KeyboardInterrupt, and `except Exception` in the cycle does not catch it.
+    """
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.default_int_handler)
+
+
 def main():
     handlers = build_handlers(variables.parse_enabled_handlers(variables.ENABLED_HANDLERS))
 
@@ -157,7 +177,15 @@ def main():
         on_error=lambda: SECRETS_RELOADS.labels(Status.FAILURE.value).inc(),
     ).start()
 
-    watcher.run()
+    install_signal_handlers()
+
+    try:
+        watcher.run()
+    except KeyboardInterrupt:
+        # Reached from Ctrl-C and, through install_signal_handlers, from SIGTERM/SIGHUP. One line
+        # so that a pod that went away on purpose is distinguishable in the logs from one that
+        # was killed -- the two look identical from the outside, and only one of them is a bug.
+        logger.info({'msg': 'Shutting down on a termination signal'})
 
 
 if __name__ == "__main__":
