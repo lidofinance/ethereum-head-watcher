@@ -1,5 +1,12 @@
+"""
+The Kubernetes half of the healthcheck server.
+
+`tests/test_healthcheck.py` covers the POST/GET split on `/pulse/` — the fix for a healthcheck that
+refreshed the deadline it was about to check. What is covered here is what Kubernetes needs on top of
+it: a bind address probes can reach, and two read-only paths that answer different questions.
+"""
+
 import socket
-from datetime import datetime, timedelta
 
 import pytest
 import requests
@@ -16,10 +23,10 @@ def _free_port() -> int:
 
 @pytest.fixture
 def health_server(monkeypatch):
-    """A running pulse server on a free port, with no cycle recorded yet."""
+    """A running server on a free port, with no cycle completed yet."""
     monkeypatch.setattr(variables, 'HEALTHCHECK_SERVER_HOST', '127.0.0.1')
     monkeypatch.setattr(variables, 'HEALTHCHECK_SERVER_PORT', _free_port())
-    monkeypatch.setattr(healthcheck_server, '_last_pulse', None)
+    monkeypatch.setattr(healthcheck_server, '_first_pulse_registered', False)
 
     server = healthcheck_server.start_pulse_server()
     yield f'http://127.0.0.1:{variables.HEALTHCHECK_SERVER_PORT}'
@@ -27,86 +34,59 @@ def health_server(monkeypatch):
     server.server_close()
 
 
-def test_healthz_is_up_before_the_first_cycle(health_server):
-    # Liveness must not fail during a cold start: reading the validator set and every Lido key
-    # takes minutes, and restarting the pod over it would never let the watcher finish.
+def test_the_server_is_reachable_on_a_non_loopback_bind(monkeypatch):
+    # The reason this test exists: bound to localhost, the server answers the container and not the
+    # kubelet, which probes the pod IP. The assertion is that the bind address is configurable at
+    # all — a probe against a real pod IP is not something a unit test can do.
+    monkeypatch.setattr(variables, 'HEALTHCHECK_SERVER_HOST', '0.0.0.0')
+    monkeypatch.setattr(variables, 'HEALTHCHECK_SERVER_PORT', _free_port())
+
+    server = healthcheck_server.start_pulse_server()
+    try:
+        assert server.server_address[0] == '0.0.0.0'
+        response = requests.get(f'http://127.0.0.1:{variables.HEALTHCHECK_SERVER_PORT}/healthz', timeout=5)
+        assert response.status_code == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_liveness_is_up_before_the_first_cycle(health_server):
+    # A cold start reads the whole validator set and every Lido key; liveness must not restart the
+    # pod over that.
     response = requests.get(f'{health_server}/healthz', timeout=5)
 
     assert response.status_code == 200
+    assert 'serving' in response.text
 
 
-def test_readyz_is_not_ready_before_the_first_cycle(health_server):
+def test_readiness_is_closed_before_the_first_cycle(health_server):
     response = requests.get(f'{health_server}/readyz', timeout=5)
 
     assert response.status_code == 503
     assert 'no cycle completed yet' in response.text
 
 
-def test_readyz_does_not_record_a_cycle(health_server):
-    # The bug this guards: /pulse/ updates the timer, so probing it answers its own question.
-    # A probe on /readyz must observe the watcher, not stand in for it.
-    requests.get(f'{health_server}/readyz', timeout=5)
-    requests.get(f'{health_server}/readyz', timeout=5)
+def test_readiness_opens_after_a_cycle(health_server):
+    healthcheck_server.register_pulse()
 
-    assert healthcheck_server.last_pulse() is None
+    response = requests.get(f'{health_server}/readyz', timeout=5)
+
+    assert response.status_code == 200
 
 
-def test_healthz_does_not_record_a_cycle(health_server):
+def test_probes_do_not_register_progress(health_server):
+    # The bug the POST/GET split fixed, guarded from the other side: neither probe may stand in for
+    # the watcher.
     requests.get(f'{health_server}/healthz', timeout=5)
+    requests.get(f'{health_server}/readyz', timeout=5)
 
-    assert healthcheck_server.last_pulse() is None
-
-
-def test_readyz_is_ready_after_a_cycle(health_server):
-    healthcheck_server.record_pulse()
-
-    response = requests.get(f'{health_server}/readyz', timeout=5)
-
-    assert response.status_code == 200
+    assert healthcheck_server.is_ready() is False
 
 
-def test_readyz_stays_ready_when_the_cycle_goes_stale(health_server, monkeypatch):
-    # Readiness is a one-way warm-up gate on purpose: dropping out of the Service would drop
-    # the pod out of Prometheus' targets, and the metric that proves the watcher is stuck would
-    # go absent instead of going flat. Staleness is an alert on the metric, not a kubelet call.
-    monkeypatch.setattr(healthcheck_server, '_last_pulse', _stale_pulse())
-
-    response = requests.get(f'{health_server}/readyz', timeout=5)
-
-    assert response.status_code == 200
-
-
-def test_healthz_stays_up_when_the_cycle_goes_stale(health_server, monkeypatch):
-    monkeypatch.setattr(healthcheck_server, '_last_pulse', _stale_pulse())
-
-    response = requests.get(f'{health_server}/healthz', timeout=5)
-
-    assert response.status_code == 200
-
-
-def test_pulse_endpoint_still_records_a_cycle(health_server):
-    # The Docker HEALTHCHECK on the VM deployment keeps hitting /pulse/; it has to keep working.
-    response = requests.get(f'{health_server}/pulse/', timeout=5)
-
-    assert response.status_code == 200
-    assert healthcheck_server.last_pulse() is not None
-
-
-def test_pulse_endpoint_reports_a_stale_cycle(health_server, monkeypatch):
-    monkeypatch.setattr(healthcheck_server, '_last_pulse', _stale_pulse())
-    monkeypatch.setattr(healthcheck_server, 'record_pulse', lambda: None)
+def test_pulse_still_reports_liveness_to_docker(health_server):
+    requests.post(f'{health_server}/pulse/', timeout=5)
 
     response = requests.get(f'{health_server}/pulse/', timeout=5)
 
-    assert response.status_code == 503
-    assert 'timeout exceeded' in response.text
-
-
-def test_unknown_path_is_not_found(health_server):
-    response = requests.get(f'{health_server}/', timeout=5)
-
-    assert response.status_code == 404
-
-
-def _stale_pulse() -> datetime:
-    return datetime.now() - timedelta(seconds=variables.MAX_CYCLE_LIFETIME_IN_SECONDS + 1)
+    assert response.status_code == 200

@@ -1,82 +1,101 @@
+import logging
 import threading
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
+import requests
+
 from src import variables
+from src.variables import MAX_CYCLE_LIFETIME_IN_SECONDS
 
-# None until the watcher has completed a cycle: "no cycle yet" and "cycle went stale" are
-# different states, and the warm-up gate has to tell them apart.
-_last_pulse: datetime | None = None
+logger = logging.getLogger()
+
+PULSE_PATH = '/pulse/'
+# Kubernetes probes read state and must never write it, so they get their own paths. `/pulse/`
+# stays exactly as the Docker HEALTHCHECK uses it.
+LIVENESS_PATH = '/healthz'
+READINESS_PATH = '/readyz'
+
+ALIVE_BODY = b'{"metrics": "ok", "reason": "ok"}\n'
+TIMEOUT_BODY = b'{"metrics": "fail", "reason": "timeout exceeded"}\n'
+SERVING_BODY = b'{"metrics": "ok", "reason": "serving"}\n'
+COLD_BODY = b'{"metrics": "fail", "reason": "no cycle completed yet"}\n'
+
+_last_pulse = datetime.now()
+# Distinct from _last_pulse, which starts warm so that the Docker HEALTHCHECK does not fail a
+# container that is still starting. Readiness needs the opposite answer: a watcher that has not
+# finished a cycle is not caught up, and its first cycle reads the whole validator set and every
+# Lido key, which takes minutes.
+_first_pulse_registered = False
 
 
-def record_pulse():
-    """Called by the watcher when a cycle completes."""
-    global _last_pulse
+def pulse():
+    """
+    Tell the healthcheck server that the watcher is still making progress.
+
+    Never raises: a healthcheck ping must not break the head cycle. A server that can not be reached
+    fails the Docker HEALTHCHECK on its own anyway.
+    """
+    try:
+        requests.post(f'http://localhost:{variables.HEALTHCHECK_SERVER_PORT}{PULSE_PATH}', timeout=10)
+    except Exception as e:  # pylint: disable=broad-except
+        logger.warning({'msg': 'Can not reach the healthcheck server', 'exception': str(e)})
+
+
+def register_pulse() -> None:
+    global _last_pulse, _first_pulse_registered
     _last_pulse = datetime.now()
+    _first_pulse_registered = True
 
 
-def last_pulse() -> datetime | None:
-    """When the watcher last completed a cycle, or None if it has not yet."""
-    return _last_pulse
+def is_ready() -> bool:
+    """Whether the watcher has completed a cycle at least once"""
+    return _first_pulse_registered
 
 
-def _pulse_is_fresh() -> bool:
-    if _last_pulse is None:
-        return False
-    return datetime.now() - _last_pulse <= timedelta(seconds=variables.MAX_CYCLE_LIFETIME_IN_SECONDS)
+def is_alive() -> bool:
+    """Whether the watcher reported progress recently enough"""
+    return datetime.now() - _last_pulse <= timedelta(seconds=MAX_CYCLE_LIFETIME_IN_SECONDS)
 
 
 class PulseRequestHandler(SimpleHTTPRequestHandler):
     """
-    Request handler for the Docker HEALTHCHECK and for Kubernetes probes.
+    Request handler for Docker HEALTHCHECK.
 
-    `/pulse/` predates both and doubles as an input: a GET on it *updates* the timer, so it
-    cannot be probed for an answer about the watcher — any prober would refresh the very
-    timestamp it is asking about. The Docker HEALTHCHECK on the VM deployment does exactly
-    that, so the endpoint stays as it is; `/healthz` and `/readyz` are read-only and answer
-    two narrower questions:
-
-      * `/healthz` — this process is up and serving. Liveness.
-      * `/readyz` — the watcher has finished its first cycle. Startup and readiness.
-
-    Neither reports staleness, and that is deliberate:
-
-      * a liveness probe that fails on a stale cycle restarts the pod, and a restart costs a
-        full re-read of the validator set and of every Lido key — minutes during which nothing
-        is watched. When the cause is a degraded upstream, that turns into a restart loop that
-        makes the outage longer. `EHWStuckBotProcessing` already pages a human for this.
-      * a readiness probe that fails on a stale cycle takes the pod out of the Service, which
-        takes the pod out of Prometheus' targets — so the metric that would have proved the
-        watcher is stuck goes absent instead of going flat. Absence is the harder signal to
-        alert on, so readiness is a one-way gate: it opens after the first cycle and stays
-        open. Staleness is `HeadBlockIsNotChanging` on the metric, not a kubelet decision.
+    The watcher reports progress with POST while the healthcheck reads the state with GET, and the
+    split matters: as long as both were served by GET, every healthcheck refreshed the very deadline
+    it was about to check, so a stuck watcher stayed healthy forever.
     """
 
+    def do_POST(self):
+        register_pulse()
+        self._respond(HTTPStatus.OK, ALIVE_BODY)
+
     def do_GET(self):
-        if self.path == '/pulse/':
-            record_pulse()
-            self._respond_by_freshness()
-        elif self.path == '/healthz':
-            self._respond(200, 'ok', 'serving')
-        elif self.path == '/readyz':
-            if _last_pulse is None:
-                self._respond(503, 'fail', 'no cycle completed yet')
+        if self.path == LIVENESS_PATH:
+            # Serving, nothing more. Staleness deliberately does not fail liveness here: a restart
+            # costs a full re-read of the validator set and of every Lido key, and when the cause is
+            # a degraded upstream that turns into a restart loop which makes the outage longer.
+            # `EHWStuckBotProcessing` pages a human for that instead.
+            self._respond(HTTPStatus.OK, SERVING_BODY)
+        elif self.path == READINESS_PATH:
+            # A one-way gate: it opens after the first completed cycle and stays open. Failing it
+            # later would take the pod out of the Service and therefore out of Prometheus' targets,
+            # which turns a flat metric into an absent one — the harder signal to alert on.
+            if is_ready():
+                self._respond(HTTPStatus.OK, ALIVE_BODY)
             else:
-                self._respond(200, 'ok', 'ok')
+                self._respond(HTTPStatus.SERVICE_UNAVAILABLE, COLD_BODY)
+        elif is_alive():
+            self._respond(HTTPStatus.OK, ALIVE_BODY)
         else:
-            self.send_response(404)
-            self.end_headers()
+            self._respond(HTTPStatus.SERVICE_UNAVAILABLE, TIMEOUT_BODY)
 
-    def _respond_by_freshness(self):
-        if _pulse_is_fresh():
-            self._respond(200, 'ok', 'ok')
-        else:
-            self._respond(503, 'fail', 'timeout exceeded')
-
-    def _respond(self, status: int, metrics: str, reason: str):
+    def _respond(self, status: HTTPStatus, body: bytes):
         self.send_response(status)
         self.end_headers()
-        self.wfile.write(f'{{"metrics": "{metrics}", "reason": "{reason}"}}\n'.encode())
+        self.wfile.write(body)
 
     def log_request(self, *args, **kwargs):
         # Disable non-error logs
@@ -89,6 +108,7 @@ def start_pulse_server() -> HTTPServer:
     If bot didn't call pulse for a while (5 minutes but should be changed individually)
     healthcheck in docker returns 1 and bot will be restarted
     """
+    # Kubernetes probes arrive on the pod IP, so binding to localhost makes them unreachable.
     server = HTTPServer(
         (variables.HEALTHCHECK_SERVER_HOST, variables.HEALTHCHECK_SERVER_PORT),
         RequestHandlerClass=PulseRequestHandler,

@@ -1,0 +1,58 @@
+name: Build and push ethereum-head-watcher to Harbor
+
+# The Kubernetes path. It runs alongside ci-dev.yml, which dispatches an ansible deploy to
+# infra-mainnet, on purpose: both deployments are live during the migration, and the VM one keeps
+# paging until its contour is cut over.
+#
+# The tag is mutable. ArgoCD Image Updater resolves `:dev` to a digest and syncs on the digest, so
+# a distinguishable tag per build would buy nothing here.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'src/**'
+      # The contract ABIs are loaded from ./assets at runtime, so a change there changes the image.
+      - 'assets/**'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+
+env:
+  REGISTRY: registry.dev.k8s-dev.org
+  REPOSITORY: team-vroom
+  APP: ethereum-head-watcher
+  IMAGE_TAG: dev
+  REGISTRY_USER: robot$team-vroom+ethereum-head-watcher
+
+# Only what checkout needs. The push is authenticated with the Harbor robot account, not with
+# GITHUB_TOKEN, so nothing here writes to the repository.
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-24.04
+    environment: harbor_dev_release
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Harbor
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ secrets.HARBOR_DEV_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/${{ env.APP }}:${{ env.IMAGE_TAG }}
