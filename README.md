@@ -205,6 +205,25 @@ kubelet decision.
 * **Required:** false
 * **Default:** 10000
 
+## Tests
+
+`poetry run pytest` runs everything that needs nothing but this repository.
+
+The suite has two halves, and the split is deliberate:
+
+- **hermetic** — the default. `tests/test_watcher_offline.py` drives the watcher against a fake
+  consensus node (`tests/node_fake.py`) with keys from a file, so a cycle, a slashing of one of our
+  validators and an exit that is not ours are all covered without a provider, a credential or a
+  network.
+- **integration** — `tests/test_watcher.py`, deselected by default. It replays real mainnet slot
+  ranges and asserts on the alert text those blocks produced, which is a check no fake can make and
+  a dependency on a third party answering in time. Run it deliberately, with provider credentials in
+  the environment:
+
+  ```sh
+  poetry run pytest -m integration
+  ```
+
 ## Application metrics
 
 You can see application metrics on `http://localhost:9000/metrics` endpoint 
