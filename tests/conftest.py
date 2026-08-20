@@ -20,7 +20,9 @@ TEST_REPLAY_EL_REQUEST_TIMEOUT = float(os.getenv('TEST_REPLAY_EL_REQUEST_TIMEOUT
 @pytest.fixture
 def watcher(request, monkeypatch):
     web3 = Web3(
-        FallbackProviderModule(variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': TEST_REPLAY_EL_REQUEST_TIMEOUT})
+        FallbackProviderModule(
+            variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': TEST_REPLAY_EL_REQUEST_TIMEOUT}
+        )
     )
     web3.attach_modules(
         {
