@@ -72,14 +72,11 @@ ignore_missing_imports = true
 mypy_path = "stubs"
 
 [tool.pytest.ini_options]
-# The integration tests replay real mainnet slots against live providers. They are part of the suite
-# and not run by default: a third party being slow is not a reason for a pull request to be red, and
-# tests/test_watcher_offline.py covers the same logic hermetically. Run them with
-# `pytest -m integration` (needs CONSENSUS_CLIENT_URI, EXECUTION_CLIENT_URI, KEYS_API_URI).
+# Everything runs by default, live replays included. The marker is there so a run without provider
+# credentials can skip them: `pytest -m "not integration"`.
 markers = [
     "integration: needs live providers and credentials; replays real mainnet slots",
 ]
-addopts = "-m 'not integration'"
 
 [tool.isort]
 profile = "black"

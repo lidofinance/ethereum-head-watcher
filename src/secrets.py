@@ -1,19 +1,12 @@
 """
-Secrets that arrive as a file, and how a rotation is noticed.
+Secrets that arrive as a file, and how a change to it is noticed.
 
-Node endpoints carry provider credentials, so they are delivered by the OpenBao agent as a JSON
-file under /vault/secrets rather than as environment variables. The reason is not aesthetics: a
-process cannot be handed new environment variables from outside, so any env-based delivery costs
-a pod restart per rotation — and a restart here costs minutes of re-reading the validator set and
-every Lido key, during which nothing is watched.
+Node endpoints carry provider credentials and are delivered as a JSON file, because a process
+cannot be handed new environment variables from outside: env-based delivery costs a restart per
+rotation. The file is replaced by a rename, which gives it a new inode, so this polls the path
+with stat() rather than watching the file.
 
-The agent updates the file by writing a temp file and renaming it over the path. The rename is
-atomic, so a reader never sees half a file — but it also creates a new inode, which is why this
-polls the path with stat() instead of watching the file. A watcher attached to the file itself
-(inotify, watchdog) goes silent after the first rotation.
-
-When the file is absent everything falls back to environment variables, which is how the VM
-deployment runs.
+No file means the values come from the environment.
 """
 
 import json
@@ -32,9 +25,8 @@ def read_secrets_file(path: str) -> dict[str, str]:
     """
     The file's contents, or an empty mapping if there is no usable file.
 
-    Absent is a normal state — it means "no agent here, use the environment". Present but
-    unparseable is not, so it is logged loudly and then treated the same way: refusing to start
-    would turn a bad render of one key into an outage of the whole watcher.
+    Absent is normal and means "use the environment". Unparseable is logged and treated the same
+    way, so one bad value cannot keep the watcher from starting.
     """
     if not path:
         return {}
@@ -67,8 +59,7 @@ class SecretsWatcher:
     ):
         self._path = path
         self._on_change = on_change
-        # A hook rather than a metric import: metrics read variables, and variables read this
-        # module at import time, so importing metrics here would close a cycle.
+        # A hook rather than importing the metric here, which would close an import cycle.
         self._on_error = on_error
         self._interval = interval
         self._mtime = self._read_mtime()
@@ -80,17 +71,14 @@ class SecretsWatcher:
             return None
 
     def check_once(self) -> bool:
-        """
-        True if a change was seen and applied. Kept separate from the loop so the behaviour is
-        testable without waiting on a thread.
-        """
+        """True if a change was seen and applied. Separate from the loop so it is testable."""
         mtime = self._read_mtime()
         if mtime is None or mtime == self._mtime:
             return False
 
         values = read_secrets_file(self._path)
         if not values:
-            # A rotation that renders to nothing is not something to apply over working values.
+            # Nothing usable: keep the values already in force.
             logger.error(
                 {'msg': f'Secrets file {self._path} changed but has no usable values, keeping the previous ones'}
             )

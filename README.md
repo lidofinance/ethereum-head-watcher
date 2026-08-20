@@ -207,22 +207,19 @@ kubelet decision.
 
 ## Tests
 
-`poetry run pytest` runs everything that needs nothing but this repository.
+`poetry run pytest` runs the whole suite. It has two halves, and both are kept on purpose:
 
-The suite has two halves, and the split is deliberate:
+- **hermetic** — `tests/test_watcher_offline.py` drives the watcher against a fake consensus node
+  (`tests/node_fake.py`) with keys from a file, so a cycle, a slashing of one of our validators, an
+  exit that is not ours and the reorg path are all checked with no provider and no credentials.
+- **integration** — `tests/test_watcher.py` replays real mainnet slot ranges and asserts on the
+  alert text those blocks produced: operator names, validator indices and wording that come from
+  data nobody wrote for a test. It needs `CONSENSUS_CLIENT_URI`, `EXECUTION_CLIENT_URI` and
+  `KEYS_API_URI`.
 
-- **hermetic** — the default. `tests/test_watcher_offline.py` drives the watcher against a fake
-  consensus node (`tests/node_fake.py`) with keys from a file, so a cycle, a slashing of one of our
-  validators and an exit that is not ours are all covered without a provider, a credential or a
-  network.
-- **integration** — `tests/test_watcher.py`, deselected by default. It replays real mainnet slot
-  ranges and asserts on the alert text those blocks produced, which is a check no fake can make and
-  a dependency on a third party answering in time. Run it deliberately, with provider credentials in
-  the environment:
+Both run by default, in CI too. Without provider credentials, skip the second kind:
 
-  ```sh
-  poetry run pytest -m integration
-  ```
+    poetry run pytest -m "not integration"
 
 ## Application metrics
 

@@ -59,11 +59,9 @@ def apply_rotated_secrets(values: dict[str, str], watcher: Watcher) -> list[str]
     """
     Swap in endpoints from a rotated secrets file, without a restart. Returns what changed.
 
-    A restart would work and is what an environment-variable delivery would force, but it costs a
-    full re-read of the validator set and of every Lido key — minutes with nothing watched, on
-    every rotation. Each client here keeps its endpoints in a plain list that it walks per
-    request, so replacing the list is enough; the execution layer needs its provider rebuilt,
-    which leaves the Web3 instance, its middlewares and the contracts bound to it in place.
+    Restarting would re-read the whole validator set and key set, so the clients are re-pointed
+    instead: each keeps its endpoints in a list it walks per request. The execution layer needs a
+    new provider, which leaves the Web3 instance, its middlewares and its contracts in place.
     """
     changed = []
 
@@ -110,15 +108,9 @@ def install_signal_handlers():
     """
     Make SIGTERM and SIGHUP stop the watcher the way Ctrl-C does.
 
-    Python installs a disposition for SIGINT only, and this process is PID 1 in its container --
-    the kernel does not apply a default action to a signal PID 1 has no handler for. So SIGTERM,
-    which is what a pod termination is, would be dropped: the kubelet would wait out
-    terminationGracePeriodSeconds and then SIGKILL, on every rollout and every node drain. The
-    30 seconds are not the cost. The cost is that the last thing a SIGKILLed watcher does is
-    unpredictable, while the SIGINT path unwinds the cycle it is in.
-
-    Routed onto SIGINT rather than given a handler of their own because the loop already unwinds
-    on KeyboardInterrupt, and `except Exception` in the cycle does not catch it.
+    Python installs a disposition for SIGINT only, and as PID 1 the process gets no default
+    action for the others, so without this they are dropped and the container is killed instead
+    of stopping. Routed onto SIGINT because the loop already unwinds on KeyboardInterrupt.
     """
     for sig in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, signal.default_int_handler)
@@ -182,9 +174,7 @@ def main():
     try:
         watcher.run()
     except KeyboardInterrupt:
-        # Reached from Ctrl-C and, through install_signal_handlers, from SIGTERM/SIGHUP. One line
-        # so that a pod that went away on purpose is distinguishable in the logs from one that
-        # was killed -- the two look identical from the outside, and only one of them is a bug.
+        # One line, so a shutdown on purpose is distinguishable from being killed.
         logger.info({'msg': 'Shutting down on a termination signal'})
 
 

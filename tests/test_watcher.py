@@ -1,17 +1,14 @@
 """
 Replays real mainnet slot ranges against live providers and asserts on the alert text those blocks
-produced. Kept because that is a check no fake can make: the operator names, the validator indices
-and the exact wording all come from data nobody wrote for a test.
+produced. That is a check no fake can make: the operator names, the validator indices and the exact
+wording all come from data nobody wrote for a test.
 
-Marked `integration` and deselected by default — see pyproject. Two reasons, and neither is that the
-tests are wrong: they need provider credentials, and they depend on a third party answering, which
-is why this file was red on `develop` from 2026-08-14 (a provider stopped serving eth_getLogs inside
-the timeout). `tests/test_watcher_offline.py` covers the same decisions against a fake node, so CI
-has coverage without a dependency on anyone's uptime.
+Runs in CI like everything else. The `integration` marker is only there so a run without provider
+credentials can skip it: `pytest -m "not integration"`. The EL timeout these use is raised in
+conftest, because replaying historical ranges means eth_getLogs over thousands of blocks.
 
-Run them deliberately:
-
-    poetry run pytest -m integration
+tests/test_watcher_offline.py covers the same decisions against a fake node, and it is the addition
+rather than the replacement: the two answer different questions.
 """
 
 import pytest

@@ -68,11 +68,7 @@ def test_build_handlers_rejects_duplicate_handler():
 
 
 def test_install_signal_handlers_routes_termination_onto_the_sigint_path():
-    """
-    SIGTERM is what a pod termination is, and this process is PID 1 in its container -- with no
-    handler installed the kernel applies no default action and the signal is dropped, which costs
-    a SIGKILL after the grace period on every rollout.
-    """
+    """Without a handler the signal is dropped, and the container is killed instead of stopping."""
     previous = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGHUP)}
     try:
         install_signal_handlers()
@@ -84,9 +80,6 @@ def test_install_signal_handlers_routes_termination_onto_the_sigint_path():
 
 
 def test_default_int_handler_raises_keyboard_interrupt():
-    """
-    The reason the loop needs no stop flag: the cycle's `except Exception` does not catch
-    KeyboardInterrupt, so it unwinds run() and main() logs the shutdown.
-    """
+    """Why the loop needs no stop flag: `except Exception` does not catch KeyboardInterrupt."""
     with pytest.raises(KeyboardInterrupt):
         signal.default_int_handler(signal.SIGTERM, None)
