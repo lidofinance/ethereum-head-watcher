@@ -1,16 +1,14 @@
 """
 The watcher's logic against a fake consensus node — no provider, no secrets, no network.
 
-These cover the same decisions `tests/test_watcher.py` covers against real mainnet slots: a slot
-range gets processed, a slashing of one of our keys alerts and names the operator, a slashing or an
-exit that is not ours does not produce a user alert, and a module in
-`disable_unexpected_exit_alerts` is silent. What they deliberately do not cover is the exact text
-those historical blocks produced — that is what the integration tests are for, and why they were kept
-rather than replaced.
+These cover the same decisions `tests/test_watcher.py` covers against real mainnet slots: a slot range gets processed, a
+slashing of one of our keys alerts and names the operator, a slashing or an exit that is not ours does not produce a
+user alert, and a module in `disable_unexpected_exit_alerts` is silent. What they deliberately do not cover is the exact
+text those historical blocks produced — that is what the integration tests are for, and why they were kept rather than
+replaced.
 
-Keys come from a file rather than from the Keys API: with `KEYS_SOURCE=file` the execution layer is
-out of the picture too, and what is left is exactly the part these tests are about — mapping a
-validator index to a key to an operator.
+Keys come from a file rather than from the Keys API: with `KEYS_SOURCE=file` the execution layer is out of the picture
+too, and what is left is exactly the part these tests are about — mapping a validator index to a key to an operator.
 """
 
 import logging

@@ -16,8 +16,8 @@ BUILD_INFO = Info(
     namespace=PROMETHEUS_PREFIX,
 )
 
-# Rotating a node endpoint is invisible otherwise: the old URL keeps answering until the provider
-# revokes it, so "the new key never reached the process" and "everything is fine" look identical.
+# Rotating a node endpoint is invisible otherwise: the old URL keeps answering until the provider revokes it, so "the
+# new key never reached the process" and "everything is fine" look identical.
 SECRETS_RELOADS = Counter(
     'secrets_reloads',
     'Rotated secrets picked up from the secrets file',

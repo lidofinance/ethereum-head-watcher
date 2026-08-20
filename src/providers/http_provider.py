@@ -22,9 +22,8 @@ def mask_url(url: str) -> str:
     """
     Host and scheme, nothing else.
 
-    Provider credentials live in the parts this drops: dRPC carries the key as `?dkey=`, Alchemy
-    and the beacon endpoints carry it as a path segment. The host is worth keeping — it says which
-    provider failed — and is not a secret.
+    Provider credentials live in the parts this drops: some providers carries the key as `?key=`, others carry it as a
+    path segment. The host is worth keeping — it says which provider failed — and is not a secret.
     """
     parsed = urlparse(url)
     if not parsed.netloc:
@@ -36,8 +35,8 @@ def mask_urls_in(text: str) -> str:
     """
     The same masking for text that is not a URL but contains one.
 
-    Exception strings from `requests` embed the URL they failed on, so an endpoint error is how a
-    provider key reaches the log — from a line that never mentions a credential.
+    Exception strings from `requests` embed the URL they failed on, so an endpoint error is how a provider key reaches
+    the log — from a line that never mentions a credential.
     """
     return URL_IN_TEXT.sub(lambda match: mask_url(match.group()), text)
 

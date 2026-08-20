@@ -33,30 +33,19 @@ Currently it supports:
 
 ## Configuration sources
 
-Every setting below is read from the environment, and — when it exists — from a JSON file whose
-values take precedence. The file is how deployments that hold credentials in a secret store deliver
-them: on Kubernetes the OpenBao agent writes `/vault/secrets/config`, and the application re-reads
-it when it changes, so a rotated node endpoint is picked up **without a restart**. That matters
-because a restart re-reads the whole validator set and every Lido key — minutes during which
-nothing is watched.
+Every setting below is read from the environment, and — when it exists — from a JSON file whose values take precedence.
+The file is how deployments that hold credentials in a secret store deliver them: on Kubernetes the OpenBao agent writes
+`/vault/secrets/config`, and the application re-reads it when it changes, so a rotated node endpoint is picked up
+**without a restart**. That matters because a restart re-reads the whole validator set and every validator key — minutes
+during which nothing is watched.
 
-The file is polled by path rather than watched: the agent replaces it with an atomic rename, so a
-watcher attached to the file itself would go silent after the first rotation. A reload emits one log
-line and increments `ethereum_head_watcher_secrets_reloads_total{status="success"}`; a file that
-changed but cannot be applied leaves the previous values in place and increments the same counter
-with `status="failure"`.
+The file is polled by path rather than watched: the agent replaces it with an atomic rename, so a watcher attached to
+the file itself would go silent after the first rotation. A reload emits one log line and increments
+`ethereum_head_watcher_secrets_reloads_total{status="success"}`; a file that changed but cannot be applied leaves the
+previous values in place and increments the same counter with `status="failure"`.
 
 ## Application Env variables
 
----
-`SECRETS_FILE_PATH` - Path to a JSON file of settings that override the environment. Absent is
-normal — it means every setting comes from the environment
-* **Required:** false
-* **Default:** /vault/secrets/config
----
-`SECRETS_POLL_INTERVAL_IN_SECONDS` - How often the secrets file is checked for a change
-* **Required:** false
-* **Default:** 10
 ---
 `LOG_LEVEL` - Application log level
 * **Required:** false
@@ -124,8 +113,7 @@ normal — it means every setting comes from the environment
 * **Required:** false
 * **Default:** 9010
 ---
-`HEALTHCHECK_SERVER_HOST` - Healthcheck server bind address. Kubernetes probes arrive on the
-pod IP, so binding to `localhost` makes them unreachable.
+`HEALTHCHECK_SERVER_HOST` - Healthcheck server bind address
 * **Required:** false
 * **Default:** 0.0.0.0
 ---
@@ -133,23 +121,6 @@ pod IP, so binding to `localhost` makes them unreachable.
 * **Required:** false
 * **Default:** 3000
 ---
-
-### Healthcheck endpoints
-
-The healthcheck server serves three paths:
-
-| Path | Reports | Used by |
-|---|---|---|
-| `/pulse/` | last cycle is newer than `MAX_CYCLE_LIFETIME_IN_SECONDS`. A GET also *records* a cycle, so it cannot be used as a probe | Docker `HEALTHCHECK` |
-| `/healthz` | this process is up and serving. Read-only | Kubernetes liveness |
-| `/readyz` | the watcher has finished its first cycle. Read-only, one-way | Kubernetes startup and readiness |
-
-Neither `/healthz` nor `/readyz` reports staleness. A liveness failure would restart the pod
-and cost a full re-read of the validator set and of every Lido key; a readiness failure would
-take the pod out of Prometheus' targets, turning a flat metric into an absent one. A stuck
-watcher is an alert on the metrics (`HeadBlockIsNotChanging`, `EHWStuckBotProcessing`), not a
-kubelet decision.
-
 `KEYS_API_REQUEST_TIMEOUT` - Keys API request timeout in seconds
 * **Required:** false
 * **Default:** 180
@@ -193,31 +164,41 @@ kubelet decision.
 * **Required:** false
 * **Default:** 1
 ---
-`VALID_WITHDRAWAL_ADDRESSES` - A comma-separated list of addresses. Triggers a critical alert if a monitored execution_request contains a source_address matching any of these addresses 
+`VALID_WITHDRAWAL_ADDRESSES` - A comma-separated list of addresses. Triggers a critical alert if a monitored
+execution_request contains a source_address matching any of these addresses.
 * **Required:** false
 * **Default:** []
 ---
-`DISABLE_UNEXPECTED_EXIT_ALERTS` - A comma-separated list of module indexes for which unexpected exit alerts are disabled.  
+`DISABLE_UNEXPECTED_EXIT_ALERTS` - A comma-separated list of module indexes for which unexpected exit alerts are
+disabled.  
 * **Required:** false
 * **Default:** []
 ---
 `EVENTS_SEARCH_STEP` - Maximum length of a range for `eth_getLogs` EL method calls.
 * **Required:** false
 * **Default:** 10000
+---
+`SECRETS_FILE_PATH` - Path to a JSON file of settings that override the environment. Absent is normal — it means every
+setting comes from the environment.
+* **Required:** false
+* **Default:** /vault/secrets/config
+---
+`SECRETS_POLL_INTERVAL_IN_SECONDS` - How often the secrets file is checked for a change.
+* **Required:** false
+* **Default:** 10
 
 ## Tests
 
 `poetry run pytest` runs the whole suite. It has two halves, and both are kept on purpose:
 
-- **hermetic** — `tests/test_watcher_offline.py` drives the watcher against a fake consensus node
-  (`tests/node_fake.py`) with keys from a file, so a cycle, a slashing of one of our validators, an
-  exit that is not ours and the reorg path are all checked with no provider and no credentials.
-- **integration** — `tests/test_watcher.py` replays real mainnet slot ranges and asserts on the
-  alert text those blocks produced: operator names, validator indices and wording that come from
-  data nobody wrote for a test. It needs `CONSENSUS_CLIENT_URI`, `EXECUTION_CLIENT_URI` and
-  `KEYS_API_URI`.
+- **hermetic** — `tests/test_watcher_offline.py` drives the watcher against a fake consensus node (`tests/node_fake.py`)
+  with keys from a file, so a cycle, a slashing of one of our validators, an exit that is not ours and the reorg path
+  are all checked with no provider and no credentials.
+- **integration** — `tests/test_watcher.py` replays real mainnet slot ranges and asserts on the alert text those blocks
+  produced: operator names, validator indices and wording that come from data nobody wrote for a test. It needs
+  `CONSENSUS_CLIENT_URI`, `EXECUTION_CLIENT_URI` and `KEYS_API_URI`.
 
-Both run by default, in CI too. Without provider credentials, skip the second kind:
+Both run by default. Without provider credentials, skip the second kind:
 
     poetry run pytest -m "not integration"
 
@@ -228,6 +209,21 @@ You can see application metrics on `http://localhost:9000/metrics` endpoint
 The source of metrics:
  - src/metrics/prometheus/basic.py
  - src/metrics/prometheus/watcher.py
+
+### Healthcheck endpoints
+
+The healthcheck server serves three paths:
+
+| Path       | Reports                                                                                                                 | Used by                          |
+|------------|-------------------------------------------------------------------------------------------------------------------------|----------------------------------|
+| `/pulse/`  | last cycle is newer than `MAX_CYCLE_LIFETIME_IN_SECONDS`. A GET also *records* a cycle, so it cannot be used as a probe | Docker `HEALTHCHECK`             |
+| `/healthz` | this process is up and serving. Read-only                                                                               | Kubernetes liveness              |
+| `/readyz`  | the watcher has finished its first cycle. Read-only, one-way                                                            | Kubernetes startup and readiness |
+
+Neither `/healthz` nor `/readyz` reports staleness. A liveness failure would restart the pod and cost a full re-read of
+the validator set and of every validator key; a readiness failure would take the pod out of Prometheus' targets, turning
+a flat metric into an absent one. A stuck watcher is an alert on the metrics (`HeadBlockIsNotChanging`,
+`EHWStuckBotProcessing`), not a kubelet decision.
 
 ## Release flow
 

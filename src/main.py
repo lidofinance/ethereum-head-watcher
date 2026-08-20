@@ -59,9 +59,9 @@ def apply_rotated_secrets(values: dict[str, str], watcher: Watcher) -> list[str]
     """
     Swap in endpoints from a rotated secrets file, without a restart. Returns what changed.
 
-    Restarting would re-read the whole validator set and key set, so the clients are re-pointed
-    instead: each keeps its endpoints in a list it walks per request. The execution layer needs a
-    new provider, which leaves the Web3 instance, its middlewares and its contracts in place.
+    Restarting would re-read the whole validator set and key set, so the clients are re-pointed instead: each keeps its
+    endpoints in a list it walks per request. The execution layer needs a new provider, which leaves the Web3 instance,
+    its middlewares and its contracts in place.
     """
     changed = []
 
@@ -83,9 +83,9 @@ def apply_rotated_secrets(values: dict[str, str], watcher: Watcher) -> list[str]
 
     execution_uri = _split(values.get('EXECUTION_CLIENT_URI'))
     if watcher.execution is not None and execution_uri and execution_uri != variables.EXECUTION_CLIENT_URI:
-        # `Web3.provider` is read-only in web3 6.x; the manager's is the settable one. The
-        # middlewares (metrics, cache) live on the manager too, so they survive the swap, and the
-        # contracts hold a reference to the Web3 instance rather than to the provider.
+        # `Web3.provider` is read-only in web3 6.x; the manager's is the settable one. The middlewares (metrics, cache)
+        # live on the manager too, so they survive the swap, and the contracts hold a reference to the Web3 instance
+        # rather than to the provider.
         watcher.execution.manager.provider = FallbackProviderModule(
             execution_uri, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT}
         )
@@ -108,9 +108,9 @@ def install_signal_handlers():
     """
     Make SIGTERM and SIGHUP stop the watcher the way Ctrl-C does.
 
-    Python installs a disposition for SIGINT only, and as PID 1 the process gets no default
-    action for the others, so without this they are dropped and the container is killed instead
-    of stopping. Routed onto SIGINT because the loop already unwinds on KeyboardInterrupt.
+    Python installs a disposition for SIGINT only, and as PID 1 the process gets no default action for the others, so
+    without this they are dropped and the container is killed instead of stopping. Routed onto SIGINT because the loop
+    already unwinds on KeyboardInterrupt.
     """
     for sig in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, signal.default_int_handler)

@@ -3,15 +3,15 @@ import os
 
 from src.secrets import DEFAULT_POLL_INTERVAL_IN_SECONDS, read_secrets_file
 
-# Where the OpenBao agent writes the secrets file, and how often it is re-read. Absent file means
-# every setting comes from the environment, which is how the VM deployment runs. See src/secrets.py.
+# Where the OpenBao agent writes the secrets file, and how often it is re-read. Absent file means every setting comes
+# from the environment. See src/secrets.py.
 SECRETS_FILE_PATH = os.getenv('SECRETS_FILE_PATH', '/vault/secrets/config')
 SECRETS_POLL_INTERVAL_IN_SECONDS = int(os.getenv('SECRETS_POLL_INTERVAL_IN_SECONDS', DEFAULT_POLL_INTERVAL_IN_SECONDS))
 
 _secrets = read_secrets_file(SECRETS_FILE_PATH)
-# Whether that file was there, for main() to report. This module is imported before logging is
-# configured, so anything read_secrets_file logs at import time is dropped — and "where did this
-# process get its endpoints" is the first question when a rotated key does not seem to have landed.
+# Whether that file was there, for main() to report. This module is imported before logging is configured, so anything
+# read_secrets_file logs at import time is dropped — and "where did this process get its endpoints" is the first
+# question when a rotated key does not seem to have landed.
 SECRETS_FILE_LOADED = bool(_secrets)
 
 
@@ -36,9 +36,8 @@ def parse_enabled_handlers(value: str | None) -> list[str] | None:
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
 # - Providers-
-# The two node endpoints carry provider credentials in the URL, so they are the values the
-# secrets file exists for. The other two are read the same way so that a deployment can choose
-# where to keep them without a code change.
+# The two node endpoints carry provider credentials in the URL, so they are the values the secrets file exists for. The
+# other two are read the same way so that a deployment can choose where to keep them without a code change.
 CONSENSUS_CLIENT_URI = setting('CONSENSUS_CLIENT_URI').split(',')
 EXECUTION_CLIENT_URI = setting('EXECUTION_CLIENT_URI').split(',')
 KEYS_API_URI = setting('KEYS_API_URI').split(',')

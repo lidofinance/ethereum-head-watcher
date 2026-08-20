@@ -1,10 +1,9 @@
 """
 Secrets that arrive as a file, and how a change to it is noticed.
 
-Node endpoints carry provider credentials and are delivered as a JSON file, because a process
-cannot be handed new environment variables from outside: env-based delivery costs a restart per
-rotation. The file is replaced by a rename, which gives it a new inode, so this polls the path
-with stat() rather than watching the file.
+Node endpoints carry provider credentials and are delivered as a JSON file, because a process cannot be handed new
+environment variables from outside: env-based delivery costs a restart per rotation. The file is replaced by a rename,
+which gives it a new inode, so this polls the path with stat() rather than watching the file.
 
 No file means the values come from the environment.
 """
@@ -25,8 +24,8 @@ def read_secrets_file(path: str) -> dict[str, str]:
     """
     The file's contents, or an empty mapping if there is no usable file.
 
-    Absent is normal and means "use the environment". Unparseable is logged and treated the same
-    way, so one bad value cannot keep the watcher from starting.
+    Absent is normal and means "use the environment". Unparseable is logged and treated the same way, so one bad value
+    cannot keep the watcher from starting.
     """
     if not path:
         return {}

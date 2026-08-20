@@ -23,10 +23,9 @@ SERVING_BODY = b'{"metrics": "ok", "reason": "serving"}\n'
 COLD_BODY = b'{"metrics": "fail", "reason": "no cycle completed yet"}\n'
 
 _last_pulse = datetime.now()
-# Distinct from _last_pulse, which starts warm so that the Docker HEALTHCHECK does not fail a
-# container that is still starting. Readiness needs the opposite answer: a watcher that has not
-# finished a cycle is not caught up, and its first cycle reads the whole validator set and every
-# Lido key, which takes minutes.
+# Distinct from _last_pulse, which starts warm so that the Docker HEALTHCHECK does not fail a container that is still
+# starting. Readiness needs the opposite answer: a watcher that has not finished a cycle is not caught up, and its first
+# cycle reads the whole validator set and every validator key, which takes minutes.
 _first_pulse_registered = False
 
 
@@ -34,8 +33,8 @@ def pulse():
     """
     Tell the healthcheck server that the watcher is still making progress.
 
-    Never raises: a healthcheck ping must not break the head cycle. A server that can not be reached
-    fails the Docker HEALTHCHECK on its own anyway.
+    Never raises: a healthcheck ping must not break the head cycle. A server that can not be reached fails the Docker
+    HEALTHCHECK on its own anyway.
     """
     try:
         requests.post(f'http://localhost:{variables.HEALTHCHECK_SERVER_PORT}{PULSE_PATH}', timeout=10)
@@ -63,9 +62,9 @@ class PulseRequestHandler(SimpleHTTPRequestHandler):
     """
     Request handler for Docker HEALTHCHECK.
 
-    The watcher reports progress with POST while the healthcheck reads the state with GET, and the
-    split matters: as long as both were served by GET, every healthcheck refreshed the very deadline
-    it was about to check, so a stuck watcher stayed healthy forever.
+    The watcher reports progress with POST while the healthcheck reads the state with GET, and the split matters: as
+    long as both were served by GET, every healthcheck refreshed the very deadline it was about to check, so a stuck
+    watcher stayed healthy forever.
     """
 
     def do_POST(self):
@@ -74,15 +73,14 @@ class PulseRequestHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == LIVENESS_PATH:
-            # Serving, nothing more. Staleness deliberately does not fail liveness here: a restart
-            # costs a full re-read of the validator set and of every Lido key, and when the cause is
-            # a degraded upstream that turns into a restart loop which makes the outage longer.
-            # `EHWStuckBotProcessing` pages a human for that instead.
+            # Serving, nothing more. Staleness deliberately does not fail liveness here: a restart costs a full re-read
+            # of the validator set and of every validator key, and when the cause is a degraded upstream that turns into
+            # a restart loop which makes the outage longer. `EHWStuckBotProcessing` pages a human for that instead.
             self._respond(HTTPStatus.OK, SERVING_BODY)
         elif self.path == READINESS_PATH:
-            # A one-way gate: it opens after the first completed cycle and stays open. Failing it
-            # later would take the pod out of the Service and therefore out of Prometheus' targets,
-            # which turns a flat metric into an absent one — the harder signal to alert on.
+            # A one-way gate: it opens after the first completed cycle and stays open. Failing it later would take the
+            # pod out of the Service and therefore out of Prometheus' targets, which turns a flat metric into an absent
+            # one — the harder signal to alert on.
             if is_ready():
                 self._respond(HTTPStatus.OK, ALIVE_BODY)
             else:
@@ -104,11 +102,9 @@ class PulseRequestHandler(SimpleHTTPRequestHandler):
 
 def start_pulse_server() -> HTTPServer:
     """
-    This is simple server for bots without any API.
-    If bot didn't call pulse for a while (5 minutes but should be changed individually)
-    healthcheck in docker returns 1 and bot will be restarted
+    This is simple server for bots without any API. If bot didn't call pulse for a while (5 minutes but should be
+    changed individually) healthcheck in docker returns 1 and bot will be restarted.
     """
-    # Kubernetes probes arrive on the pod IP, so binding to localhost makes them unreachable.
     server = HTTPServer(
         (variables.HEALTHCHECK_SERVER_HOST, variables.HEALTHCHECK_SERVER_PORT),
         RequestHandlerClass=PulseRequestHandler,

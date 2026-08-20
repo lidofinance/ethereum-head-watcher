@@ -1,14 +1,13 @@
 """
-Replays real mainnet slot ranges against live providers and asserts on the alert text those blocks
-produced. That is a check no fake can make: the operator names, the validator indices and the exact
-wording all come from data nobody wrote for a test.
+Replays real mainnet slot ranges against live providers and asserts on the alert text those blocks produced. That is a
+check no fake can make: the operator names, the validator indices and the exact wording all come from data nobody wrote
+for a test.
 
-Runs in CI like everything else. The `integration` marker is only there so a run without provider
-credentials can skip it: `pytest -m "not integration"`. The EL timeout these use is raised in
-conftest, because replaying historical ranges means eth_getLogs over thousands of blocks.
+The EL timeout these use is raised in conftest, because replaying historical ranges means eth_getLogs over thousands of
+blocks.
 
-tests/test_watcher_offline.py covers the same decisions against a fake node, and it is the addition
-rather than the replacement: the two answer different questions.
+tests/test_watcher_offline.py covers the same decisions against a fake node, and it is the addition rather than the
+replacement: the two answer different questions.
 """
 
 import pytest

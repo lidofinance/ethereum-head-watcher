@@ -25,7 +25,6 @@ def write(path: str, values: dict, mtime_ns: int | None = None):
 
 
 def test_absent_file_reads_as_empty(secrets_path):
-    # The VM deployment has no agent and no file; every setting comes from the environment there.
     assert read_secrets_file(secrets_path) == {}
 
 

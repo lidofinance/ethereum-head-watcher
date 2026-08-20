@@ -1,32 +1,26 @@
 """
-Provider keys live inside endpoint URLs, and endpoint URLs reach the log through exception text
-rather than through anything that looks like a credential. These are the shapes our providers use.
+Provider keys live inside endpoint URLs, and endpoint URLs reach the log through exception text rather than through
+anything that looks like a credential. These are the shapes our providers use.
 """
 
 from src.providers.http_provider import mask_url, mask_urls_in
 
 
 def test_query_string_key_is_dropped():
-    masked = mask_url('https://lb.drpc.org/ogrpc?network=ethereum&dkey=SECRETKEYVALUE')
+    masked = mask_url('https://provider.org/ogrpc?network=ethereum&key=SECRETKEYVALUE')
 
-    assert masked == 'https://lb.drpc.org'
+    assert masked == 'https://provider.org'
     assert 'SECRETKEYVALUE' not in masked
 
 
 def test_path_segment_key_is_dropped():
-    masked = mask_url('https://eth-mainnet.g.alchemy.com/v2/SECRETKEYVALUE')
+    masked = mask_url('https://provider.com/v2/SECRETKEYVALUE')
 
-    assert masked == 'https://eth-mainnet.g.alchemy.com'
-
-
-def test_beacon_path_key_is_dropped():
-    masked = mask_url('https://lb.drpc.live/eth-beacon-chain/SECRETKEYVALUE')
-
-    assert masked == 'https://lb.drpc.live'
+    assert masked == 'https://provider.com'
 
 
 def test_host_survives_because_it_says_which_provider_failed():
-    assert mask_url('http://vroom-hw-kapi-server:3000/v1/keys') == 'http://vroom-hw-kapi-server:3000'
+    assert mask_url('http://kapi-server:3000/v1/keys') == 'http://kapi-server:3000'
 
 
 def test_non_url_text_is_returned_unchanged():
@@ -36,8 +30,8 @@ def test_non_url_text_is_returned_unchanged():
 def test_url_inside_exception_text_is_masked():
     # What requests actually produces on a failed call, key included.
     text = (
-        "HTTPSConnectionPool(host='lb.drpc.org', port=443): Max retries exceeded with url: "
-        "https://lb.drpc.org/ogrpc?network=ethereum&dkey=SECRETKEYVALUE (Caused by ReadTimeout)"
+        "HTTPSConnectionPool(host='provider.org', port=443): Max retries exceeded with url: "
+        "https://provider.org/ogrpc?network=ethereum&key=SECRETKEYVALUE (Caused by ReadTimeout)"
     )
 
     masked = mask_urls_in(text)

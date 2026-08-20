@@ -1,9 +1,9 @@
 """
 The Kubernetes half of the healthcheck server.
 
-`tests/test_healthcheck.py` covers the POST/GET split on `/pulse/` — the fix for a healthcheck that
-refreshed the deadline it was about to check. What is covered here is what Kubernetes needs on top of
-it: a bind address probes can reach, and two read-only paths that answer different questions.
+`tests/test_healthcheck.py` covers the POST/GET split on `/pulse/` — the fix for a healthcheck that refreshed the
+deadline it was about to check. What is covered here is what Kubernetes needs on top of it: a bind address probes can
+reach, and two read-only paths that answer different questions.
 """
 
 import socket
@@ -35,9 +35,9 @@ def health_server(monkeypatch):
 
 
 def test_the_server_is_reachable_on_a_non_loopback_bind(monkeypatch):
-    # The reason this test exists: bound to localhost, the server answers the container and not the
-    # kubelet, which probes the pod IP. The assertion is that the bind address is configurable at
-    # all — a probe against a real pod IP is not something a unit test can do.
+    # The reason this test exists: bound to localhost, the server answers the container and not the kubelet, which
+    # probes the pod IP. The assertion is that the bind address is configurable at all — a probe against a real pod IP
+    # is not something a unit test can do.
     monkeypatch.setattr(variables, 'HEALTHCHECK_SERVER_HOST', '0.0.0.0')
     monkeypatch.setattr(variables, 'HEALTHCHECK_SERVER_PORT', _free_port())
 
@@ -52,8 +52,7 @@ def test_the_server_is_reachable_on_a_non_loopback_bind(monkeypatch):
 
 
 def test_liveness_is_up_before_the_first_cycle(health_server):
-    # A cold start reads the whole validator set and every Lido key; liveness must not restart the
-    # pod over that.
+    # A cold start reads the whole validator set and every validator key; liveness must not restart the pod over that.
     response = requests.get(f'{health_server}/healthz', timeout=5)
 
     assert response.status_code == 200
@@ -76,8 +75,7 @@ def test_readiness_opens_after_a_cycle(health_server):
 
 
 def test_probes_do_not_register_progress(health_server):
-    # The bug the POST/GET split fixed, guarded from the other side: neither probe may stand in for
-    # the watcher.
+    # The bug the POST/GET split fixed, guarded from the other side: neither probe may stand in for the watcher.
     requests.get(f'{health_server}/healthz', timeout=5)
     requests.get(f'{health_server}/readyz', timeout=5)
 

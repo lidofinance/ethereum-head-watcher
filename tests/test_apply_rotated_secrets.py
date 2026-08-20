@@ -1,12 +1,11 @@
 """
-The rotation is applied to live client objects, so these tests build real ones — a real Web3 with
-the real fallback provider, and the real HTTP clients. Nothing here talks to a node: a swap is a
-change of endpoint lists, and asserting on the lists is the whole point.
+The rotation is applied to live client objects, so these tests build real ones — a real Web3 with the real fallback
+provider, and the real HTTP clients. Nothing here talks to a node: a swap is a change of endpoint lists, and asserting
+on the lists is the whole point.
 
-The regression worth naming: `Web3.provider` has no setter in web3 6.x, so an obvious-looking
-`web3.provider = ...` raises AttributeError. It would be swallowed by the watcher's callback guard
-and logged as a failed reload — a rotation that quietly never lands. That is what
-test_execution_endpoints_are_swapped covers.
+The regression worth naming: `Web3.provider` has no setter in web3 6.x, so an obvious-looking `web3.provider = ...`
+raises AttributeError. It would be swallowed by the watcher's callback guard and logged as a failed reload — a rotation
+that quietly never lands. That is what test_execution_endpoints_are_swapped covers.
 """
 
 import pytest

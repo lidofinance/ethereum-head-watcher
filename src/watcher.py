@@ -61,9 +61,8 @@ class Watcher:
         """
         One pass: read the head, and handle it if it moved. Returns whether it did.
 
-        A method rather than a closure inside run(), and it does not sleep — the caller paces the
-        loop. That is what makes a single cycle callable from a test, which is how the request
-        profile behind the provider budget is measured instead of being asserted from memory.
+        A method rather than a closure inside run(), and it does not sleep — the caller paces the loop. That is what
+        makes a single cycle callable from a test.
         """
         current_head = self._get_header_full_info(slot_to_handle)
         if not current_head:
@@ -82,8 +81,8 @@ class Watcher:
         self._handle_head(current_head)
 
         SLOT_NUMBER.set(current_head.header.message.slot)
-        # Only a handled head counts as progress, so that an error loop can not keep the
-        # container alive: the head cycle swallows its exceptions and would retry forever
+        # Only a handled head counts as progress, so that an error loop can not keep the container alive: the head cycle
+        # swallows its exceptions and would retry forever
         pulse()
         logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
         return True
