@@ -2,19 +2,19 @@ name: Build and push ethereum-head-watcher to dev
 
 run-name: Build and push ethereum-head-watcher:dev to dev
 
-# New file: this repository had no Harbor push at all. build-image.yml only builds on pull
-# requests as a check and pushes nothing, and the image production runs comes from the
-# dispatch into lidofinance/infra-mainnet. That dispatch stays for now — this adds the
-# Kubernetes delivery path beside it, it does not replace it (VROOM-547).
+# Builds the mutable `dev` image tag through the shared reusable build workflow, so action
+# pins, buildx setup and cache behaviour are maintained in one place.
 #
-# vroom-head-watcher in helm-charts-vroom pulls
-# registry.dev.k8s-dev.org/team-vroom/ethereum-head-watcher:dev, and
-# argocd-image-updater rolls the Deployment when the digest behind that tag changes.
+# This runs alongside ci-dev.yml and does not replace it: both delivery paths are active
+# for now.
 on:
   workflow_dispatch:
   push:
     branches:
       - develop
+    # paths-ignore rather than an allowlist of paths: an allowlist has to be extended every
+    # time a new file is baked into the image, and a forgotten entry produces a stale image
+    # with a green pipeline rather than a failure.
     paths-ignore:
       - '.github/**'
       - 'test/**'
