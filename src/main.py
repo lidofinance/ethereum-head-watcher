@@ -15,8 +15,8 @@ from src.keys_source.file_source import FileSource
 from src.keys_source.keys_api_source import KeysApiSource
 from src.metrics.healthcheck_server import start_pulse_server
 from src.metrics.logging import logging
-from src.metrics.prometheus.basic import BUILD_INFO, SECRETS_RELOADS, Status
-from src.secrets import SecretsWatcher
+from src.metrics.prometheus.basic import BUILD_INFO, SECRETS_FILE_MTIME, SECRETS_RELOADS, Status
+from src.secrets import SecretsWatcher, read_secrets_file_mtime
 from src.utils.build import get_build_info
 from src.watcher import Watcher
 from src.web3py.extensions import FallbackProviderModule, LidoContracts
@@ -55,7 +55,24 @@ def build_handlers(enabled_handlers: list[str] | None = None) -> list[WatcherHan
     return handlers
 
 
-def apply_rotated_secrets(values: dict[str, str], watcher: Watcher) -> list[str]:
+# The settings a rotation can be applied to while the watcher runs. Anything else in the file is
+# read at startup and only at startup.
+LIVE_APPLIED_SETTINGS = ('CONSENSUS_CLIENT_URI', 'EXECUTION_CLIENT_URI', 'KEYS_API_URI', 'ALERTMANAGER_URI')
+
+
+def unapplied_changes(values: dict[str, str], in_force: dict[str, str]) -> list[str]:
+    """
+    Keys the file changed that a live apply cannot reach.
+
+    Without this a rotation of, say, a locator address is indistinguishable from no rotation at all: the file is read,
+    the mtime is remembered, and the setting keeps its startup value forever.
+    """
+    return sorted(
+        key for key, value in values.items() if key not in LIVE_APPLIED_SETTINGS and in_force.get(key) != value
+    )
+
+
+def apply_rotated_secrets(values: dict[str, str], watcher: Watcher, in_force: dict[str, str]) -> list[str]:
     """
     Swap in endpoints from a rotated secrets file, without a restart. Returns what changed.
 
@@ -95,6 +112,19 @@ def apply_rotated_secrets(values: dict[str, str], watcher: Watcher) -> list[str]
     if changed:
         logger.info({'msg': f'Applied rotated secrets: {", ".join(changed)}'})
         SECRETS_RELOADS.labels(Status.SUCCESS.value).inc()
+
+    if not_applied := unapplied_changes(values, in_force):
+        logger.warning(
+            {
+                'msg': f'Rotated settings a restart is needed for: {", ".join(not_applied)}',
+                'applied_live': ', '.join(LIVE_APPLIED_SETTINGS),
+            }
+        )
+        SECRETS_RELOADS.labels(Status.NOT_APPLIED.value).inc()
+
+    in_force.clear()
+    in_force.update(values)
+    SECRETS_FILE_MTIME.set((read_secrets_file_mtime(variables.SECRETS_FILE_PATH) or 0) / 1e9)
     return changed
 
 
@@ -162,9 +192,12 @@ def main():
 
     watcher = Watcher(handlers, keys_source, web3)
 
+    in_force = variables.secrets_in_force()
+    SECRETS_FILE_MTIME.set((read_secrets_file_mtime(variables.SECRETS_FILE_PATH) or 0) / 1e9)
+
     SecretsWatcher(
         variables.SECRETS_FILE_PATH,
-        on_change=lambda values: apply_rotated_secrets(values, watcher),
+        on_change=lambda values: apply_rotated_secrets(values, watcher, in_force),
         interval=variables.SECRETS_POLL_INTERVAL_IN_SECONDS,
         on_error=lambda: SECRETS_RELOADS.labels(Status.FAILURE.value).inc(),
     ).start()

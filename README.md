@@ -44,6 +44,11 @@ the file itself would go silent after the first rotation. A reload emits one log
 `ethereum_head_watcher_secrets_reloads_total{status="success"}`; a file that changed but cannot be applied leaves the
 previous values in place and increments the same counter with `status="failure"`.
 
+Only the node and Alertmanager endpoints can be swapped while the watcher runs. Any other setting in the file that
+changes is logged and counted as `status="not_applied"` — it keeps its startup value until the process restarts.
+`ethereum_head_watcher_secrets_file_mtime_seconds` reports the mtime of the file in force, or 0 when the configuration
+came from the environment.
+
 ## Application Env variables
 
 ---

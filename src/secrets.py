@@ -46,6 +46,14 @@ def read_secrets_file(path: str) -> dict[str, str]:
     return {key: str(value) for key, value in values.items()}
 
 
+def read_secrets_file_mtime(path: str) -> int | None:
+    """The path's mtime in nanoseconds, or None when there is nothing at the path."""
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return None
+
+
 class SecretsWatcher:
     """Re-reads the secrets file when its mtime changes and hands the new values to a callback."""
 
@@ -61,17 +69,11 @@ class SecretsWatcher:
         # A hook rather than importing the metric here, which would close an import cycle.
         self._on_error = on_error
         self._interval = interval
-        self._mtime = self._read_mtime()
-
-    def _read_mtime(self) -> int | None:
-        try:
-            return os.stat(self._path).st_mtime_ns
-        except OSError:
-            return None
+        self._mtime = read_secrets_file_mtime(path)
 
     def check_once(self) -> bool:
         """True if a change was seen and applied. Separate from the loop so it is testable."""
-        mtime = self._read_mtime()
+        mtime = read_secrets_file_mtime(self._path)
         if mtime is None or mtime == self._mtime:
             return False
 

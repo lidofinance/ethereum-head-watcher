@@ -11,12 +11,17 @@ that quietly never lands. That is what test_execution_endpoints_are_swapped cove
 import pytest
 
 from src import variables
-from src.main import _split, apply_rotated_secrets
+from src.main import _split, apply_rotated_secrets, unapplied_changes
 from src.providers.alertmanager.client import AlertmanagerClient
 from src.providers.consensus.client import ConsensusClient
 from src.providers.keys_api.client import KeysAPIClient
 from src.web3py.extensions import FallbackProviderModule
 from src.web3py.typings import Web3
+
+
+def rotate(values, watcher, in_force=None):
+    """apply_rotated_secrets with a snapshot of its own, since these tests assert on one rotation."""
+    return apply_rotated_secrets(values, watcher, {} if in_force is None else in_force)
 
 
 class KeysApiSourceStub:
@@ -46,7 +51,7 @@ def execution_uri_restored():
 def test_consensus_endpoints_are_swapped():
     watcher = WatcherStub()
 
-    changed = apply_rotated_secrets({'CONSENSUS_CLIENT_URI': 'https://cl-a,https://cl-b'}, watcher)
+    changed = rotate({'CONSENSUS_CLIENT_URI': 'https://cl-a,https://cl-b'}, watcher)
 
     assert changed == ['CONSENSUS_CLIENT_URI']
     assert watcher.consensus.hosts == ['https://cl-a', 'https://cl-b']
@@ -55,7 +60,7 @@ def test_consensus_endpoints_are_swapped():
 def test_keys_api_and_alertmanager_endpoints_are_swapped():
     watcher = WatcherStub()
 
-    changed = apply_rotated_secrets(
+    changed = rotate(
         {'KEYS_API_URI': 'http://kapi-new:3000', 'ALERTMANAGER_URI': 'http://am-new:9093'}, watcher
     )
 
@@ -71,7 +76,7 @@ def test_execution_endpoints_are_swapped(execution_uri_restored):
 
     old_provider = web3.provider
 
-    changed = apply_rotated_secrets({'EXECUTION_CLIENT_URI': 'https://el-new'}, watcher)
+    changed = rotate({'EXECUTION_CLIENT_URI': 'https://el-new'}, watcher)
 
     assert changed == ['EXECUTION_CLIENT_URI']
     assert web3.provider is not old_provider
@@ -88,7 +93,7 @@ def test_middlewares_survive_the_execution_swap(execution_uri_restored):
     watcher = WatcherStub(execution=web3)
     variables.EXECUTION_CLIENT_URI = ['https://el-old']
 
-    apply_rotated_secrets({'EXECUTION_CLIENT_URI': 'https://el-new'}, watcher)
+    rotate({'EXECUTION_CLIENT_URI': 'https://el-new'}, watcher)
 
     # The metrics collector and the cache are attached this way; losing them on rotation would
     # silently stop the EL metrics rather than break anything visible.
@@ -98,7 +103,7 @@ def test_middlewares_survive_the_execution_swap(execution_uri_restored):
 def test_unchanged_values_are_not_reapplied():
     watcher = WatcherStub()
 
-    changed = apply_rotated_secrets({'CONSENSUS_CLIENT_URI': 'https://cl-old'}, watcher)
+    changed = rotate({'CONSENSUS_CLIENT_URI': 'https://cl-old'}, watcher)
 
     assert not changed
 
@@ -106,7 +111,7 @@ def test_unchanged_values_are_not_reapplied():
 def test_missing_and_empty_keys_are_left_alone():
     watcher = WatcherStub()
 
-    changed = apply_rotated_secrets({'CONSENSUS_CLIENT_URI': '', 'KEYS_API_URI': '  '}, watcher)
+    changed = rotate({'CONSENSUS_CLIENT_URI': '', 'KEYS_API_URI': '  '}, watcher)
 
     # An empty value in a rendered secret is a rotation gone wrong, not an instruction to point a
     # client at nothing — the previous endpoints stay.
@@ -118,7 +123,7 @@ def test_missing_and_empty_keys_are_left_alone():
 def test_file_keys_source_has_no_keys_api_to_swap():
     watcher = WatcherStub(keys_source=FileSourceStub())
 
-    changed = apply_rotated_secrets({'KEYS_API_URI': 'http://kapi-new:3000'}, watcher)
+    changed = rotate({'KEYS_API_URI': 'http://kapi-new:3000'}, watcher)
 
     assert not changed
 
@@ -126,3 +131,23 @@ def test_file_keys_source_has_no_keys_api_to_swap():
 def test_split_trims_and_drops_empties():
     assert _split(' https://a , https://b ,') == ['https://a', 'https://b']
     assert _split(None) == []
+
+
+def test_a_setting_no_live_apply_reaches_is_reported():
+    """A rotated setting outside the live-applied list must not read as "nothing changed"."""
+    watcher = WatcherStub()
+    in_force = {'LIDO_LOCATOR_ADDRESS': '0xold'}
+
+    changed = rotate({'LIDO_LOCATOR_ADDRESS': '0xnew'}, watcher, in_force)
+
+    assert changed == []
+    assert unapplied_changes({'LIDO_LOCATOR_ADDRESS': '0xnew'}, {'LIDO_LOCATOR_ADDRESS': '0xold'}) == [
+        'LIDO_LOCATOR_ADDRESS'
+    ]
+    # The snapshot moves on, so the same render is not reported again on the next poll.
+    assert in_force == {'LIDO_LOCATOR_ADDRESS': '0xnew'}
+    assert unapplied_changes({'LIDO_LOCATOR_ADDRESS': '0xnew'}, in_force) == []
+
+
+def test_live_applied_settings_are_not_reported_as_needing_a_restart():
+    assert unapplied_changes({'CONSENSUS_CLIENT_URI': 'https://cl-new'}, {'CONSENSUS_CLIENT_URI': 'https://cl-old'}) == []

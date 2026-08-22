@@ -15,6 +15,11 @@ _secrets = read_secrets_file(SECRETS_FILE_PATH)
 SECRETS_FILE_LOADED = bool(_secrets)
 
 
+def secrets_in_force() -> dict[str, str]:
+    """What the file held when this process read it, for a reload to compare a new render against."""
+    return dict(_secrets)
+
+
 def setting(name: str, default: str = '') -> str:
     """The secrets file wins over the environment, so a rotated value is not shadowed by a stale env."""
     value = _secrets.get(name)
