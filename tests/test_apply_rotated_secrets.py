@@ -60,9 +60,7 @@ def test_consensus_endpoints_are_swapped():
 def test_keys_api_and_alertmanager_endpoints_are_swapped():
     watcher = WatcherStub()
 
-    changed = rotate(
-        {'KEYS_API_URI': 'http://kapi-new:3000', 'ALERTMANAGER_URI': 'http://am-new:9093'}, watcher
-    )
+    changed = rotate({'KEYS_API_URI': 'http://kapi-new:3000', 'ALERTMANAGER_URI': 'http://am-new:9093'}, watcher)
 
     assert sorted(changed) == ['ALERTMANAGER_URI', 'KEYS_API_URI']
     assert watcher.keys_source.keys_api.hosts == ['http://kapi-new:3000']
@@ -150,4 +148,6 @@ def test_a_setting_no_live_apply_reaches_is_reported():
 
 
 def test_live_applied_settings_are_not_reported_as_needing_a_restart():
-    assert unapplied_changes({'CONSENSUS_CLIENT_URI': 'https://cl-new'}, {'CONSENSUS_CLIENT_URI': 'https://cl-old'}) == []
+    assert (
+        unapplied_changes({'CONSENSUS_CLIENT_URI': 'https://cl-new'}, {'CONSENSUS_CLIENT_URI': 'https://cl-old'}) == []
+    )
