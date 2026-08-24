@@ -15,7 +15,12 @@ from src.keys_source.file_source import FileSource
 from src.keys_source.keys_api_source import KeysApiSource
 from src.metrics.healthcheck_server import start_pulse_server
 from src.metrics.logging import logging
-from src.metrics.prometheus.basic import BUILD_INFO, SECRETS_FILE_MTIME, SECRETS_RELOADS, Status
+from src.metrics.prometheus.basic import (
+    BUILD_INFO,
+    SECRETS_FILE_MTIME,
+    SECRETS_RELOADS,
+    Status,
+)
 from src.secrets import SecretsWatcher, read_secrets_file_mtime
 from src.utils.build import get_build_info
 from src.watcher import Watcher

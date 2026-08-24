@@ -138,7 +138,7 @@ def test_a_setting_no_live_apply_reaches_is_reported():
 
     changed = rotate({'LIDO_LOCATOR_ADDRESS': '0xnew'}, watcher, in_force)
 
-    assert changed == []
+    assert not changed
     assert unapplied_changes({'LIDO_LOCATOR_ADDRESS': '0xnew'}, {'LIDO_LOCATOR_ADDRESS': '0xold'}) == [
         'LIDO_LOCATOR_ADDRESS'
     ]
