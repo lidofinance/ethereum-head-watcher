@@ -1,6 +1,32 @@
 import json
 import os
 
+from src.secrets import DEFAULT_POLL_INTERVAL_IN_SECONDS, read_secrets_file
+
+# Where the OpenBao agent writes the secrets file, and how often it is re-read. Absent file means every setting comes
+# from the environment. See src/secrets.py.
+SECRETS_FILE_PATH = os.getenv('SECRETS_FILE_PATH', '/vault/secrets/config')
+SECRETS_POLL_INTERVAL_IN_SECONDS = int(os.getenv('SECRETS_POLL_INTERVAL_IN_SECONDS', DEFAULT_POLL_INTERVAL_IN_SECONDS))
+
+_secrets = read_secrets_file(SECRETS_FILE_PATH)
+# Whether that file was there, for main() to report. This module is imported before logging is configured, so anything
+# read_secrets_file logs at import time is dropped — and "where did this process get its endpoints" is the first
+# question when a rotated key does not seem to have landed.
+SECRETS_FILE_LOADED = bool(_secrets)
+
+
+def secrets_in_force() -> dict[str, str]:
+    """What the file held when this process read it, for a reload to compare a new render against."""
+    return dict(_secrets)
+
+
+def setting(name: str, default: str = '') -> str:
+    """The secrets file wins over the environment, so a rotated value is not shadowed by a stale env."""
+    value = _secrets.get(name)
+    if value:
+        return value
+    return os.getenv(name, default)
+
 
 def parse_enabled_handlers(value: str | None) -> list[str] | None:
     """Parse handler names, using ``None`` to represent the default handler set."""
@@ -15,10 +41,12 @@ def parse_enabled_handlers(value: str | None) -> list[str] | None:
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
 # - Providers-
-CONSENSUS_CLIENT_URI = os.getenv('CONSENSUS_CLIENT_URI', '').split(',')
-EXECUTION_CLIENT_URI = os.getenv('EXECUTION_CLIENT_URI', '').split(',')
-KEYS_API_URI = os.getenv('KEYS_API_URI', '').split(',')
-ALERTMANAGER_URI = os.getenv('ALERTMANAGER_URI', '').split(',')
+# The two node endpoints carry provider credentials in the URL, so they are the values the secrets file exists for. The
+# other two are read the same way so that a deployment can choose where to keep them without a code change.
+CONSENSUS_CLIENT_URI = setting('CONSENSUS_CLIENT_URI').split(',')
+EXECUTION_CLIENT_URI = setting('EXECUTION_CLIENT_URI').split(',')
+KEYS_API_URI = setting('KEYS_API_URI').split(',')
+ALERTMANAGER_URI = setting('ALERTMANAGER_URI').split(',')
 
 NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
 
@@ -67,6 +95,7 @@ PROMETHEUS_PORT = int(os.getenv('PROMETHEUS_PORT', 9000))
 PROMETHEUS_PREFIX = os.getenv("PROMETHEUS_PREFIX", "ethereum_head_watcher")
 
 HEALTHCHECK_SERVER_PORT = int(os.getenv('HEALTHCHECK_SERVER_PORT', 9010))
+HEALTHCHECK_SERVER_HOST = os.getenv('HEALTHCHECK_SERVER_HOST', '0.0.0.0')
 
 MAX_CYCLE_LIFETIME_IN_SECONDS = int(os.getenv("MAX_CYCLE_LIFETIME_IN_SECONDS", 3000))
 
@@ -89,4 +118,8 @@ def check_uri_required_variables():
 
 def raise_from_errors(errors):
     if errors:
-        raise ValueError("The following variables are required: " + ", ".join(errors))
+        raise ValueError(
+            "The following variables are required: "
+            + ", ".join(errors)
+            + f" (read from {SECRETS_FILE_PATH} when it exists, otherwise from the environment)"
+        )
