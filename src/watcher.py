@@ -143,7 +143,7 @@ class Watcher:
                 json_stream.requests.load(stream)['data'], self.indexed_validators_keys
             )
         except Exception as e:  # pylint: disable=broad-except
-            logger.error({'msg': f'Error while getting validators: {e}'})
+            logger.error({'msg': f'Error while getting validators: {mask_urls_in(str(e))}'})
             return
 
         logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
