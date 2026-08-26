@@ -28,7 +28,7 @@ from src.providers.consensus.typings import (
     ChainReorgEvent,
     FullBlockInfo,
 )
-from src.providers.http_provider import NotOkResponse
+from src.providers.http_provider import NotOkResponse, mask_urls_in
 from src.utils.decorators import thread_as_daemon
 from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 from src.web3py.typings import Web3
@@ -109,7 +109,9 @@ class Watcher:
                         self.chain_reorg_event_listener = self.listen_chain_reorg_event()
                     self.run_cycle()
                 except Exception as e:  # pylint: disable=broad-except
-                    logger.error({'msg': 'Error while handling head', 'exception': str(e)})
+                    # A raw provider exception embeds the full URL, key included — the fallback
+                    # loop masks its own warnings, but the exhausted-retries error lands here.
+                    logger.error({'msg': 'Error while handling head', 'exception': mask_urls_in(str(e))})
                 time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
     @duration_meter()
@@ -141,7 +143,7 @@ class Watcher:
                 json_stream.requests.load(stream)['data'], self.indexed_validators_keys
             )
         except Exception as e:  # pylint: disable=broad-except
-            logger.error({'msg': f'Error while getting validators: {e}'})
+            logger.error({'msg': f'Error while getting validators: {mask_urls_in(str(e))}'})
             return
 
         logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
@@ -154,7 +156,7 @@ class Watcher:
         try:
             new_keys = self.keys_source.update_keys()
         except Exception as e:  # pylint: disable=broad-except
-            logger.error({'msg': 'Can not update user keys', 'exception': str(e)})
+            logger.error({'msg': 'Can not update user keys', 'exception': mask_urls_in(str(e))})
             return
         if new_keys:
             self.user_keys = new_keys
@@ -197,7 +199,7 @@ class Watcher:
                 with lock:
                     self.chain_reorgs[event.slot] = event
         except Exception as e:  # pylint: disable=broad-except
-            logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
+            logger.error({'msg': 'Error while listening chain reorg events', 'exception': mask_urls_in(str(e))})
 
     @cached_property
     def valid_withdrawal_addresses(self):
