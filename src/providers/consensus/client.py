@@ -49,8 +49,8 @@ class ConsensusClient(HTTPProvider):
     API_GET_BLOCK_ROOT = 'eth/v1/beacon/blocks/{}/root'
     API_GET_BLOCK_HEADER = 'eth/v1/beacon/headers/{}'
     API_GET_BLOCK_DETAILS = 'eth/v2/beacon/blocks/{}'
-    # Gloas (EIP-7732). The path is not settled in beacon-APIs yet, keep it in one place
-    API_GET_EXECUTION_PAYLOAD_ENVELOPE = 'eth/v1/beacon/blocks/{}/execution_payload_envelope'
+    # Gloas (EIP-7732), `getSignedExecutionPayloadEnvelope` in beacon-APIs
+    API_GET_EXECUTION_PAYLOAD_ENVELOPE = 'eth/v1/beacon/execution_payload_envelopes/{}'
     API_GET_VALIDATORS = 'eth/v1/beacon/states/{}/validators'
     API_GET_PENDING_CONSOLIDATIONS = 'eth/v1/beacon/states/{}/pending_consolidations'
     API_GET_SPEC = 'eth/v1/config/spec'
@@ -133,6 +133,8 @@ class ConsensusClient(HTTPProvider):
         self, state_id: Union[SlotNumber, BlockRoot, LiteralState]
     ) -> Optional[ExecutionPayloadEnvelope]:
         """
+        Spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getSignedExecutionPayloadEnvelope
+
         Execution payload revealed for the block since Gloas (EIP-7732).
 
         Returns None if the builder did not reveal the payload, so the block has no envelope at all.
