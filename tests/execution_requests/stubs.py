@@ -37,7 +37,6 @@ class ConsensusClientStub:
         self.get_validators = MagicMock(return_value=[])
         self.get_pending_consolidations = MagicMock(return_value=[])
         self.get_block_details = MagicMock(return_value=None)
-        self.get_execution_payload_envelope = MagicMock(return_value=None)
 
 
 class WatcherStub:

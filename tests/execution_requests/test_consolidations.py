@@ -10,11 +10,10 @@ from src.providers.consensus.typings import (
     ValidatorStatus,
 )
 from tests.execution_requests.helpers import (
-    GLOAS_EL_BLOCK_NUMBER,
     GLOAS_HEAD_SLOT,
     GLOAS_PARENT_SLOT,
     gen_random_pubkey,
-    create_gloas_head_with_envelope,
+    create_gloas_head_with_parent_requests,
     create_sample_block,
     create_validator,
     gen_random_address,
@@ -256,12 +255,12 @@ def test_consolidation_foreign_withdrawal_address_user_target_pubkey(
     assert block.message.slot in alert.annotations.description
 
 
-def test_gloas_alerts_are_built_from_the_parent_envelope(watcher: WatcherStub, withdrawal_address: str):
+def test_gloas_alerts_are_built_from_the_requests_of_the_parent_payload(watcher: WatcherStub, withdrawal_address: str):
     """After Glamsterdam (EIP-7732) the same requests must produce the same alerts"""
     random_source_pubkey = gen_random_pubkey()
     random_target_pubkey = gen_random_pubkey()
 
-    head = create_gloas_head_with_envelope(
+    head = create_gloas_head_with_parent_requests(
         watcher,
         consolidations=[
             ConsolidationRequest(
@@ -303,7 +302,7 @@ def test_gloas_validator_state_is_read_at_the_state_the_requests_were_applied_to
     the head. Reading the state of the parent instead would report every accepted consolidation as
     invalid and rejected.
     """
-    head = create_gloas_head_with_envelope(
+    head = create_gloas_head_with_parent_requests(
         watcher,
         consolidations=[
             ConsolidationRequest(
@@ -337,14 +336,15 @@ def test_gloas_validator_state_is_read_at_the_state_the_requests_were_applied_to
     assert not any(name.startswith('HeadWatcherConsolidationCLRejected') for name in alert_names)
 
 
-def test_gloas_vebo_lookup_uses_the_el_block_number_of_the_parent_envelope(
+def test_gloas_vebo_lookup_uses_the_el_block_number_the_state_has(
     user_validator_1: TestValidator,
     user_validator_2: TestValidator,
     watcher: WatcherStub,
     withdrawal_address: str,
     monkeypatch,
 ):
-    head = create_gloas_head_with_envelope(
+    """The payload the state already has is named by the parent block hash of the bid of the head"""
+    head = create_gloas_head_with_parent_requests(
         watcher,
         consolidations=[
             ConsolidationRequest(
@@ -364,6 +364,8 @@ def test_gloas_vebo_lookup_uses_the_el_block_number_of_the_parent_envelope(
     watcher.consensus.get_pending_consolidations = MagicMock(
         return_value=[PendingConsolidation(source_index='1', target_index='2')]
     )
+    watcher.execution = MagicMock()
+    watcher.execution.eth.get_block = MagicMock(return_value=MagicMock(number=31))
 
     lookup = MagicMock(side_effect=lambda _watcher, _el_block_number, exits_info: exits_info)
     monkeypatch.setattr('src.handlers.consolidation.get_last_requested_validator_exit_indexes', lookup)
@@ -373,12 +375,16 @@ def test_gloas_vebo_lookup_uses_the_el_block_number_of_the_parent_envelope(
     task = handler.handle(watcher, head)
     task.result()
 
-    assert lookup.call_args.args[1] == int(GLOAS_EL_BLOCK_NUMBER)
+    assert lookup.call_args.args[1] == 31
+    assert (
+        watcher.execution.eth.get_block.call_args.args[0]
+        == head.message.body.signed_execution_payload_bid.message.parent_block_hash
+    )
 
 
 def test_gloas_not_revealed_parent_payload_produces_no_alerts(watcher: WatcherStub, withdrawal_address: str):
     """The head is built on the branch without the parent payload, so its requests were not applied"""
-    head = create_gloas_head_with_envelope(
+    head = create_gloas_head_with_parent_requests(
         watcher,
         consolidations=[
             ConsolidationRequest(
@@ -396,11 +402,11 @@ def test_gloas_not_revealed_parent_payload_produces_no_alerts(watcher: WatcherSt
     task.result()
 
     assert len(watcher.alertmanager.sent_alerts) == 0
-    watcher.consensus.get_execution_payload_envelope.assert_not_called()
 
 
-def test_gloas_unreadable_envelope_produces_no_alerts(watcher: WatcherStub, withdrawal_address: str):
-    head = create_gloas_head_with_envelope(
+def test_gloas_alerts_survive_a_parent_block_that_can_not_be_read(watcher: WatcherStub, withdrawal_address: str):
+    """The requests are in the head block itself, so a failed lookup of the parent costs the slot only"""
+    head = create_gloas_head_with_parent_requests(
         watcher,
         consolidations=[
             ConsolidationRequest(
@@ -410,14 +416,15 @@ def test_gloas_unreadable_envelope_produces_no_alerts(watcher: WatcherStub, with
             )
         ],
     )
-    watcher.consensus.get_execution_payload_envelope = MagicMock(return_value=None)
+    watcher.consensus.get_block_details = MagicMock(side_effect=ConnectionError('boom'))
 
     handler = ConsolidationHandler()
 
     task = handler.handle(watcher, head)
     task.result()
 
-    assert len(watcher.alertmanager.sent_alerts) == 0
+    alert_names = [alert.labels.alertname for alert in watcher.alertmanager.sent_alerts]
+    assert any(name.startswith('HeadWatcherConsolidationSourceWithdrawalAddress') for name in alert_names)
 
 
 def test_absence_of_alerts_on_foreign_validators(watcher: WatcherStub):

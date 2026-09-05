@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 from src.keys_source.keys_api_source import KeysApiSource
 from src.providers.consensus.client import ConsensusClient
-from src.providers.consensus.typings import BlockDetailsResponse, ExecutionPayloadEnvelope
+from src.providers.consensus.typings import BlockDetailsResponse
 from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
 
 PARENT_ROOT = '0x924057843cd2718a918a1e354c0eb111b15f471319195ed9eeb45e7bf2dae3a7'
@@ -118,20 +118,6 @@ def test_fork_version_is_empty_when_it_is_not_reported():
     client.get = MagicMock(return_value=(block_data(INLINE_PAYLOAD_AND_REQUESTS), {}))
 
     assert client.get_block_details('head').version == ''
-
-
-def test_execution_payload_envelope_is_parsed():
-    envelope = ExecutionPayloadEnvelope.from_response(
-        payload={'block_number': '31', 'block_hash': PAYLOAD_BLOCK_HASH, 'transactions': []},
-        execution_requests={'deposits': [], 'withdrawals': [], 'consolidations': [CONSOLIDATION]},
-        beacon_block_root=PARENT_ROOT,
-        builder_index='7',
-        unknown_field='1',  # not modelled, has to be ignored
-    )
-
-    assert envelope.payload.block_number == '31'
-    assert envelope.beacon_block_root == PARENT_ROOT
-    assert [c.target_pubkey for c in envelope.execution_requests.consolidations] == [TARGET_PUBKEY]
 
 
 def test_vebo_exit_requests_lookup_is_skipped_without_el_block_number():

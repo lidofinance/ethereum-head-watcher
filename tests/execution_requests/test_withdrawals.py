@@ -4,7 +4,7 @@ from src.providers.consensus.typings import WithdrawalRequest
 from tests.execution_requests.helpers import (
     GLOAS_HEAD_SLOT,
     GLOAS_PARENT_SLOT,
-    create_gloas_head_with_envelope,
+    create_gloas_head_with_parent_requests,
     create_sample_block,
     gen_random_address,
 )
@@ -142,12 +142,12 @@ def test_no_withdrawals_produce_no_alerts(watcher: WatcherStub):
     assert len(watcher.alertmanager.sent_alerts) == 0
 
 
-def test_gloas_alerts_are_built_from_the_parent_envelope(
+def test_gloas_alerts_are_built_from_the_requests_of_the_parent_payload(
     user_validator_1: TestValidator, watcher: WatcherStub, withdrawal_address: str
 ):
     """After Glamsterdam (EIP-7732) the same requests must produce the same alerts"""
     handler = ElTriggeredExitHandler()
-    head = create_gloas_head_with_envelope(
+    head = create_gloas_head_with_parent_requests(
         watcher,
         withdrawals=[
             WithdrawalRequest(source_address=withdrawal_address, validator_pubkey=user_validator_1.pubkey, amount='0')

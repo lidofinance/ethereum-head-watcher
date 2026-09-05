@@ -129,38 +129,20 @@ class ExecutionRequests(Nested, FromResponse):
 
 
 @dataclass
-class ExecutionPayloadEnvelope(Nested, FromResponse):
-    """
-    Execution payload revealed by the builder since Gloas (EIP-7732).
-
-    It carries the execution requests that used to be a part of the block body. The envelope of block
-    N is applied to the beacon state while block N+1 is being processed, so its requests affect the
-    state one block later than they are published (later still if the slots in between are empty).
-    """
-
-    payload: BlockExecutionPayload
-    execution_requests: ExecutionRequests
-    beacon_block_root: str = ''
-    builder_index: str = ''
-
-
-@dataclass
-class SignedExecutionPayloadEnvelope(Nested, FromResponse):
-    message: ExecutionPayloadEnvelope
-    signature: str = ''
-
-
-@dataclass
 class BlockBody(Nested, FromResponse):
     voluntary_exits: list[BlockVoluntaryExit]
     proposer_slashings: list
     attester_slashings: list
     # Up to Fulu the block body carries the execution payload and the execution requests inline.
-    # Since Gloas (EIP-7732) it commits to a payload bid instead, while the payload itself, together
-    # with the execution requests, is revealed by the builder in a separate envelope.
+    # Since Gloas (EIP-7732) it commits to a payload bid instead, while the payload itself is
+    # revealed by the builder in a separate envelope.
     execution_payload: Optional[BlockExecutionPayload] = None
     execution_requests: Optional[ExecutionRequests] = None
     signed_execution_payload_bid: Optional[SignedExecutionPayloadBid] = None
+    # Requests of the payload of the parent block, applied while this block is being processed.
+    # `process_parent_execution_payload` checks them against `execution_requests_root` of the bid of
+    # the parent, and has them empty when the payload of the parent was skipped.
+    parent_execution_requests: Optional[ExecutionRequests] = None
 
     @property
     def el_block_number(self) -> Optional[int]:

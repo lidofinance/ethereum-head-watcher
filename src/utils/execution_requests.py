@@ -6,7 +6,6 @@ from typing import Optional
 from src.providers.consensus.typings import (
     BlockDetailsResponse,
     ConsolidationRequest,
-    ExecutionPayloadEnvelope,
     ExecutionRequests,
     FullBlockInfo,
     WithdrawalRequest,
@@ -17,14 +16,12 @@ logger = logging.getLogger()
 
 
 class ExecutionRequestsSource(StrEnum):
-    # Up to Fulu the requests are a part of the block body
+    # Up to Fulu the requests are a part of the block body and are applied within the same slot
     BLOCK = 'block'
-    # Since Gloas (EIP-7732) they come with the payload envelope of the parent block
-    ENVELOPE = 'envelope'
+    # Since Gloas (EIP-7732) the block carries the requests of the payload of its parent
+    PARENT_BLOCK = 'parent_block'
     # No payload was applied while the head block was being processed, so there is nothing to check
     NOTHING_APPLIED = 'nothing_applied'
-    # A payload was applied but its envelope could not be read: monitoring has a gap
-    UNAVAILABLE = 'unavailable'
 
 
 @dataclass
@@ -33,10 +30,10 @@ class ExecutionRequestsContext:
     Execution requests applied to the beacon state while the head block was being processed.
 
     Up to Fulu a block carries its requests inline and they are applied within the same slot, so
-    `request_slot` and `state_slot` are equal. Since Gloas (EIP-7732) the requests are revealed in
-    the payload envelope of the parent block and are applied by `apply_parent_execution_payload`
-    while the head block is being processed: they were published in `request_slot` (the parent slot)
-    but are only observable in the state of `state_slot` (the head slot).
+    `request_slot` and `state_slot` are equal. Since Gloas (EIP-7732) the requests belong to the
+    payload of the parent block and are applied by `apply_parent_execution_payload` while the head
+    block is being processed: they were published in `request_slot` (the parent slot) but are only
+    observable in the state of `state_slot` (the head slot).
 
     Reading validator states and pending consolidations by the state of `state_slot` is what keeps
     the checks meaningful: a consolidation moves its source validator to `active_exiting` and appends
@@ -82,16 +79,24 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
             el_block_number=body.el_block_number,
         )
 
-    # Since Gloas (EIP-7732) `apply_parent_execution_payload` applies the payload of the parent
-    # block, whatever slot it sits at. Following `parent_root` instead of counting slots back keeps
-    # missed slots and reorgs handled for free.
+    # Since Gloas (EIP-7732) the head block carries the requests of the payload of its parent in
+    # `parent_execution_requests`, and `process_parent_execution_payload` checks them against the
+    # commitment in the bid of the parent. So they take no request of their own, and no payload can
+    # be applied with its requests left unreadable.
+    #
+    # The parent block is still read, to name the slot the requests were published in and to tell a
+    # skipped payload from an applied one. Following `parent_root` instead of counting slots back
+    # keeps missed slots and reorgs handled for free.
     parent = _get_parent_block(watcher, head)
     if parent is None:
+        # Only the slot to name in an alert is lost, the requests themselves are at hand
+        logger.warning({'msg': f'Can not tell which slot published the requests applied at block [{head_slot}]'})
         return ExecutionRequestsContext(
-            source=ExecutionRequestsSource.UNAVAILABLE,
+            source=ExecutionRequestsSource.PARENT_BLOCK,
             request_slot=head_slot,
             state_slot=head_slot,
             state_root=head_state_root,
+            requests=body.parent_execution_requests,
             el_block_number=_applied_el_block_number(watcher, head),
         )
 
@@ -109,8 +114,8 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
 
     if not _parent_payload_applied(head, parent):
         # The builder did not reveal the payload in time, so the head is built on the branch without
-        # it and nothing was applied. The requests stay in the EL queues and will be included into
-        # one of the following payloads.
+        # it and nothing was applied. The head carries no requests then, and they stay in the EL
+        # queues to be included into one of the following payloads.
         logger.info(
             {'msg': f'Payload of block [{parent.message.slot}] was not applied at block [{head_slot}]'}
         )
@@ -122,42 +127,26 @@ def resolve_execution_requests(watcher, head: FullBlockInfo) -> ExecutionRequest
             el_block_number=_applied_el_block_number(watcher, head),
         )
 
-    envelope = _get_payload_envelope(watcher, head.message.parent_root)
-    if envelope is None:
-        logger.warning(
-            {
-                'msg': f'No execution payload envelope for block [{parent.message.slot}] applied at '
-                f'block [{head_slot}], its execution requests are not checked'
-            }
-        )
-        return ExecutionRequestsContext(
-            source=ExecutionRequestsSource.UNAVAILABLE,
-            request_slot=parent.message.slot,
-            state_slot=head_slot,
-            state_root=head_state_root,
-            el_block_number=_applied_el_block_number(watcher, head),
-        )
-
     return ExecutionRequestsContext(
-        source=ExecutionRequestsSource.ENVELOPE,
+        source=ExecutionRequestsSource.PARENT_BLOCK,
         request_slot=parent.message.slot,
         state_slot=head_slot,
         state_root=head_state_root,
-        requests=envelope.execution_requests,
-        el_block_number=int(envelope.payload.block_number),
+        requests=body.parent_execution_requests,
+        el_block_number=_applied_el_block_number(watcher, head),
     )
 
 
 def _applied_el_block_number(watcher, head: FullBlockInfo) -> Optional[int]:
     """
-    Number of the latest EL block applied to the state, resolved without the payload envelope.
+    Number of the latest EL block applied to the state.
 
     Whatever branch the head is built on, the parent block hash of its bid is the payload the state
     already has: the one of the parent block when it was revealed in time, the one of an earlier
     ancestor when it was not. So the hash identifies the EL block the contract calls of the handlers
-    have to be made against even when the envelope of the parent is not read.
+    have to be made against.
 
-    Costs one EL request, but only on the paths where the envelope did not give the number away.
+    Costs one EL request per head block.
     """
     bid = head.message.body.signed_execution_payload_bid
     if bid is None or not bid.message.parent_block_hash:
@@ -192,14 +181,6 @@ def _get_parent_block(watcher, head: FullBlockInfo) -> Optional[BlockDetailsResp
         return watcher.consensus.get_block_details(parent_root)
     except Exception as e:  # pylint: disable=broad-except
         logger.error({'msg': f'Can not get parent block [{parent_root}] for slot {head.message.slot}', 'exception': str(e)})
-        return None
-
-
-def _get_payload_envelope(watcher, block_root: str) -> Optional[ExecutionPayloadEnvelope]:
-    try:
-        return watcher.consensus.get_execution_payload_envelope(block_root)
-    except Exception as e:  # pylint: disable=broad-except
-        logger.error({'msg': f'Can not get payload envelope of block [{block_root}]', 'exception': str(e)})
         return None
 
 

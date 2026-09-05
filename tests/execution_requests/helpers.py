@@ -9,7 +9,6 @@ from src.providers.consensus.typings import (
     BlockBody,
     BlockExecutionPayload,
     ExecutionPayloadBid,
-    ExecutionPayloadEnvelope,
     ExecutionRequests,
     SignedExecutionPayloadBid,
     Validator,
@@ -22,7 +21,6 @@ from src.typings import StateRoot, BlockRoot
 
 GLOAS_PARENT_SLOT = '32'
 GLOAS_HEAD_SLOT = '33'
-GLOAS_EL_BLOCK_NUMBER = '31'
 
 
 def gen_random_pubkey():
@@ -112,17 +110,17 @@ def create_sample_gloas_block(
     return block
 
 
-def create_gloas_head_with_envelope(
+def create_gloas_head_with_parent_requests(
     watcher,
     withdrawals: list[WithdrawalRequest] = None,
     consolidations: list[ConsolidationRequest] = None,
 ) -> FullBlockInfo:
     """
-    Head block of the Glamsterdam (EIP-7732) shape whose parent revealed an envelope with the given
-    execution requests, with the consensus stub wired to serve that parent block and that envelope.
+    Head block of the Glamsterdam (EIP-7732) shape carrying the given requests of the payload of its
+    parent, with the consensus stub wired to serve that parent block.
 
-    The bid of the head is built on the payload of the parent, so the requests of the parent envelope
-    are applied while the head is being processed.
+    The bid of the head is built on the payload of the parent, so those requests are applied while
+    the head is being processed.
     """
     parent_payload_block_hash = random_hex(32)
 
@@ -130,18 +128,11 @@ def create_gloas_head_with_envelope(
     head = create_sample_gloas_block(
         slot=GLOAS_HEAD_SLOT, parent_root=parent.root, parent_payload_block_hash=parent_payload_block_hash
     )
-
-    envelope = ExecutionPayloadEnvelope(
-        payload=BlockExecutionPayload(block_number=GLOAS_EL_BLOCK_NUMBER, block_hash=parent_payload_block_hash),
-        execution_requests=ExecutionRequests(
-            deposits=[], withdrawals=withdrawals or [], consolidations=consolidations or []
-        ),
-        beacon_block_root=parent.root,
-        builder_index='7',
+    head.message.body.parent_execution_requests = ExecutionRequests(
+        deposits=[], withdrawals=withdrawals or [], consolidations=consolidations or []
     )
 
     watcher.consensus.get_block_details = MagicMock(return_value=parent)
-    watcher.consensus.get_execution_payload_envelope = MagicMock(return_value=envelope)
     return head
 
 
