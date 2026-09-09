@@ -1,8 +1,10 @@
 import logging
-import re
+import time
 from abc import ABC
+from contextlib import contextmanager
+from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Callable, Optional, Sequence, Tuple
+from typing import Callable, Iterator, Optional, Sequence, Tuple
 from urllib.parse import urljoin, urlparse
 
 from prometheus_client import Histogram
@@ -10,35 +12,19 @@ from requests import Response, Session
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
+from src.metrics.prometheus.rpc import RESULT_FAIL, RESULT_SUCCESS, observe_rpc_request
 from src.typings import InfinityType
+from src.utils.build import user_agent
+from src.utils.urls import mask_urls_in
 
 logger = logging.getLogger(__name__)
 
 
-URL_IN_TEXT = re.compile(r'https?://[^\s\'"]+')
+@dataclass
+class RpcObservation:
+    """The part of a round trip that is only known once the response is in hand."""
 
-
-def mask_url(url: str) -> str:
-    """
-    Host and scheme, nothing else.
-
-    Provider credentials live in the parts this drops: some providers carries the key as `?key=`, others carry it as a
-    path segment. The host is worth keeping — it says which provider failed — and is not a secret.
-    """
-    parsed = urlparse(url)
-    if not parsed.netloc:
-        return url
-    return f'{parsed.scheme}://{parsed.netloc}'
-
-
-def mask_urls_in(text: str) -> str:
-    """
-    The same masking for text that is not a URL but contains one.
-
-    Exception strings from `requests` embed the URL they failed on, so an endpoint error is how a provider key reaches
-    the log — from a line that never mentions a credential.
-    """
-    return URL_IN_TEXT.sub(lambda match: mask_url(match.group()), text)
+    status: int | None = None
 
 
 class NoHostsProvided(Exception):
@@ -69,6 +55,9 @@ class HTTPProvider(ABC):
     HTTP_REQUEST_RETRY_COUNT: int
     HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS: float
     HTTP_REQUEST_RETRY_STATUS_FORCELIST = [418, 429, 500, 502, 503, 504]
+    # Set by the subclasses that talk to a node. The Keys API and the Alertmanager are not blockchain
+    # RPC endpoints, so they stay out of the cross-service RPC metrics.
+    RPC_LAYER: str | None = None
 
     def __init__(self, hosts: list[str]):
         if not hosts:
@@ -91,9 +80,34 @@ class HTTPProvider(ABC):
     def _prepare_session(self, custom_retry_strategy: Retry | None) -> Session:
         adapter = HTTPAdapter(max_retries=custom_retry_strategy or self.default_retry_strategy)
         session = Session()
+        session.headers['User-Agent'] = user_agent()
         session.mount("https://", adapter)
         session.mount("http://", adapter)
         return session
+
+    @contextmanager
+    def _rpc_observation(self, host: str, method: str) -> Iterator[RpcObservation]:
+        """
+        Report one round trip to a node in the cross-service RPC metrics, however the call ends.
+
+        An exception leaving the block is the failure; the status, when there is one, comes back on the observation.
+        """
+        observation = RpcObservation()
+        started = time.monotonic()
+        result = RESULT_FAIL
+        try:
+            yield observation
+            result = RESULT_SUCCESS
+        finally:
+            if self.RPC_LAYER is not None:
+                observe_rpc_request(
+                    layer=self.RPC_LAYER,
+                    provider_url=host,
+                    method=method,
+                    duration=time.monotonic() - started,
+                    status=observation.status,
+                    result=result,
+                )
 
     def get(
         self,
@@ -242,7 +256,7 @@ class HTTPProvider(ABC):
         """
         complete_endpoint = endpoint.format(*path_params) if path_params else endpoint
 
-        with self.PROMETHEUS_HISTOGRAM.time() as t:
+        with self.PROMETHEUS_HISTOGRAM.time() as t, self._rpc_observation(host, endpoint) as observed:
             try:
                 response = self._prepare_session(retry_strategy).get(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
@@ -260,6 +274,7 @@ class HTTPProvider(ABC):
                 )
                 raise error
 
+            observed.status = response.status_code
             t.labels(
                 endpoint=endpoint,
                 code=response.status_code,
@@ -288,7 +303,7 @@ class HTTPProvider(ABC):
         """
         complete_endpoint = endpoint.format(*path_params) if path_params else endpoint
 
-        with self.PROMETHEUS_HISTOGRAM.time() as t:
+        with self.PROMETHEUS_HISTOGRAM.time() as t, self._rpc_observation(host, endpoint) as observed:
             try:
                 response = self._prepare_session(retry_strategy).get(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
@@ -304,6 +319,7 @@ class HTTPProvider(ABC):
                 )
                 raise error
 
+            observed.status = response.status_code
             t.labels(
                 endpoint=endpoint,
                 code=response.status_code,
@@ -347,7 +363,7 @@ class HTTPProvider(ABC):
         """
         complete_endpoint = endpoint.format(*path_params) if path_params else endpoint
 
-        with self.PROMETHEUS_HISTOGRAM.time() as t:
+        with self.PROMETHEUS_HISTOGRAM.time() as t, self._rpc_observation(host, endpoint) as observed:
             try:
                 response = self._prepare_session(retry_strategy).post(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
@@ -363,6 +379,7 @@ class HTTPProvider(ABC):
                 )
                 raise error
 
+            observed.status = response.status_code
             t.labels(
                 endpoint=endpoint,
                 code=response.status_code,
