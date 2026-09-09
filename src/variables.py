@@ -1,7 +1,10 @@
 import json
 import os
+import sys
+from types import ModuleType
 
 from src.secrets import DEFAULT_POLL_INTERVAL_IN_SECONDS, read_secrets_file
+from src.utils.urls import mask_url, register_credential_urls
 
 # Where the OpenBao agent writes the secrets file, and how often it is re-read. Absent file means every setting comes
 # from the environment. See src/secrets.py.
@@ -47,6 +50,10 @@ CONSENSUS_CLIENT_URI = setting('CONSENSUS_CLIENT_URI').split(',')
 EXECUTION_CLIENT_URI = setting('EXECUTION_CLIENT_URI').split(',')
 KEYS_API_URI = setting('KEYS_API_URI').split(',')
 ALERTMANAGER_URI = setting('ALERTMANAGER_URI').split(',')
+
+# Here rather than in main(): this module is imported before logging is configured, and anything logged in between
+# would otherwise print a credential the formatter does not yet know about.
+register_credential_urls(CONSENSUS_CLIENT_URI, EXECUTION_CLIENT_URI, KEYS_API_URI, ALERTMANAGER_URI)
 
 NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
 
@@ -98,6 +105,28 @@ HEALTHCHECK_SERVER_PORT = int(os.getenv('HEALTHCHECK_SERVER_PORT', 9010))
 HEALTHCHECK_SERVER_HOST = os.getenv('HEALTHCHECK_SERVER_HOST', '0.0.0.0')
 
 MAX_CYCLE_LIFETIME_IN_SECONDS = int(os.getenv("MAX_CYCLE_LIFETIME_IN_SECONDS", 3000))
+
+
+# The settings whose values carry provider credentials. An explicit list rather than a name pattern: KEYS_SOURCE,
+# KEYS_FILE_PATH and KEYS_API_URI all read as secrets to a substring rule, and none of the first two is one.
+_CREDENTIAL_BEARING_SETTINGS = ('CONSENSUS_CLIENT_URI', 'EXECUTION_CLIENT_URI', 'KEYS_API_URI', 'ALERTMANAGER_URI')
+
+
+def effective_config() -> dict[str, str]:
+    """
+    Every setting this process is running with, safe to log.
+
+    The endpoint lists are reduced to scheme and host per entry — the provider stays readable, the key does not.
+    """
+    config = {}
+    for name, value in vars(sys.modules[__name__]).items():
+        if name.startswith('_') or not name.isupper() or callable(value) or isinstance(value, ModuleType):
+            continue
+        if name in _CREDENTIAL_BEARING_SETTINGS:
+            config[name] = ', '.join(mask_url(entry) for entry in value)
+        else:
+            config[name] = str(value)
+    return dict(sorted(config.items()))
 
 
 def check_uri_required_variables():
