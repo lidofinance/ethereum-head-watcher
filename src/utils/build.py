@@ -1,10 +1,17 @@
 import json
 import logging
 import os
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
 UNKNOWN_BUILD_INFO = {"version": "unknown", "branch": "unknown", "commit": "unknown"}
+
+
+@lru_cache(maxsize=1)
+def user_agent() -> str:
+    """How this application identifies itself to the endpoints it calls."""
+    return f"ethereum-head-watcher/{get_build_info().get('version', 'unknown')}"
 
 
 def get_build_info() -> dict:

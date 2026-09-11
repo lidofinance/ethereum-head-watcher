@@ -3,7 +3,7 @@ Provider keys live inside endpoint URLs, and endpoint URLs reach the log through
 anything that looks like a credential. These are the shapes our providers use.
 """
 
-from src.providers.http_provider import mask_url, mask_urls_in
+from src.utils.urls import mask_url, mask_urls_in
 
 
 def test_query_string_key_is_dropped():

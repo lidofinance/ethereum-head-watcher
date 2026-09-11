@@ -69,11 +69,14 @@ class BeaconNodeFake:
         head_slot: int | None = None,
         validators: dict[str, str] | None = None,
         bodies: dict[int, dict] | None = None,
+        chain_id: int = 1,
     ):
         self.head_slot = head_slot if head_slot is not None else current_slot()
         self.validators = validators or {}
         self.bodies = bodies or {}
+        self.chain_id = chain_id
         self.requests: Counter = Counter()
+        self.user_agents: list[str] = []
         self._server = ThreadingHTTPServer(('127.0.0.1', 0), self._handler_class())
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
 
@@ -92,12 +95,14 @@ class BeaconNodeFake:
 
     def reset_counts(self):
         self.requests.clear()
+        self.user_agents.clear()
 
     def _handler_class(self):
         fake = self
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):  # noqa: N802 - BaseHTTPRequestHandler's spelling
+                fake.user_agents.append(self.headers.get('User-Agent', ''))
                 payload = fake.respond_to(urlparse(self.path).path)
                 if payload is None:
                     self.send_response(404)
@@ -125,6 +130,16 @@ class BeaconNodeFake:
                     'genesis_time': str(GENESIS_TIME),
                     'genesis_validators_root': '0x' + '11' * 32,
                     'genesis_fork_version': '0x00000000',
+                }
+            }
+        if path == '/eth/v1/config/spec':
+            self.requests['config/spec'] += 1
+            return {
+                'data': {
+                    'DEPOSIT_CHAIN_ID': str(self.chain_id),
+                    'SLOTS_PER_EPOCH': '32',
+                    'SECONDS_PER_SLOT': str(SECONDS_PER_SLOT),
+                    'DEPOSIT_CONTRACT_ADDRESS': '0x' + '00' * 20,
                 }
             }
         if path.startswith('/eth/v1/beacon/headers/'):

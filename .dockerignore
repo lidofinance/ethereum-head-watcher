@@ -1,0 +1,29 @@
+# Everything the runtime image has no use for. build-info.json and assets/ are deliberately absent:
+# the image writes the first from build args and reads the ABIs in the second at startup.
+.git
+.github
+.gitignore
+.dockerignore
+.hadolint.yaml
+Dockerfile
+renovate.json
+
+.env
+.env.*
+
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+.pytest_cache
+.mypy_cache
+*.log
+
+tests
+docker-compose.yml
+docker/alertmanager
+docker/alertmanager-discord
+docker/prometheus
+CHANGELOG.md
+README.md

@@ -7,6 +7,7 @@ from urllib3 import Retry
 
 from src.metrics.logging import logging
 from src.metrics.prometheus.basic import CL_REQUESTS_DURATION
+from src.metrics.prometheus.rpc import LAYER_CL
 from src.providers.consensus.typings import (
     BeaconSpecResponse,
     BlockDetailsResponse,
@@ -40,6 +41,7 @@ class ConsensusClient(HTTPProvider):
     """
 
     PROMETHEUS_HISTOGRAM = CL_REQUESTS_DURATION
+    RPC_LAYER = LAYER_CL
 
     HTTP_REQUEST_TIMEOUT: float = CL_REQUEST_TIMEOUT
     HTTP_REQUEST_RETRY_COUNT = CL_REQUEST_RETRY_COUNT
@@ -60,6 +62,10 @@ class ConsensusClient(HTTPProvider):
         if not isinstance(data, dict):
             raise ValueError("Expected mapping response from getSpec")
         return BeaconSpecResponse.from_response(**data)
+
+    def get_deposit_chain_id(self) -> int:
+        """The chain this endpoint follows. Read once at startup — it cannot change under a running process."""
+        return int(self.get_config_spec().DEPOSIT_CHAIN_ID)
 
     def get_genesis(self):
         """

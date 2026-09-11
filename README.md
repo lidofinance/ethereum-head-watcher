@@ -49,6 +49,16 @@ changes is logged and counted as `status="not_applied"` — it keeps its startup
 `ethereum_head_watcher_secrets_file_mtime_seconds` reports the mtime of the file in force, or 0 when the configuration
 came from the environment.
 
+At startup the application logs every setting it is running with under `Effective configuration`. The four endpoint
+lists are reduced to scheme and host per entry, so the log says which provider each layer is pointed at without the key
+that follows it in the path or the query. The same masking is applied to every log line by the formatter, so an
+exception text that embeds an endpoint URL cannot leak one either.
+
+The formatter also redacts the configured endpoints' path, query and userinfo by value, wherever they appear. That is
+what covers the failure texts `requests` and `urllib3` produce, which name the request by its path alone — there is no
+scheme in them to match a URL on. The registry is extended on every rotation and never shrinks, so a key rotated out
+is still redacted from an exception text logged later.
+
 ## Application Env variables
 
 ---
@@ -214,6 +224,33 @@ You can see application metrics on `http://localhost:9000/metrics` endpoint
 The source of metrics:
  - src/metrics/prometheus/basic.py
  - src/metrics/prometheus/watcher.py
+ - src/metrics/prometheus/rpc.py
+
+### Blockchain RPC metrics
+
+Calls to a consensus or execution node are reported a second time in the shape every Lido service reports them, so one
+dashboard reads them all. These carry no `PROMETHEUS_PREFIX`:
+
+| Metric                       | Labels                                                                       |
+|------------------------------|------------------------------------------------------------------------------|
+| `http_rpc_requests_total`    | `network`, `layer`, `chain_id`, `provider`, `batched`, `response_code`, `result` |
+| `http_rpc_response_seconds`  | `network`, `layer`, `chain_id`, `provider`                                   |
+| `rpc_request_total`          | `network`, `layer`, `chain_id`, `provider`, `method`, `result`, `rpc_error_code` |
+
+`layer` is `cl` or `el`. `chain_id` is read once at startup — from the consensus spec and from `eth_chainId` — and
+reads `unknown` until it is. `provider` is the endpoint's last two DNS labels, or host and port when there are no two
+labels to cut to (an address, or a single-label in-cluster name). `method` is the beacon endpoint template on the
+consensus side and the JSON-RPC method on the execution side. `response_code` is aggregated to `2xx`, `4xx`, `5xx`, and
+is empty when the request never got a response.
+
+The Keys API and the Alertmanager are not blockchain RPC and are not reported here. The
+`ethereum_head_watcher_*_requests_duration` histograms are unchanged.
+
+### Build info
+
+`ethereum_head_watcher_build_info` comes from `build-info.json` at the working directory. The image writes that file
+from the `BUILD_VERSION`, `BUILD_BRANCH` and `BUILD_COMMIT` build arguments; a checkout has the placeholder file the
+release pipeline substitutes into.
 
 ### Healthcheck endpoints
 
