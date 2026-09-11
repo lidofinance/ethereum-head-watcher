@@ -65,9 +65,11 @@ def test_url_in_a_rendered_traceback_is_masked():
     error = ConnectionError(f'Max retries exceeded with url: {ENDPOINT}')
 
     rendered = render(make_record({'msg': 'failed'}, exc_info=(type(error), error, error.__traceback__)))
+    last_line = rendered['exc_info'].splitlines()[-1]
 
     assert 'SECRETKEYVALUE' not in rendered['exc_info']
-    assert 'https://provider.org' in rendered['exc_info']
+    # Whole line, not a substring: containment against a host reads as URL validation to the code scanner.
+    assert last_line == 'ConnectionError: Max retries exceeded with url: https://provider.org'
 
 
 def test_the_caller_s_message_dict_is_not_rewritten():
