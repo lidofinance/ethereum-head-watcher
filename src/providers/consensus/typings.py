@@ -7,14 +7,6 @@ from src.utils.dataclass import FromResponse, Nested
 
 
 @dataclass
-class BeaconSpecResponse(FromResponse):
-    DEPOSIT_CHAIN_ID: str
-    SLOTS_PER_EPOCH: str
-    SECONDS_PER_SLOT: str
-    DEPOSIT_CONTRACT_ADDRESS: str
-
-
-@dataclass
 class GenesisResponse(FromResponse):
     genesis_time: str
     genesis_validators_root: str

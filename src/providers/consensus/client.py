@@ -8,7 +8,6 @@ from urllib3 import Retry
 from src.metrics.logging import logging
 from src.metrics.prometheus.basic import CL_REQUESTS_DURATION
 from src.providers.consensus.typings import (
-    BeaconSpecResponse,
     BlockDetailsResponse,
     BlockHeaderResponseData,
     BlockRootResponse,
@@ -50,16 +49,8 @@ class ConsensusClient(HTTPProvider):
     API_GET_BLOCK_DETAILS = 'eth/v2/beacon/blocks/{}'
     API_GET_VALIDATORS = 'eth/v1/beacon/states/{}/validators'
     API_GET_PENDING_CONSOLIDATIONS = 'eth/v1/beacon/states/{}/pending_consolidations'
-    API_GET_SPEC = 'eth/v1/config/spec'
     API_GET_GENESIS = 'eth/v1/beacon/genesis'
     API_GET_EVENTS = 'eth/v1/events'
-
-    def get_config_spec(self):
-        """Spec: https://ethereum.github.io/beacon-APIs/#/Config/getSpec"""
-        data, _ = self.get(self.API_GET_SPEC)
-        if not isinstance(data, dict):
-            raise ValueError("Expected mapping response from getSpec")
-        return BeaconSpecResponse.from_response(**data)
 
     def get_genesis(self):
         """
