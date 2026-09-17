@@ -114,10 +114,9 @@ class ConsolidationHandler(WatcherHandler):
         self, watcher, block: FullBlockInfo, consolidations: list[ConsolidationRequest]
     ):
         slot = block.message.slot
-        state_root = block.message.state_root
         pubkeys = list({pk for c in consolidations for pk in (c.source_pubkey, c.target_pubkey)})
-        validators = watcher.consensus.get_validators(state_root, pubkeys)
-        pending_consolidations = watcher.consensus.get_pending_consolidations(state_root)
+        validators = watcher.consensus.get_validators(slot, pubkeys)
+        pending_consolidations = watcher.consensus.get_pending_consolidations(slot)
         self._update_last_requested_exit_indexes(watcher, block)
 
         all_exit_indexes = set().union(*self.last_requested_exit_indexes.values())
@@ -200,7 +199,7 @@ class ConsolidationHandler(WatcherHandler):
 
     def _send_withdrawals_address(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationSourceWithdrawalAddress", severity="critical")
-        summary = "**🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address**"
+        summary = "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address"
         self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_user_withdrawal_address_foreign_source_pubkey(
@@ -210,7 +209,7 @@ class ConsolidationHandler(WatcherHandler):
             name="HeadWatcherConsolidationUserWithdrawalAddressForeignSourcePubkey", severity="critical"
         )
         summary = (
-            "**🚨🚨🚨 Validator consolidation was requested for foreign source validator from Withdrawal Vault address**"
+            "🚨🚨🚨 Validator consolidation was requested for foreign source validator from Withdrawal Vault address"
         )
         self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
@@ -221,7 +220,7 @@ class ConsolidationHandler(WatcherHandler):
             name="HeadWatcherConsolidationUserWithdrawalAddressForeignTargetPubkey", severity="critical"
         )
         summary = (
-            "**🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault address to foreign target validator**"
+            "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault address to foreign target validator"
         )
         self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
@@ -229,7 +228,7 @@ class ConsolidationHandler(WatcherHandler):
         self, watcher, slot, consolidations: list[ConsolidationRequest]
     ):
         alert = CommonAlert(name="HeadWatcherConsolidationUserSourcePubkey", severity="info")
-        summary = "**⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)**"
+        summary = "⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)"
         self._send_alert(watcher, slot, alert, summary, consolidations)
 
     def _send_foreign_withdrawal_address_user_target_pubkey(
@@ -237,18 +236,18 @@ class ConsolidationHandler(WatcherHandler):
     ):
         alert = CommonAlert(name="HeadWatcherConsolidationUserTargetPubkey", severity="info")
         summary = (
-            "**⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)**"
+            "⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)"
         )
         self._send_alert(watcher, slot, alert, summary, consolidations)
 
     def _send_rejected(self, watcher, slot, consolidations: list[ConsolidationRequest]):
         alert = CommonAlert(name="HeadWatcherConsolidationCLRejected", severity="critical")
-        summary = "**🚨🚨🚨 Validator consolidation was rejected on CL**"
+        summary = "🚨🚨🚨 Validator consolidation was rejected on CL"
         self._send_alert(watcher, slot, alert, summary, consolidations, ADDITIONAL_ALERTMANAGER_LABELS)
 
     def _send_over_deposit(self, watcher, slot: str, consolidations: list[OverDepositConsolidation]):
         alert = CommonAlert(name="HeadWatcherConsolidationOverDeposit", severity="critical")
-        summary = "**⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2049 ETH**"
+        summary = "⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2049 ETH"
         description = '\n\n'.join(
             self._describe_over_deposit_consolidation(c, watcher.user_keys) for c in consolidations
         )
@@ -257,7 +256,7 @@ class ConsolidationHandler(WatcherHandler):
 
     def _send_invalid_status(self, watcher, slot: str, consolidations: list[InvalidStatusConsolidation]):
         alert = CommonAlert(name="HeadWatcherConsolidationInvalidStatus", severity="critical")
-        summary = "**⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)**"
+        summary = "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
         description = '\n\n'.join(
             self._describe_invalid_status_consolidation(c, watcher.user_keys) for c in consolidations
         )
@@ -266,7 +265,7 @@ class ConsolidationHandler(WatcherHandler):
 
     def _send_requested_to_exit(self, watcher, slot: str, consolidations: list[RequestedToExitConsolidation]):
         alert = CommonAlert(name="HeadWatcherConsolidationRequestedToExit", severity="critical")
-        summary = "**⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO**"
+        summary = "⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO"
         description = '\n\n'.join(
             self._describe_requested_to_exit_consolidation(c, watcher.user_keys) for c in consolidations
         )
@@ -290,7 +289,7 @@ class ConsolidationHandler(WatcherHandler):
     def _describe_consolidation(consolidation: ConsolidationRequest, keys):
         return '\n'.join(
             [
-                f'- Request source address: {consolidation.source_address}',
+                f'Request source address: {consolidation.source_address}',
                 f'Source: {validator_pubkey_link(consolidation.source_pubkey, keys)}',
                 f'Target: {validator_pubkey_link(consolidation.target_pubkey, keys)}',
             ]
@@ -300,7 +299,7 @@ class ConsolidationHandler(WatcherHandler):
     def _describe_over_deposit_consolidation(consolidation: OverDepositConsolidation, keys):
         return '\n'.join(
             [
-                f'- Request source address: {consolidation.source_address}',
+                f'Request source address: {consolidation.source_address}',
                 f'Source index: {consolidation.source_index}',
                 f'Source pubkey: {validator_pubkey_link(consolidation.source_pubkey, keys)}',
                 f'Source balance (gwei): {consolidation.source_balance}',
@@ -314,7 +313,7 @@ class ConsolidationHandler(WatcherHandler):
     def _describe_invalid_status_consolidation(consolidation: InvalidStatusConsolidation, keys):
         return '\n'.join(
             [
-                f'- Request source address: {consolidation.source_address}',
+                f'Request source address: {consolidation.source_address}',
                 f'Source index: {consolidation.source_index}',
                 f'Source pubkey: {validator_pubkey_link(consolidation.source_pubkey, keys)}',
                 f'Source status: {consolidation.source_status}',
@@ -330,7 +329,7 @@ class ConsolidationHandler(WatcherHandler):
     def _describe_requested_to_exit_consolidation(consolidation: RequestedToExitConsolidation, keys):
         return '\n'.join(
             [
-                f'- Request source address: {consolidation.source_address}',
+                f'Request source address: {consolidation.source_address}',
                 f'Source index: {consolidation.source_index}',
                 f'Source pubkey: {validator_pubkey_link(consolidation.source_pubkey, keys)}',
                 f'Target index: {consolidation.target_index}',

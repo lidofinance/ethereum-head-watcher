@@ -11,7 +11,6 @@ class Labels:
     alertname: str
     severity: str
     mentions: Optional[str] = None
-    slack_mentions: Optional[str] = None
 
 
 @dataclass
