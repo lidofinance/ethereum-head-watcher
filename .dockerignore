@@ -1,0 +1,17 @@
+.git
+.github
+.gitignore
+.env
+.env.*
+.venv
+.mypy_cache
+.pytest_cache
+tests
+assets
+docker
+docker-compose.yml
+CHANGELOG.md
+README.md
+LICENSE
+.hadolint.yaml
+renovate.json
