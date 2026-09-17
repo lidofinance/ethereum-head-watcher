@@ -1,3 +1,5 @@
+import signal
+
 from prometheus_client import start_http_server
 from web3.middleware import simple_cache_middleware
 
@@ -13,7 +15,13 @@ from src.keys_source.file_source import FileSource
 from src.keys_source.keys_api_source import KeysApiSource
 from src.metrics.healthcheck_server import start_pulse_server
 from src.metrics.logging import logging
-from src.metrics.prometheus.basic import BUILD_INFO
+from src.metrics.prometheus.basic import (
+    BUILD_INFO,
+    SECRETS_FILE_MTIME,
+    SECRETS_RELOADS,
+    Status,
+)
+from src.secrets import SecretsWatcher, read_secrets_file_mtime
 from src.utils.build import get_build_info
 from src.watcher import Watcher
 from src.web3py.extensions import FallbackProviderModule, LidoContracts
@@ -52,12 +60,110 @@ def build_handlers(enabled_handlers: list[str] | None = None) -> list[WatcherHan
     return handlers
 
 
+# The settings a rotation can be applied to while the watcher runs. Anything else in the file is
+# read at startup and only at startup.
+LIVE_APPLIED_SETTINGS = ('CONSENSUS_CLIENT_URI', 'EXECUTION_CLIENT_URI', 'KEYS_API_URI', 'ALERTMANAGER_URI')
+
+
+def unapplied_changes(values: dict[str, str], in_force: dict[str, str]) -> list[str]:
+    """
+    Keys the file changed that a live apply cannot reach.
+
+    Without this a rotation of, say, a locator address is indistinguishable from no rotation at all: the file is read,
+    the mtime is remembered, and the setting keeps its startup value forever.
+    """
+    return sorted(
+        key for key, value in values.items() if key not in LIVE_APPLIED_SETTINGS and in_force.get(key) != value
+    )
+
+
+def apply_rotated_secrets(values: dict[str, str], watcher: Watcher, in_force: dict[str, str]) -> list[str]:
+    """
+    Swap in endpoints from a rotated secrets file, without a restart. Returns what changed.
+
+    Restarting would re-read the whole validator set and key set, so the clients are re-pointed instead: each keeps its
+    endpoints in a list it walks per request. The execution layer needs a new provider, which leaves the Web3 instance,
+    its middlewares and its contracts in place.
+    """
+    changed = []
+
+    consensus_uri = _split(values.get('CONSENSUS_CLIENT_URI'))
+    if consensus_uri and consensus_uri != watcher.consensus.hosts:
+        watcher.consensus.hosts = consensus_uri
+        changed.append('CONSENSUS_CLIENT_URI')
+
+    alertmanager_uri = _split(values.get('ALERTMANAGER_URI'))
+    if alertmanager_uri and alertmanager_uri != watcher.alertmanager.hosts:
+        watcher.alertmanager.hosts = alertmanager_uri
+        changed.append('ALERTMANAGER_URI')
+
+    keys_api = getattr(watcher.keys_source, 'keys_api', None)
+    keys_api_uri = _split(values.get('KEYS_API_URI'))
+    if keys_api is not None and keys_api_uri and keys_api_uri != keys_api.hosts:
+        keys_api.hosts = keys_api_uri
+        changed.append('KEYS_API_URI')
+
+    execution_uri = _split(values.get('EXECUTION_CLIENT_URI'))
+    if watcher.execution is not None and execution_uri and execution_uri != variables.EXECUTION_CLIENT_URI:
+        # `Web3.provider` is read-only in web3 6.x; the manager's is the settable one. The middlewares (metrics, cache)
+        # live on the manager too, so they survive the swap, and the contracts hold a reference to the Web3 instance
+        # rather than to the provider.
+        watcher.execution.manager.provider = FallbackProviderModule(
+            execution_uri, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT}
+        )
+        variables.EXECUTION_CLIENT_URI = execution_uri
+        changed.append('EXECUTION_CLIENT_URI')
+
+    if changed:
+        logger.info({'msg': f'Applied rotated secrets: {", ".join(changed)}'})
+        SECRETS_RELOADS.labels(Status.SUCCESS.value).inc()
+
+    if not_applied := unapplied_changes(values, in_force):
+        logger.warning(
+            {
+                'msg': f'Rotated settings a restart is needed for: {", ".join(not_applied)}',
+                'applied_live': ', '.join(LIVE_APPLIED_SETTINGS),
+            }
+        )
+        SECRETS_RELOADS.labels(Status.NOT_APPLIED.value).inc()
+
+    in_force.clear()
+    in_force.update(values)
+    SECRETS_FILE_MTIME.set((read_secrets_file_mtime(variables.SECRETS_FILE_PATH) or 0) / 1e9)
+    return changed
+
+
+def _split(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [entry for entry in (part.strip() for part in value.split(',')) if entry]
+
+
+def install_signal_handlers():
+    """
+    Make SIGTERM and SIGHUP stop the watcher the way Ctrl-C does.
+
+    Python installs a disposition for SIGINT only, and as PID 1 the process gets no default action for the others, so
+    without this they are dropped and the container is killed instead of stopping. Routed onto SIGINT because the loop
+    already unwinds on KeyboardInterrupt.
+    """
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.default_int_handler)
+
+
 def main():
     handlers = build_handlers(variables.parse_enabled_handlers(variables.ENABLED_HANDLERS))
 
     BUILD_INFO.info(get_build_info())
 
     logger.info({'msg': 'Ethereum head watcher startup.'})
+
+    if variables.SECRETS_FILE_LOADED:
+        logger.info({'msg': f'Configuration: {variables.SECRETS_FILE_PATH} over the environment'})
+    else:
+        logger.info(
+            {'msg': f'Configuration: the environment (no secrets file at {variables.SECRETS_FILE_PATH})'}
+        )
 
     logger.info({'msg': f'Start healthcheck server for Docker container on port {variables.HEALTHCHECK_SERVER_PORT}'})
     start_pulse_server()
@@ -89,7 +195,25 @@ def main():
     if variables.DRY_RUN:
         logger.warning({'msg': 'Dry run mode enabled! No alerts will be sent.'})
 
-    Watcher(handlers, keys_source, web3).run()
+    watcher = Watcher(handlers, keys_source, web3)
+
+    in_force = variables.secrets_in_force()
+    SECRETS_FILE_MTIME.set((read_secrets_file_mtime(variables.SECRETS_FILE_PATH) or 0) / 1e9)
+
+    SecretsWatcher(
+        variables.SECRETS_FILE_PATH,
+        on_change=lambda values: apply_rotated_secrets(values, watcher, in_force),
+        interval=variables.SECRETS_POLL_INTERVAL_IN_SECONDS,
+        on_error=lambda: SECRETS_RELOADS.labels(Status.FAILURE.value).inc(),
+    ).start()
+
+    install_signal_handlers()
+
+    try:
+        watcher.run()
+    except KeyboardInterrupt:
+        # One line, so a shutdown on purpose is distinguishable from being killed.
+        logger.info({'msg': 'Shutting down on a termination signal'})
 
 
 if __name__ == "__main__":

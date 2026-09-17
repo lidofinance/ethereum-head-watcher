@@ -48,7 +48,7 @@ def test_consolidation_foreign_source_and_target_pubkey_from_user_withdrawal_add
     assert general_user_withdrawal_address_alert.labels.severity == 'critical'
     assert (
         general_user_withdrawal_address_alert.annotations.summary
-        == "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address"
+        == "**🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault source address**"
     )
     assert withdrawal_address in general_user_withdrawal_address_alert.annotations.description
     assert random_source_pubkey in general_user_withdrawal_address_alert.annotations.description
@@ -119,7 +119,7 @@ def test_consolidation_foreign_source_pubkey_from_user_withdrawal_address(
     assert foreign_source_alert.labels.severity == 'critical'
     assert (
         foreign_source_alert.annotations.summary
-        == "🚨🚨🚨 Validator consolidation was requested for foreign source validator from Withdrawal Vault address"
+        == "**🚨🚨🚨 Validator consolidation was requested for foreign source validator from Withdrawal Vault address**"
     )
     assert withdrawal_address in foreign_source_alert.annotations.description
     assert random_source_pubkey in foreign_source_alert.annotations.description
@@ -170,7 +170,7 @@ def test_consolidation_foreign_target_pubkey_from_user_withdrawal_address(
     assert foreign_target_alert.labels.severity == 'critical'
     assert (
         foreign_target_alert.annotations.summary
-        == "🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault address to foreign target validator"
+        == "**🚨🚨🚨 Validator consolidation was requested from Withdrawal Vault address to foreign target validator**"
     )
     assert withdrawal_address in foreign_target_alert.annotations.description
     assert user_validator_1.pubkey in foreign_target_alert.annotations.description
@@ -204,7 +204,7 @@ def test_consolidation_foreign_withdrawal_address_user_source_pubkey(
     assert alert.labels.severity == 'info'
     assert (
         alert.annotations.summary
-        == "⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)"
+        == "**⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)**"
     )
     assert random_source_address in alert.annotations.description
     assert user_validator_1.pubkey in alert.annotations.description
@@ -238,7 +238,7 @@ def test_consolidation_foreign_withdrawal_address_user_target_pubkey(
     assert alert.labels.severity == 'info'
     assert (
         alert.annotations.summary
-        == "⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)"
+        == "**⚠️⚠️⚠️ Someone attempts to consolidate their validators to our validators (not from Withdrawal Vault address)**"
     )
     assert random_source_address in alert.annotations.description
     assert random_source_pubkey in alert.annotations.description
@@ -352,7 +352,7 @@ def test_over_deposit_consolidation(
     assert over_deposit_consolidation_alert.labels.severity == 'critical'
     assert (
         over_deposit_consolidation_alert.annotations.summary
-        == "⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2049 ETH"
+        == "**⚠️⚠️⚠️ Total balance of source and target validators during consolidation is greater than 2049 ETH**"
     )
     assert withdrawal_address in over_deposit_consolidation_alert.annotations.description
     assert source_validator.index in over_deposit_consolidation_alert.annotations.description
@@ -453,7 +453,7 @@ def test_invalid_source_consolidation_status(
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
         invalid_status_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
+        == "**⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)**"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -556,7 +556,7 @@ def test_invalid_target_consolidation_status(
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
         invalid_status_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
+        == "**⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)**"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -659,7 +659,7 @@ def test_slashed_source_consolidation(
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
         invalid_status_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
+        == "**⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)**"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -762,7 +762,7 @@ def test_slashed_target_consolidation(
     assert invalid_status_alert.labels.severity == 'critical'
     assert (
         invalid_status_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)"
+        == "**⚠️⚠️⚠️ Attempt to consolidate validators in unexpected status (source must be active_exiting, target must be active_ongoing)**"
     )
     assert withdrawal_address in invalid_status_alert.annotations.description
     assert source_validator.index in invalid_status_alert.annotations.description
@@ -873,7 +873,7 @@ def test_rejected_consolidation(
     )
     assert rejected_consolidation_alert is not None
     assert rejected_consolidation_alert.labels.severity == 'critical'
-    assert rejected_consolidation_alert.annotations.summary == "🚨🚨🚨 Validator consolidation was rejected on CL"
+    assert rejected_consolidation_alert.annotations.summary == "**🚨🚨🚨 Validator consolidation was rejected on CL**"
     assert withdrawal_address in rejected_consolidation_alert.annotations.description
     assert user_validator_1.pubkey in rejected_consolidation_alert.annotations.description
     assert user_validator_2.pubkey in rejected_consolidation_alert.annotations.description
@@ -1049,7 +1049,7 @@ def test_consolidation_for_source_requested_to_exit_by_vebo(
     assert requested_to_exit_consolidation_alert.labels.severity == 'critical'
     assert (
         requested_to_exit_consolidation_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO"
+        == "**⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO**"
     )
     assert withdrawal_address in requested_to_exit_consolidation_alert.annotations.description
     assert source_validator.index in requested_to_exit_consolidation_alert.annotations.description
@@ -1144,7 +1144,7 @@ def test_consolidation_for_target_requested_to_exit_by_vebo(
     assert requested_to_exit_consolidation_alert.labels.severity == 'critical'
     assert (
         requested_to_exit_consolidation_alert.annotations.summary
-        == "⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO"
+        == "**⚠️⚠️⚠️ Attempt to consolidate validators that were requested to exit by VEBO**"
     )
     assert withdrawal_address in requested_to_exit_consolidation_alert.annotations.description
     assert source_validator.index in requested_to_exit_consolidation_alert.annotations.description
@@ -1183,7 +1183,7 @@ def test_group_similar_alerts(user_validator_1: TestValidator, watcher: WatcherS
     assert alert.labels.severity == 'info'
     assert (
         alert.annotations.summary
-        == "⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)"
+        == "**⚠️⚠️⚠️ Consolidation was requested for our validators (not from Withdrawal Vault address)**"
     )
     assert random_source_address in alert.annotations.description
     assert user_validator_1.pubkey in alert.annotations.description

@@ -1,3 +1,5 @@
+import signal
+
 import pytest
 
 from src.handlers.consolidation import ConsolidationHandler
@@ -5,7 +7,7 @@ from src.handlers.el_triggered_exit import ElTriggeredExitHandler
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
-from src.main import build_handlers
+from src.main import build_handlers, install_signal_handlers
 from src.variables import parse_enabled_handlers
 
 
@@ -63,3 +65,21 @@ def test_build_handlers_rejects_configuring_mandatory_fork_handler():
 def test_build_handlers_rejects_duplicate_handler():
     with pytest.raises(ValueError, match='Duplicate handlers in ENABLED_HANDLERS: exits'):
         build_handlers(['exits', 'exits'])
+
+
+def test_install_signal_handlers_routes_termination_onto_the_sigint_path():
+    """Without a handler the signal is dropped, and the container is killed instead of stopping."""
+    previous = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGHUP)}
+    try:
+        install_signal_handlers()
+        for sig in (signal.SIGTERM, signal.SIGHUP):
+            assert signal.getsignal(sig) is signal.default_int_handler
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+
+
+def test_default_int_handler_raises_keyboard_interrupt():
+    """Why the loop needs no stop flag: `except Exception` does not catch KeyboardInterrupt."""
+    with pytest.raises(KeyboardInterrupt):
+        signal.default_int_handler(signal.SIGTERM, None)

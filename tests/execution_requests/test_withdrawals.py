@@ -26,7 +26,7 @@ def test_user_validator_full_withdrawal_from_valid_source_triggers_info_alert(
     alert = watcher.alertmanager.sent_alerts[0]
     assert alert.labels.alertname.startswith('HeadWatcherFullELWithdrawalObserved')
     assert alert.labels.severity == 'info'
-    assert alert.annotations.summary == "⚠️ Full withdrawal (exit) requested for our validator(s)"
+    assert alert.annotations.summary == "**⚠️ Full withdrawal (exit) requested for our validator(s)**"
     assert user_validator_1.pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
     assert '0' in alert.annotations.description
@@ -51,7 +51,10 @@ def test_user_validator_full_withdrawal_unknown_source_triggers_alert(
     alert = watcher.alertmanager.sent_alerts[0]
     assert alert.labels.alertname.startswith('HeadWatcherELRequestFromUnknownSourceForOurValidators')
     assert alert.labels.severity == 'info'
-    assert alert.annotations.summary == "⚠️ Withdrawal request from unknown source address for our validator(s) observed"
+    assert (
+        alert.annotations.summary
+        == "**⚠️ Withdrawal request from unknown source address for our validator(s) observed**"
+    )
     assert user_validator_1.pubkey in alert.annotations.description
     assert random_address in alert.annotations.description
     assert '0' in alert.annotations.description
@@ -75,7 +78,7 @@ def test_user_validator_partial_withdrawal_from_valid_source(
     alert = watcher.alertmanager.sent_alerts[0]
     assert alert.labels.alertname.startswith('HeadWatcherPartialELWithdrawalObserved')
     assert alert.labels.severity == 'critical'
-    assert alert.annotations.summary == "🚨 Partial withdrawal observed for our validator(s) (unsupported)"
+    assert alert.annotations.summary == "**🚨 Partial withdrawal observed for our validator(s) (unsupported)**"
     assert user_validator_1.pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
     assert '32' in alert.annotations.description
@@ -114,7 +117,8 @@ def test_from_user_withdrawal_address_for_foreign_validator_triggers_alert(
     assert alert.labels.alertname.startswith('HeadWatcherELRequestFromOurSourceForForeignValidators')
     assert alert.labels.severity == 'critical'
     assert (
-        alert.annotations.summary == "🚨️ Withdrawal request from our source address for non-user validator(s) observed"
+        alert.annotations.summary
+        == "**🚨️ Withdrawal request from our source address for non-user validator(s) observed**"
     )
     assert validator.pubkey in alert.annotations.description
     assert withdrawal_address in alert.annotations.description
@@ -202,7 +206,7 @@ def test_group_similar_partial_withdrawal_alerts():
     alert = watcher.alertmanager.sent_alerts[0]
     assert alert.labels.alertname.startswith('HeadWatcherPartialELWithdrawalObserved')
     assert alert.labels.severity == 'critical'
-    assert alert.annotations.summary == "🚨 Partial withdrawal observed for our validator(s) (unsupported)"
+    assert alert.annotations.summary == "**🚨 Partial withdrawal observed for our validator(s) (unsupported)**"
     assert validator1.pubkey in alert.annotations.description
     assert validator2.pubkey in alert.annotations.description
     assert 'test operator 1' in alert.annotations.description

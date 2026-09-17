@@ -30,8 +30,15 @@ jobs:
         run: |
           poetry install --no-interaction --with=dev
 
-      - name: Test with pytest
-        run: poetry run pytest tests
+      # Two steps rather than one run, so a provider being slow is distinguishable at a glance
+      # from the watcher deciding something wrong. Both are required.
+      - name: Test with pytest (no providers needed)
+        run: poetry run pytest tests -m "not integration"
+        env:
+          DRY_RUN: true
+
+      - name: Test with pytest (replays against live providers)
+        run: poetry run pytest tests -m integration
         env:
           CONSENSUS_CLIENT_URI: ${{ secrets.CL_API_URL }}
           EXECUTION_CLIENT_URI: ${{ secrets.EXECUTION_API_URL }}

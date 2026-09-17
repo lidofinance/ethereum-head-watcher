@@ -141,7 +141,7 @@ class ExitsHandler(WatcherHandler):
 
                 for operator_exits in by_operator_exits.values():
                     total_exits += len(operator_exits.validator_indexes)
-                    description += f'\n{operator_exits.module}#{operator_exits.operator} - '
+                    description += f'\n- {operator_exits.module}#{operator_exits.operator} - '
                     description += (
                         "["
                         + ', '.join(
@@ -156,13 +156,13 @@ class ExitsHandler(WatcherHandler):
                     f'\n\nslot: [{block.message.slot}](https://{NETWORK_NAME}.beaconcha.in/slot/{block.message.slot})'
                 )
                 alert = CommonAlert(name="HeadWatcherUserUnexpectedExit", severity="critical")
-                summary = f'🚨🚨🚨 {total_exits} Our validators were unexpectedly exited! 🚨🚨🚨'
+                summary = f'**🚨🚨🚨 {total_exits} Our validators were unexpectedly exited! 🚨🚨🚨**'
                 self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
             if by_operator_consolidations:
                 description = ''
                 for operator_exits in by_operator_consolidations.values():
-                    description += f'\n{operator_exits.module}#{operator_exits.operator} - '
+                    description += f'\n- {operator_exits.module}#{operator_exits.operator} - '
                     description += (
                         "["
                         + ', '.join(
@@ -178,12 +178,12 @@ class ExitsHandler(WatcherHandler):
                 )
                 alert = CommonAlert(name="HeadWatcherUserExitForRequestedConsolidation", severity="critical")
                 summary = (
-                    "🚨🚨🚨 Voluntary exit of validators for which consolidation was requested in ConsolidationBus"
+                    "**🚨🚨🚨 Voluntary exit of validators for which consolidation was requested in ConsolidationBus**"
                 )
                 self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
         if unknown_exits:
-            summary = f'🚨 {len(unknown_exits)} unknown validators were exited!'
+            summary = f'**🚨 {len(unknown_exits)} unknown validators were exited!**'
             description = (
                 "["
                 + ', '.join(
