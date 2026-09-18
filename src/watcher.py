@@ -14,6 +14,7 @@ from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
 from src.handlers.handler import WatcherHandler
 from src.keys_source.base_source import BaseSource, NamedKey
+from src.metrics.healthcheck_server import pulse
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
     KEYS_SOURCE_SLOT_NUMBER,
@@ -22,19 +23,19 @@ from src.metrics.prometheus.watcher import (
 )
 from src.providers.alertmanager.client import AlertmanagerClient
 from src.providers.consensus.client import ConsensusClient
-from src.providers.consensus.typings import (
-    BlockHeaderResponseData,
-    ChainReorgEvent,
-    FullBlockInfo,
-)
+from src.providers.consensus.typings import ChainReorgEvent, FullBlockInfo
 from src.providers.http_provider import NotOkResponse
 from src.utils.decorators import thread_as_daemon
+from src.utils.execution_requests import (
+    ExecutionRequestsContext,
+    resolve_execution_requests,
+)
 from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 from src.web3py.typings import Web3
 
 logger = logging.getLogger()
 
-KEEP_MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
+KEEP_MAX_HANDLED_BLOCKS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
 
 
 class Watcher:
@@ -53,8 +54,9 @@ class Watcher:
         self.user_keys: dict[str, NamedKey] = {}
         self.indexed_validators_keys: dict[str, str] = {}
         self.chain_reorgs: dict[str, ChainReorgEvent] = {}
-        self.handled_headers: list[BlockHeaderResponseData] = []
+        self.handled_blocks: list[FullBlockInfo] = []
         self.disable_unexpected_exit_alerts: list[str] = variables.DISABLE_UNEXPECTED_EXIT_ALERTS
+        self._execution_requests: tuple[str, ExecutionRequestsContext] | None = None
 
     def run(self, slots_range: Optional[str] = SLOTS_RANGE):
         def _run(slot_to_handle='head'):
@@ -76,6 +78,9 @@ class Watcher:
             self._handle_head(current_head)
 
             SLOT_NUMBER.set(current_head.header.message.slot)
+            # Only a handled head counts as progress, so that an error loop can not keep the
+            # container alive: the head cycle swallows its exceptions and would retry forever
+            pulse()
             logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
             time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
@@ -102,14 +107,22 @@ class Watcher:
                     logger.error({'msg': 'Error while handling head', 'exception': str(e)})
                     time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
+    def execution_requests(self, head: FullBlockInfo) -> ExecutionRequestsContext:
+        """Execution requests applied to the state while `head` was being processed, resolved once per head"""
+        if self._execution_requests is None or self._execution_requests[0] != head.root:
+            self._execution_requests = (head.root, resolve_execution_requests(self, head))
+        return self._execution_requests[1]
+
     @duration_meter()
     def _handle_head(self, head: FullBlockInfo):
+        # Resolve before the handlers start: they run in parallel and would race for it otherwise
+        self.execution_requests(head)
         tasks = [h.handle(self, head) for h in self.handlers]
         for t in tasks:
             t.result()
-        self.handled_headers.append(head)
-        if len(self.handled_headers) > KEEP_MAX_HANDLED_HEADERS_COUNT:
-            self.handled_headers.pop(0)
+        self.handled_blocks.append(head)
+        if len(self.handled_blocks) > KEEP_MAX_HANDLED_BLOCKS_COUNT:
+            self.handled_blocks.pop(0)
 
     @unsync
     @duration_meter()
@@ -139,7 +152,7 @@ class Watcher:
 
     @unsync
     @duration_meter()
-    def _update_user_keys(self, header: BlockHeaderResponseData) -> None:
+    def _update_user_keys(self, block: FullBlockInfo) -> None:
         """Return dict with `publickey` as key and `NamedKey` as value"""
         try:
             new_keys = self.keys_source.update_keys()
@@ -149,7 +162,7 @@ class Watcher:
         if new_keys:
             self.user_keys = new_keys
             logger.warning({'msg': f'User keys updated: [{len(self.user_keys)}]'})
-        KEYS_SOURCE_SLOT_NUMBER.set(int(header.header.message.slot))
+        KEYS_SOURCE_SLOT_NUMBER.set(int(block.header.message.slot))
 
     @duration_meter()
     def _get_header_full_info(self, slot=None) -> FullBlockInfo | None:
@@ -157,7 +170,7 @@ class Watcher:
             """Callback that will be called if we can't get valid head block from beacon node"""
             data, _ = result
             diff = time.time() - ((int(data['header']['message']['slot']) * SECONDS_PER_SLOT) + self.genesis_time)
-            if len(self.handled_headers) > 0 and diff > SECONDS_PER_SLOT * 4:
+            if len(self.handled_blocks) > 0 and diff > SECONDS_PER_SLOT * 4:
                 # head didn't change for more than 4 slots (1/8 of epoch)
                 return True
             return False
@@ -167,8 +180,8 @@ class Watcher:
         current_head = self.consensus.get_block_header(
             slot, force_use_fallback_callback if slot == 'head' else lambda _: False
         )
-        if len(self.handled_headers) > 0 and int(current_head.header.message.slot) == int(
-            self.handled_headers[-1].header.message.slot
+        if len(self.handled_blocks) > 0 and int(current_head.header.message.slot) == int(
+            self.handled_blocks[-1].header.message.slot
         ):
             return None
         current_block = self.consensus.get_block_details(current_head.root)
