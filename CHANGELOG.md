@@ -1,3 +1,29 @@
+# [0.8.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.7.0...0.8.0) (2026-09-18)
+
+
+### Bug Fixes
+
+* keep provider credentials out of the logs ([b1aae62](https://github.com/lidofinance/ethereum-head-watcher/commit/b1aae62028069653919eae1e85a7f580ffb405fc))
+* linter issues ([d6bc67e](https://github.com/lidofinance/ethereum-head-watcher/commit/d6bc67e90e27768a47d4fddc22e7fb01dd844be1))
+* name the failing provider by position, not by host ([e06f5f1](https://github.com/lidofinance/ethereum-head-watcher/commit/e06f5f139398d8e48859bd4e9e39a2cc37541a1b))
+* replace slot number with state root ([5f90815](https://github.com/lidofinance/ethereum-head-watcher/commit/5f90815a6c45f0760ef23ccc1fbd38aab26b9ebf))
+* say where the configuration came from ([16cf775](https://github.com/lidofinance/ethereum-head-watcher/commit/16cf77531bfe4ff737ecc4cb891f152ff497e036))
+* stop on SIGTERM instead of waiting out the pod grace period ([ffec629](https://github.com/lidofinance/ethereum-head-watcher/commit/ffec629a1f90546e5b81ce752b0e3bf69da45ab7))
+* tests ([2fb5104](https://github.com/lidofinance/ethereum-head-watcher/commit/2fb51041fdb5dbc1ef2244e84ff40bedca903cb6))
+* tests ([3073901](https://github.com/lidofinance/ethereum-head-watcher/commit/3073901098cf2e75abd65ba1c5826264fc563b25))
+* update dependencies in Dockerfile ([0b8979b](https://github.com/lidofinance/ethereum-head-watcher/commit/0b8979bb1588607e7fac9b9032a687cf72cb7334))
+
+
+### Features
+
+* add Slack support ([13db474](https://github.com/lidofinance/ethereum-head-watcher/commit/13db47463cca675cd614832a9f48b26637571df9))
+* read-only health endpoints for k8s probes ([f2c084a](https://github.com/lidofinance/ethereum-head-watcher/commit/f2c084aecfa80029aafbcdf2fc3f519c62f57031))
+* report a rotated setting no live apply reaches, and the mtime of the file in force ([7ad516f](https://github.com/lidofinance/ethereum-head-watcher/commit/7ad516fad866468469cfe0c8ee988246af51a3b9))
+* **vroom-546:** read node endpoints from a secrets file and reload on rotation ([c358466](https://github.com/lidofinance/ethereum-head-watcher/commit/c358466e1c27d5e9a17d32f3c9a909916e26bea2))
+* workflow ([e00d51c](https://github.com/lidofinance/ethereum-head-watcher/commit/e00d51c2694f8dc4acafb97ab8ed8a345c144dc1))
+
+
+
 # [0.7.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.6.0...0.7.0) (2026-08-07)
 
 
