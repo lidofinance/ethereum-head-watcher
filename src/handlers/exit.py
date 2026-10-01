@@ -14,7 +14,7 @@ from src.keys_source.base_source import SourceType
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
 from src.typings import BlockNumber
-from src.utils.events import get_events_in_range_multi
+from src.utils.events import get_events_in_range
 from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
 from src.utils.types import bytes_to_hex_str
 from src.variables import ADDITIONAL_ALERTMANAGER_LABELS, NETWORK_NAME
@@ -24,8 +24,6 @@ logger = logging.getLogger()
 Owner = Literal['user', 'other', 'unknown']
 
 BATCH_TUPLE_TYPE = '(bytes[],bytes)[]'
-
-CONSOLIDATIONS_REORG_DEPTH_BLOCKS = 64
 
 
 @dataclass
@@ -66,12 +64,14 @@ class ExitsHandler(WatcherHandler):
     last_total_vebo_requests_processed = 0
     last_requested_exit_indexes: dict[int, set[int]]
     last_requested_consolidations: dict[bytes, tuple[int, set[ConsolidationBatchItem]]]
+    unfinalized_consolidations: dict[bytes, tuple[int, set[ConsolidationBatchItem]]]
     last_consolidations_synced_block: int
 
     def __init__(self):
         super().__init__()
         self.last_requested_exit_indexes = {}
         self.last_requested_consolidations = {}
+        self.unfinalized_consolidations = {}
         self.last_consolidations_synced_block = -1
 
     @unsync
@@ -122,7 +122,8 @@ class ExitsHandler(WatcherHandler):
             all_consolidation_pubkeys = set().union(
                 *(
                     {item.target_pubkey, *item.source_pubkeys}
-                    for _, items in self.last_requested_consolidations.values()
+                    for cache in (self.last_requested_consolidations, self.unfinalized_consolidations)
+                    for _, items in cache.values()
                     for item in items
                 )
             )
@@ -243,6 +244,8 @@ class ExitsHandler(WatcherHandler):
         if current_block_number <= self.last_consolidations_synced_block:
             return
 
+        finalized_block_number = min(watcher.execution.eth.get_block('finalized')['number'], current_block_number)
+
         logger.info({'msg': 'Getting last validator consolidations from ConsolidationBus'})
 
         lookup_window = Web3.to_int(
@@ -252,34 +255,33 @@ class ExitsHandler(WatcherHandler):
         )
 
         window_start = current_block_number - lookup_window
-        l_block = max(self.last_consolidations_synced_block + 1 - CONSOLIDATIONS_REORG_DEPTH_BLOCKS, window_start, 0)
-
-        self.last_requested_consolidations = {
-            batch_hash: entry for batch_hash, entry in self.last_requested_consolidations.items() if entry[0] < l_block
-        }
-
-        bus = watcher.execution.lido_contracts.consolidation_bus
-        events = get_events_in_range_multi(
-            [bus.events.RequestsAdded, bus.events.BatchesRemoved],
+        l_block = max(self.last_consolidations_synced_block + 1, window_start, 0)
+        events = get_events_in_range(
+            watcher.execution.lido_contracts.consolidation_bus,
+            ['RequestsAdded', 'BatchesRemoved'],
             l_block=BlockNumber(l_block),
             r_block=BlockNumber(current_block_number),
         )
 
+        unfinalized = {}
         for event in events:
             args = event['args']
+            is_final = event['blockNumber'] <= finalized_block_number
             match event['event']:
                 case 'RequestsAdded':
-                    self.last_requested_consolidations[Web3.keccak(args['batchData'])] = (
-                        event['blockNumber'],
-                        _decode_batch(args['batchData']),
-                    )
+                    cache = self.last_requested_consolidations if is_final else unfinalized
+                    cache[Web3.keccak(args['batchData'])] = (event['blockNumber'], _decode_batch(args['batchData']))
                 case 'BatchesRemoved':
-                    for batch_hash in args['batchHashes']:
-                        self.last_requested_consolidations.pop(batch_hash, None)
+                    if is_final:
+                        for batch_hash in args['batchHashes']:
+                            self.last_requested_consolidations.pop(batch_hash, None)
+                case _:
+                    raise ValueError(f"Unexpected ConsolidationBus event {event['event']}")
 
         self.last_requested_consolidations = {
             batch_hash: entry
             for batch_hash, entry in self.last_requested_consolidations.items()
             if entry[0] >= window_start
         }
-        self.last_consolidations_synced_block = current_block_number
+        self.unfinalized_consolidations = unfinalized
+        self.last_consolidations_synced_block = finalized_block_number
