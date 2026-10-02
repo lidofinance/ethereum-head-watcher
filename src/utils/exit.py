@@ -55,7 +55,8 @@ def get_last_requested_validator_exit_indexes(
     l_block = max(last_cached_block + 1, current_block_number - lookup_window)
 
     events = get_events_in_range(
-        watcher.execution.lido_contracts.validators_exit_bus_oracle.events.ValidatorExitRequest,
+        watcher.execution.lido_contracts.validators_exit_bus_oracle,
+        ['ValidatorExitRequest'],
         l_block=BlockNumber(l_block),
         r_block=BlockNumber(current_block_number),
     )

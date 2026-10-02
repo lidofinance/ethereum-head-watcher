@@ -25,6 +25,8 @@ Owner = Literal['user', 'other', 'unknown']
 
 BATCH_TUPLE_TYPE = '(bytes[],bytes)[]'
 
+CONSOLIDATIONS_REORG_DEPTH_BLOCKS = 64
+
 
 @dataclass
 class ExitInfo:
@@ -49,15 +51,28 @@ class ConsolidationBatchItem:
     target_pubkey: str
 
 
+def _decode_batch(batch_data: bytes) -> set[ConsolidationBatchItem]:
+    (batch,) = decode([BATCH_TUPLE_TYPE], batch_data)
+    return {
+        ConsolidationBatchItem(
+            source_pubkeys=tuple(bytes_to_hex_str(pubkey) for pubkey in sources),
+            target_pubkey=bytes_to_hex_str(target),
+        )
+        for sources, target in batch
+    }
+
+
 class ExitsHandler(WatcherHandler):
     last_total_vebo_requests_processed = 0
     last_requested_exit_indexes: dict[int, set[int]]
-    last_requested_consolidations: dict[int, set[ConsolidationBatchItem]]
+    last_requested_consolidations: dict[bytes, tuple[int, set[ConsolidationBatchItem]]]
+    last_consolidations_synced_block: int
 
     def __init__(self):
         super().__init__()
         self.last_requested_exit_indexes = {}
         self.last_requested_consolidations = {}
+        self.last_consolidations_synced_block = -1
 
     @unsync
     @duration_meter()
@@ -107,8 +122,8 @@ class ExitsHandler(WatcherHandler):
             all_consolidation_pubkeys = set().union(
                 *(
                     {item.target_pubkey, *item.source_pubkeys}
-                    for batch_items in self.last_requested_consolidations.values()
-                    for item in batch_items
+                    for _, items in self.last_requested_consolidations.values()
+                    for item in items
                 )
             )
 
@@ -225,6 +240,8 @@ class ExitsHandler(WatcherHandler):
             return
 
         current_block_number = int(block.message.body.execution_payload.block_number)
+        if current_block_number <= self.last_consolidations_synced_block:
+            return
 
         logger.info({'msg': 'Getting last validator consolidations from ConsolidationBus'})
 
@@ -234,34 +251,37 @@ class ExitsHandler(WatcherHandler):
             ).call(block_identifier=current_block_number)
         )
 
-        last_cached_block = -1
-        if self.last_requested_consolidations:
-            last_cached_block = max(self.last_requested_consolidations)
+        window_start = current_block_number - lookup_window
+        l_block = max(self.last_consolidations_synced_block + 1 - CONSOLIDATIONS_REORG_DEPTH_BLOCKS, window_start, 0)
 
-        l_block = max(last_cached_block + 1, current_block_number - lookup_window)
+        self.last_requested_consolidations = {
+            batch_hash: entry for batch_hash, entry in self.last_requested_consolidations.items() if entry[0] < l_block
+        }
 
         events = get_events_in_range(
-            watcher.execution.lido_contracts.consolidation_bus.events.RequestsAdded,
+            watcher.execution.lido_contracts.consolidation_bus,
+            ['RequestsAdded', 'BatchesRemoved'],
             l_block=BlockNumber(l_block),
             r_block=BlockNumber(current_block_number),
         )
 
         for event in events:
-            if event['blockNumber'] not in self.last_requested_consolidations:
-                self.last_requested_consolidations[event['blockNumber']] = set()
-
-            consolidation_group = decode([BATCH_TUPLE_TYPE], event['args']['batchData'])[0]
-
-            for batch in consolidation_group:
-                source_pubkeys = tuple(bytes_to_hex_str(pubkey) for pubkey in batch[0])
-                target_pubkey = bytes_to_hex_str(batch[1])
-                self.last_requested_consolidations[event['blockNumber']].add(
-                    ConsolidationBatchItem(
-                        source_pubkeys=source_pubkeys,
-                        target_pubkey=target_pubkey,
+            args = event['args']
+            match event['event']:
+                case 'RequestsAdded':
+                    self.last_requested_consolidations[Web3.keccak(args['batchData'])] = (
+                        event['blockNumber'],
+                        _decode_batch(args['batchData']),
                     )
-                )
+                case 'BatchesRemoved':
+                    for batch_hash in args['batchHashes']:
+                        self.last_requested_consolidations.pop(batch_hash, None)
+                case _:
+                    raise ValueError(f"Unexpected ConsolidationBus event {event['event']}")
 
-        for cached_block in list(self.last_requested_consolidations.keys()):
-            if cached_block < current_block_number - lookup_window:
-                del self.last_requested_consolidations[cached_block]
+        self.last_requested_consolidations = {
+            batch_hash: entry
+            for batch_hash, entry in self.last_requested_consolidations.items()
+            if entry[0] >= window_start
+        }
+        self.last_consolidations_synced_block = current_block_number
