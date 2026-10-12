@@ -1,10 +1,10 @@
-FROM python:3.11.3-slim AS base
+FROM python:3.11.4-slim-bookworm AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends -qq \
-    gcc=4:10.2.1-1 \
-    libffi-dev=3.3-6 \
-    g++=4:10.2.1-1 \
-    git=1:2.30.2-1+deb11u2 \
+    gcc=4:12.2.0-3 \
+    libffi-dev=3.4.4-1 \
+    g++=4:12.2.0-3 \
+    git=1:2.39.5-0+deb12u3 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
