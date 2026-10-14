@@ -1,5 +1,31 @@
 import json
 import os
+import sys
+from types import ModuleType
+
+from src.secrets import DEFAULT_POLL_INTERVAL_IN_SECONDS, read_secrets_file
+from src.utils.urls import mask_url, register_credential_urls
+
+# Where the secrets agent writes the file, and how often it is re-read. No file: settings come from the environment.
+SECRETS_FILE_PATH = os.getenv('SECRETS_FILE_PATH', '/vault/secrets/config')
+SECRETS_POLL_INTERVAL_IN_SECONDS = int(os.getenv('SECRETS_POLL_INTERVAL_IN_SECONDS', DEFAULT_POLL_INTERVAL_IN_SECONDS))
+
+_secrets = read_secrets_file(SECRETS_FILE_PATH)
+# For main() to report: this module is imported before logging is set up, so read_secrets_file's logs are lost.
+SECRETS_FILE_LOADED = bool(_secrets)
+
+
+def secrets_in_force() -> dict[str, str]:
+    """What the file held when this process read it, for a reload to compare a new render against."""
+    return dict(_secrets)
+
+
+def setting(name: str, default: str = '') -> str:
+    """The secrets file wins over the environment, so a rotated value is not shadowed by a stale env."""
+    value = _secrets.get(name)
+    if value:
+        return value
+    return os.getenv(name, default)
 
 
 def parse_enabled_handlers(value: str | None) -> list[str] | None:
@@ -15,10 +41,15 @@ def parse_enabled_handlers(value: str | None) -> list[str] | None:
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
 # - Providers-
-CONSENSUS_CLIENT_URI = os.getenv('CONSENSUS_CLIENT_URI', '').split(',')
-EXECUTION_CLIENT_URI = os.getenv('EXECUTION_CLIENT_URI', '').split(',')
-KEYS_API_URI = os.getenv('KEYS_API_URI', '').split(',')
-ALERTMANAGER_URI = os.getenv('ALERTMANAGER_URI', '').split(',')
+# The node endpoints carry credentials in the URL, which is what the secrets file is for; all four read it alike.
+CONSENSUS_CLIENT_URI = setting('CONSENSUS_CLIENT_URI').split(',')
+EXECUTION_CLIENT_URI = setting('EXECUTION_CLIENT_URI').split(',')
+KEYS_API_URI = setting('KEYS_API_URI').split(',')
+ALERTMANAGER_URI = setting('ALERTMANAGER_URI').split(',')
+
+# Here rather than in main(): this module is imported before logging is configured, and anything logged in between
+# would otherwise print a credential the formatter does not yet know about.
+register_credential_urls(CONSENSUS_CLIENT_URI, EXECUTION_CLIENT_URI, KEYS_API_URI, ALERTMANAGER_URI)
 
 NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
 
@@ -67,8 +98,27 @@ PROMETHEUS_PORT = int(os.getenv('PROMETHEUS_PORT', 9000))
 PROMETHEUS_PREFIX = os.getenv("PROMETHEUS_PREFIX", "ethereum_head_watcher")
 
 HEALTHCHECK_SERVER_PORT = int(os.getenv('HEALTHCHECK_SERVER_PORT', 9010))
+HEALTHCHECK_SERVER_HOST = os.getenv('HEALTHCHECK_SERVER_HOST', '0.0.0.0')
 
 MAX_CYCLE_LIFETIME_IN_SECONDS = int(os.getenv("MAX_CYCLE_LIFETIME_IN_SECONDS", 3000))
+
+
+# The settings whose values carry provider credentials. An explicit list rather than a name pattern: KEYS_SOURCE,
+# KEYS_FILE_PATH and KEYS_API_URI all read as secrets to a substring rule, and none of the first two is one.
+_CREDENTIAL_BEARING_SETTINGS = ('CONSENSUS_CLIENT_URI', 'EXECUTION_CLIENT_URI', 'KEYS_API_URI', 'ALERTMANAGER_URI')
+
+
+def effective_config() -> dict[str, str]:
+    """Every setting this process runs with, safe to log: endpoint lists reduced to scheme and host."""
+    config = {}
+    for name, value in vars(sys.modules[__name__]).items():
+        if name.startswith('_') or not name.isupper() or callable(value) or isinstance(value, ModuleType):
+            continue
+        if name in _CREDENTIAL_BEARING_SETTINGS:
+            config[name] = ', '.join(mask_url(entry) for entry in value)
+        else:
+            config[name] = str(value)
+    return dict(sorted(config.items()))
 
 
 def check_uri_required_variables():
@@ -89,4 +139,8 @@ def check_uri_required_variables():
 
 def raise_from_errors(errors):
     if errors:
-        raise ValueError("The following variables are required: " + ", ".join(errors))
+        raise ValueError(
+            "The following variables are required: "
+            + ", ".join(errors)
+            + f" (read from {SECRETS_FILE_PATH} when it exists, otherwise from the environment)"
+        )
