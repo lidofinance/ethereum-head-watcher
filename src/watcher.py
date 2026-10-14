@@ -14,6 +14,7 @@ from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
 from src.handlers.handler import WatcherHandler
 from src.keys_source.base_source import BaseSource, NamedKey
+from src.metrics.healthcheck_server import pulse
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
     KEYS_SOURCE_SLOT_NUMBER,
@@ -56,51 +57,60 @@ class Watcher:
         self.handled_headers: list[BlockHeaderResponseData] = []
         self.disable_unexpected_exit_alerts: list[str] = variables.DISABLE_UNEXPECTED_EXIT_ALERTS
 
+    def run_cycle(self, slot_to_handle: str = 'head') -> bool:
+        """
+        One pass: read the head, and handle it if it moved. Returns whether it did.
+
+        A method rather than a closure inside run(), and it does not sleep — the caller paces the loop. That is what
+        makes a single cycle callable from a test.
+        """
+        current_head = self._get_header_full_info(slot_to_handle)
+        if not current_head:
+            logger.debug({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
+            return False
+
+        if self.keys_updater is None or self.keys_updater.done():
+            self.keys_updater = self._update_user_keys(current_head)
+        if self.validators_updater is None or self.validators_updater.done():
+            self.validators_updater = self._update_validators()
+
+        logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
+
+        # ATTENTION! While we handle current head, new head could be happened
+        # We should keep eye on handler execution time
+        self._handle_head(current_head)
+
+        SLOT_NUMBER.set(current_head.header.message.slot)
+        # Only a handled head counts as progress, so that an error loop can not keep the container alive: the head cycle
+        # swallows its exceptions and would retry forever
+        pulse()
+        logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
+        return True
+
     def run(self, slots_range: Optional[str] = SLOTS_RANGE):
-        def _run(slot_to_handle='head'):
-            current_head = self._get_header_full_info(slot_to_handle)
-            if not current_head:
-                logger.debug({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
-                time.sleep(CYCLE_SLEEP_IN_SECONDS)
-                return
-
-            if self.keys_updater is None or self.keys_updater.done():
-                self.keys_updater = self._update_user_keys(current_head)
-            if self.validators_updater is None or self.validators_updater.done():
-                self.validators_updater = self._update_validators()
-
-            logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
-
-            # ATTENTION! While we handle current head, new head could be happened
-            # We should keep eye on handler execution time
-            self._handle_head(current_head)
-
-            SLOT_NUMBER.set(current_head.header.message.slot)
-            logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
-            time.sleep(CYCLE_SLEEP_IN_SECONDS)
-
         logger.info({'msg': f'Watcher started. Handlers: {[handler.__class__.__name__ for handler in self.handlers]}'})
 
         if slots_range is not None:
             start, end = slots_range.split('-')
             for slot in range(int(start), int(end) + 1):
                 try:
-                    _run(str(slot))
+                    self.run_cycle(str(slot))
                 except NotOkResponse as e:
                     if e.status == 404:
                         pass
                 self.keys_updater.result()
                 self.validators_updater.result()
+                time.sleep(CYCLE_SLEEP_IN_SECONDS)
         else:
             while True:
                 try:
                     # Run event listener task very first time or re-run after error
                     if self.chain_reorg_event_listener is None or not self.chain_reorg_event_listener.is_alive():
                         self.chain_reorg_event_listener = self.listen_chain_reorg_event()
-                    _run()
+                    self.run_cycle()
                 except Exception as e:  # pylint: disable=broad-except
                     logger.error({'msg': 'Error while handling head', 'exception': str(e)})
-                    time.sleep(CYCLE_SLEEP_IN_SECONDS)
+                time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
     @duration_meter()
     def _handle_head(self, head: FullBlockInfo):

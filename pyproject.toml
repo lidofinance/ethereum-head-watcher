@@ -71,6 +71,13 @@ strict_equality = true
 ignore_missing_imports = true
 mypy_path = "stubs"
 
+[tool.pytest.ini_options]
+# Everything runs by default, live replays included. The marker is there so a run without provider credentials can skip
+# them: `pytest -m "not integration"`.
+markers = [
+    "integration: needs live providers and credentials; replays real mainnet slots",
+]
+
 [tool.isort]
 profile = "black"
 

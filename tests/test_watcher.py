@@ -1,3 +1,19 @@
+"""
+Replays real mainnet slot ranges against live providers and asserts on the alert text those blocks produced. That is a
+check no fake can make: the operator names, the validator indices and the exact wording all come from data nobody wrote
+for a test.
+
+The EL timeout these use is raised in conftest, because replaying historical ranges means eth_getLogs over thousands of
+blocks.
+
+tests/test_watcher_offline.py covers the same decisions against a fake node, and it is the addition rather than the
+replacement: the two answer different questions.
+"""
+
+import pytest
+
+
+@pytest.mark.integration
 def test_processing(watcher):
     watcher.run("6213851-6213858")
 
@@ -38,6 +54,7 @@ slashing_alerts = [
 ]
 
 
+@pytest.mark.integration
 def test_slashings(caplog, watcher):
     watcher.run("6213851-6213858")
 
@@ -57,6 +74,7 @@ exit_alerts = [
 ]
 
 
+@pytest.mark.integration
 def test_unexpected_exits(caplog, watcher):
     watcher.run("13312725-13312727")
 
@@ -64,12 +82,14 @@ def test_unexpected_exits(caplog, watcher):
         assert str(alert) in caplog.text, f"Alert {alert} should be in logs"
 
 
+@pytest.mark.integration
 def test_expected_exits(caplog, watcher):
     watcher.run("14110908-14110912")
 
     assert 'Our validators were unexpectedly exited!' not in caplog.text, "Alert should not be in logs"
 
 
+@pytest.mark.integration
 def test_disabled_alerts_exits(caplog, watcher, monkeypatch):
     monkeypatch.setattr(watcher, "disable_unexpected_exit_alerts", ['3'])
 
