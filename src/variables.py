@@ -6,15 +6,12 @@ from types import ModuleType
 from src.secrets import DEFAULT_POLL_INTERVAL_IN_SECONDS, read_secrets_file
 from src.utils.urls import mask_url, register_credential_urls
 
-# Where the OpenBao agent writes the secrets file, and how often it is re-read. Absent file means every setting comes
-# from the environment. See src/secrets.py.
+# Where the secrets agent writes the file, and how often it is re-read. No file: settings come from the environment.
 SECRETS_FILE_PATH = os.getenv('SECRETS_FILE_PATH', '/vault/secrets/config')
 SECRETS_POLL_INTERVAL_IN_SECONDS = int(os.getenv('SECRETS_POLL_INTERVAL_IN_SECONDS', DEFAULT_POLL_INTERVAL_IN_SECONDS))
 
 _secrets = read_secrets_file(SECRETS_FILE_PATH)
-# Whether that file was there, for main() to report. This module is imported before logging is configured, so anything
-# read_secrets_file logs at import time is dropped — and "where did this process get its endpoints" is the first
-# question when a rotated key does not seem to have landed.
+# For main() to report: this module is imported before logging is set up, so read_secrets_file's logs are lost.
 SECRETS_FILE_LOADED = bool(_secrets)
 
 
@@ -44,8 +41,7 @@ def parse_enabled_handlers(value: str | None) -> list[str] | None:
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
 # - Providers-
-# The two node endpoints carry provider credentials in the URL, so they are the values the secrets file exists for. The
-# other two are read the same way so that a deployment can choose where to keep them without a code change.
+# The node endpoints carry credentials in the URL, which is what the secrets file is for; all four read it alike.
 CONSENSUS_CLIENT_URI = setting('CONSENSUS_CLIENT_URI').split(',')
 EXECUTION_CLIENT_URI = setting('EXECUTION_CLIENT_URI').split(',')
 KEYS_API_URI = setting('KEYS_API_URI').split(',')
@@ -113,11 +109,7 @@ _CREDENTIAL_BEARING_SETTINGS = ('CONSENSUS_CLIENT_URI', 'EXECUTION_CLIENT_URI', 
 
 
 def effective_config() -> dict[str, str]:
-    """
-    Every setting this process is running with, safe to log.
-
-    The endpoint lists are reduced to scheme and host per entry — the provider stays readable, the key does not.
-    """
+    """Every setting this process runs with, safe to log: endpoint lists reduced to scheme and host."""
     config = {}
     for name, value in vars(sys.modules[__name__]).items():
         if name.startswith('_') or not name.isupper() or callable(value) or isinstance(value, ModuleType):

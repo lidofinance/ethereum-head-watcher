@@ -1,17 +1,5 @@
-"""
-A consensus node that answers the watcher, with the block bodies a test asks for.
-
-Why it exists: `tests/test_watcher.py` replays real mainnet slot ranges against live providers and asserts on the alert
-text those blocks produced. That is a valuable check and an unreliable one — it sometimes fails because a provider
-stopped answering `eth_getLogs` inside the timeout, and it cannot be made hermetic by recording fixtures either: the
-assertions depend on the mainnet validator set (~2.3M entries).
-
-So the two are split. Those tests keep the real data and are marked `integration`. This fake carries the same logic — a
-cycle, a slashing of one of our keys, an exit that is not ours — at a scale that fits in a test file and needs no
-network.
-
-Only the endpoints a cycle touches are served, and an unserved path answers 404 rather than a plausible default.
-"""
+"""A consensus node for hermetic tests of the watcher's decisions; the live replays in test_watcher.py stay.
+Only the endpoints a cycle touches are served; any other path answers 404, not a plausible default."""
 
 import json
 import threading
@@ -25,13 +13,7 @@ SECONDS_PER_SLOT = 12
 
 
 def current_slot() -> int:
-    """
-    The slot the chain would be at right now.
-
-    Not cosmetic: the watcher forces its fallback provider when the head it is served is more than four slots behind the
-    wall clock, so a fake serving a fixed historical slot fails every cycle for a reason that has nothing to do with
-    what is being tested.
-    """
+    """The current slot: the watcher switches provider when the head it is served is over four slots behind."""
     return int((time.time() - GENESIS_TIME) / SECONDS_PER_SLOT)
 
 
@@ -56,13 +38,8 @@ def voluntary_exit(index: str) -> dict:
 
 
 class BeaconNodeFake:
-    """
-    Serves the endpoints a cycle can touch, and counts requests per endpoint.
-
-    `bodies` maps a slot to the parts of a block body a test cares about; anything not given is empty. `validators` maps
-    a validator index to its pubkey — the watcher builds `indexed_validators_keys` from it, which is what decides
-    whether a slashing is ours.
-    """
+    """Serves the endpoints a cycle can touch and counts requests per endpoint. `validators` maps an index
+    to a pubkey, which is what decides whether a slashing is ours."""
 
     def __init__(
         self,

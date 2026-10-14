@@ -58,12 +58,7 @@ class Watcher:
         self.disable_unexpected_exit_alerts: list[str] = variables.DISABLE_UNEXPECTED_EXIT_ALERTS
 
     def run_cycle(self, slot_to_handle: str = 'head') -> bool:
-        """
-        One pass: read the head, and handle it if it moved. Returns whether it did.
-
-        A method rather than a closure inside run(), and it does not sleep — the caller paces the loop. That is what
-        makes a single cycle callable from a test.
-        """
+        """One pass: read the head, handle it if it moved, return whether it did. No sleep, so a test can call it."""
         current_head = self._get_header_full_info(slot_to_handle)
         if not current_head:
             logger.debug({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})

@@ -1,10 +1,4 @@
-"""
-The Kubernetes half of the healthcheck server.
-
-`tests/test_healthcheck.py` covers the POST/GET split on `/pulse/` — the fix for a healthcheck that refreshed the
-deadline it was about to check. What is covered here is what Kubernetes needs on top of it: a bind address probes can
-reach, and two read-only paths that answer different questions.
-"""
+"""The Kubernetes side of the healthcheck server: a bind address probes can reach, and two read-only paths."""
 
 import socket
 
@@ -35,9 +29,7 @@ def health_server(monkeypatch):
 
 
 def test_the_server_is_reachable_on_a_non_loopback_bind(monkeypatch):
-    # The reason this test exists: bound to localhost, the server answers the container and not the kubelet, which
-    # probes the pod IP. The assertion is that the bind address is configurable at all — a probe against a real pod IP
-    # is not something a unit test can do.
+    # Bound to localhost, the server answers the container but not the kubelet, which probes the pod IP.
     monkeypatch.setattr(variables, 'HEALTHCHECK_SERVER_HOST', '0.0.0.0')
     monkeypatch.setattr(variables, 'HEALTHCHECK_SERVER_PORT', _free_port())
 

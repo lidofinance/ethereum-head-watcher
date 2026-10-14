@@ -21,12 +21,8 @@ def mask_field(value: Any) -> Any:
 
 
 class JsonFormatter(logging.Formatter):
-    """
-    The one place a provider credential is redacted, ours and our dependencies' lines alike.
-
-    Both halves are needed: the registered endpoint parts catch a key named without a scheme, URL masking catches an
-    endpoint this process was never configured with.
-    """
+    """The one place credentials are redacted. Registered endpoint parts catch a key named without a scheme,
+    URL masking an endpoint this process was never configured with."""
 
     def format(self, record: logging.LogRecord) -> str:
         if isinstance(record.msg, dict):
@@ -58,12 +54,7 @@ def log_uncaught(
     exc_value: BaseException,
     exc_traceback: TracebackType | None,
 ) -> None:
-    """
-    Route a crash through the logger.
-
-    Python's default hook writes the traceback straight to stderr, past the formatter — and the traceback of a failed
-    request carries the endpoint it failed on, credential included.
-    """
+    """Route a crash through the logger: the default hook prints the traceback, endpoint and key, to stderr."""
     if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return

@@ -1,8 +1,4 @@
-"""
-The startup dump answers "what is this process actually running with" without answering "and what is the key".
-
-Both halves matter: a rotated endpoint that never landed looks exactly like one that did.
-"""
+"""The startup config dump: what the process runs with, never the key."""
 
 import json
 

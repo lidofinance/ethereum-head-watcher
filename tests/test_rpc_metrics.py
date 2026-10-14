@@ -1,8 +1,4 @@
-"""
-The cross-service RPC metrics, and the labels that decide whether they are readable.
-
-Two things: a label never carries a credential or a per-request value, and only the node providers report these.
-"""
+"""Cross-service RPC metrics: no label carries a credential or a per-request value; only node providers report."""
 
 import pytest
 from prometheus_client import REGISTRY

@@ -12,10 +12,7 @@ def secrets_path(tmp_path):
 
 
 def write(path: str, values: dict, mtime_ns: int | None = None):
-    """
-    Writes the way the OpenBao agent does — a temp file renamed over the path, which is what makes
-    the inode change on every rotation.
-    """
+    """Writes the way the secrets agent does: a temp file renamed over the path, so the inode changes."""
     temp = f'{path}.tmp'
     with open(temp, 'w') as file:
         json.dump(values, file)

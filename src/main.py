@@ -73,11 +73,7 @@ def el_request_headers() -> dict[str, str]:
 
 
 def resolve_chain_ids(watcher: Watcher) -> None:
-    """
-    Fill in the `chain_id` label the RPC metrics carry, once.
-
-    A layer that will not answer keeps reporting `unknown` rather than holding up the start.
-    """
+    """Fill in the `chain_id` label of the RPC metrics once; a layer that does not answer stays `unknown`."""
     try:
         set_chain_id(LAYER_CL, watcher.consensus.get_deposit_chain_id())
     except Exception as error:  # pylint: disable=broad-except
@@ -93,25 +89,14 @@ def resolve_chain_ids(watcher: Watcher) -> None:
 
 
 def unapplied_changes(values: dict[str, str], in_force: dict[str, str]) -> list[str]:
-    """
-    Keys the file changed that a live apply cannot reach.
-
-    Without this a rotation of, say, a locator address is indistinguishable from no rotation at all: the file is read,
-    the mtime is remembered, and the setting keeps its startup value forever.
-    """
+    """Keys the file changed that no live apply reaches; without this such a rotation looks like none at all."""
     return sorted(
         key for key, value in values.items() if key not in LIVE_APPLIED_SETTINGS and in_force.get(key) != value
     )
 
 
 def apply_rotated_secrets(values: dict[str, str], watcher: Watcher, in_force: dict[str, str]) -> list[str]:
-    """
-    Swap in endpoints from a rotated secrets file, without a restart. Returns what changed.
-
-    Restarting would re-read the whole validator set and key set, so the clients are re-pointed instead: each keeps its
-    endpoints in a list it walks per request. The execution layer needs a new provider, which leaves the Web3 instance,
-    its middlewares and its contracts in place.
-    """
+    """Swap in endpoints from a rotated secrets file; a restart would re-read every validator and key."""
     changed = []
 
     # Before anything is applied or logged: the rotated-in key has to be redactable from this point on, and the
@@ -136,9 +121,7 @@ def apply_rotated_secrets(values: dict[str, str], watcher: Watcher, in_force: di
 
     execution_uri = _split(values.get('EXECUTION_CLIENT_URI'))
     if watcher.execution is not None and execution_uri and execution_uri != variables.EXECUTION_CLIENT_URI:
-        # `Web3.provider` is read-only in web3 6.x; the manager's is the settable one. The middlewares (metrics, cache)
-        # live on the manager too, so they survive the swap, and the contracts hold a reference to the Web3 instance
-        # rather than to the provider.
+        # web3 6.x: `Web3.provider` has no setter, the manager's does; middlewares and contracts survive the swap.
         watcher.execution.manager.provider = FallbackProviderModule(
             execution_uri, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT, 'headers': el_request_headers()}
         )
@@ -171,13 +154,7 @@ def _split(value: str | None) -> list[str]:
 
 
 def install_signal_handlers():
-    """
-    Make SIGTERM and SIGHUP stop the watcher the way Ctrl-C does.
-
-    Python installs a disposition for SIGINT only, and as PID 1 the process gets no default action for the others, so
-    without this they are dropped and the container is killed instead of stopping. Routed onto SIGINT because the loop
-    already unwinds on KeyboardInterrupt.
-    """
+    """Stop on SIGTERM and SIGHUP the way Ctrl-C does: as PID 1 the process has no default action for them."""
     for sig in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, signal.default_int_handler)
 

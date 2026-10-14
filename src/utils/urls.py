@@ -13,12 +13,7 @@ _redaction: tuple[re.Pattern[str], dict[str, str]] | None = None
 
 
 def mask_url(url: str) -> str:
-    """
-    Host and scheme, nothing else.
-
-    Provider credentials live in the parts this drops: some providers carry the key as `?key=`, others carry it as a
-    path segment. The host is worth keeping — it says which provider failed — and is not a secret.
-    """
+    """Scheme and host only: keys travel as `?key=` or as a path segment; the host says which provider failed."""
     parsed = urlparse(url)
     if not parsed.netloc:
         return url
@@ -26,21 +21,12 @@ def mask_url(url: str) -> str:
 
 
 def mask_urls_in(text: str) -> str:
-    """
-    The same masking for text that is not a URL but contains one.
-
-    Exception strings from `requests` embed the URL they failed on, so an endpoint error is how a provider key reaches
-    the log — from a line that never mentions a credential.
-    """
+    """`mask_url` for every URL inside a text, such as an exception string from `requests`."""
     return URL_IN_TEXT.sub(lambda match: mask_url(match.group()), text)
 
 
 def credential_parts(url: str) -> dict[str, str]:
-    """
-    The substrings of one endpoint that must not be logged, each with its replacement.
-
-    An endpoint with no path and no query has nothing to register: everything left is host and port.
-    """
+    """The substrings of one endpoint that must not be logged, with replacements; none for a bare host."""
     endpoint = url.strip()
     parsed = urlparse(endpoint)
     if not parsed.netloc:
@@ -64,11 +50,8 @@ def credential_parts(url: str) -> dict[str, str]:
 
 
 def register_credential_urls(*endpoint_lists: Iterable[str]) -> None:
-    """
-    Teach `redact_text` the path, query and userinfo of every configured endpoint, by value.
-
-    Registration only ever adds: a key rotated out an hour ago is still a key in an exception text logged now.
-    """
+    """Teach `redact_text` the path, query and userinfo of every configured endpoint, by value.
+    Only ever adds: a key rotated out an hour ago is still a key in an exception logged now."""
     global _redaction  # pylint: disable=global-statement
     with _LOCK:
         added = False
@@ -86,12 +69,8 @@ def register_credential_urls(*endpoint_lists: Iterable[str]) -> None:
 
 
 def redact_registered_parts(text: str) -> str:
-    """
-    Redaction by value, for the credentials no scheme-anchored pattern can find.
-
-    `requests` and `urllib3` name a failed request by its path alone — `url: /v2/<key>/eth/v1/...` — which carries no
-    `https://` for `mask_urls_in` to match.
-    """
+    """Redaction by value: `requests` names a failed request by its path alone (`url: /v2/<key>/...`),
+    with no `https://` for `mask_urls_in` to match."""
     redaction = _redaction
     if redaction is None:
         return text

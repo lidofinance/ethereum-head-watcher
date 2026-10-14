@@ -23,19 +23,12 @@ SERVING_BODY = b'{"metrics": "ok", "reason": "serving"}\n'
 COLD_BODY = b'{"metrics": "fail", "reason": "no cycle completed yet"}\n'
 
 _last_pulse = datetime.now()
-# Distinct from _last_pulse, which starts warm so that the Docker HEALTHCHECK does not fail a container that is still
-# starting. Readiness needs the opposite answer: a watcher that has not finished a cycle is not caught up, and its first
-# cycle reads the whole validator set and every validator key, which takes minutes.
+# Unlike _last_pulse, starts cold: readiness waits for the first completed cycle, which reads every validator key.
 _first_pulse_registered = False
 
 
 def pulse():
-    """
-    Tell the healthcheck server that the watcher is still making progress.
-
-    Never raises: a healthcheck ping must not break the head cycle. A server that can not be reached fails the Docker
-    HEALTHCHECK on its own anyway.
-    """
+    """Tell the healthcheck server the watcher is progressing. Never raises: a ping must not break the cycle."""
     try:
         requests.post(f'http://localhost:{variables.HEALTHCHECK_SERVER_PORT}{PULSE_PATH}', timeout=10)
     except Exception as e:  # pylint: disable=broad-except
@@ -59,13 +52,8 @@ def is_alive() -> bool:
 
 
 class PulseRequestHandler(SimpleHTTPRequestHandler):
-    """
-    Request handler for Docker HEALTHCHECK.
-
-    The watcher reports progress with POST while the healthcheck reads the state with GET, and the split matters: as
-    long as both were served by GET, every healthcheck refreshed the very deadline it was about to check, so a stuck
-    watcher stayed healthy forever.
-    """
+    """Docker HEALTHCHECK handler. The watcher POSTs progress and the check reads it with GET:
+    while GET did both, every check refreshed the deadline it checked, and a stuck watcher stayed healthy."""
 
     def do_POST(self):
         register_pulse()
@@ -73,14 +61,12 @@ class PulseRequestHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == LIVENESS_PATH:
-            # Serving, nothing more. Staleness deliberately does not fail liveness here: a restart costs a full re-read
-            # of the validator set and of every validator key, and when the cause is a degraded upstream that turns into
-            # a restart loop which makes the outage longer. `EHWStuckBotProcessing` pages a human for that instead.
+            # Liveness ignores staleness: a restart re-reads every validator and key, and a degraded upstream
+            # would turn it into a restart loop.
             self._respond(HTTPStatus.OK, SERVING_BODY)
         elif self.path == READINESS_PATH:
-            # A one-way gate: it opens after the first completed cycle and stays open. Failing it later would take the
-            # pod out of the Service and therefore out of Prometheus' targets, which turns a flat metric into an absent
-            # one — the harder signal to alert on.
+            # One-way gate: failing it later drops the pod from the Service and from Prometheus' targets,
+            # turning a flat metric into an absent one.
             if is_ready():
                 self._respond(HTTPStatus.OK, ALIVE_BODY)
             else:

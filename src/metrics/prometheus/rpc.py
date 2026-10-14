@@ -1,8 +1,4 @@
-"""
-Blockchain RPC metrics in the shape every Lido service reports them: no application prefix, fixed label names.
-
-The `ethereum_head_watcher_*_requests_duration` histograms next door are unchanged — dashboards read them today.
-"""
+"""Blockchain RPC metrics in the cross-service shape: no application prefix, fixed label names."""
 
 import ipaddress
 from typing import Final
@@ -54,12 +50,8 @@ def chain_id(layer: str) -> str:
 
 
 def normalize_provider(url: str) -> str:
-    """
-    Which provider answered, with nothing in it that could identify a request or carry a credential.
-
-    A DNS name is cut to its last two labels; an address or a single-label in-cluster name keeps its port instead,
-    since that is the only thing telling two of them on one host apart.
-    """
+    """Which provider answered, never a credential: a DNS name cut to its last two labels, an address or
+    a single-label name with its port, the only thing telling two on one host apart."""
     netloc = urlparse(url).netloc.lower() or url.lower()
     netloc = netloc.rpartition('@')[2]
     if netloc.startswith('['):

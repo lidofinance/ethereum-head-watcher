@@ -1,10 +1,4 @@
-"""
-The formatter is the only thing between a provider key and stdout.
-
-Everything a call site can hand a logger goes through it: a message dict, a plain string with lazy `%s` arguments, a
-traceback from a dependency that never heard of masking — and a credential named without the scheme that would make
-it look like a URL.
-"""
+"""The formatter is the only thing between a provider key and stdout, for every shape a log call takes."""
 
 import json
 import logging

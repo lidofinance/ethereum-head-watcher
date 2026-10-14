@@ -1,7 +1,4 @@
-"""
-Provider keys live inside endpoint URLs, and endpoint URLs reach the log through exception text rather than through
-anything that looks like a credential. These are the shapes our providers use.
-"""
+"""Provider keys inside endpoint URLs, in the shapes our providers use, as they reach the log in exceptions."""
 
 from src.utils.urls import mask_url, mask_urls_in
 

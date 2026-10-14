@@ -87,11 +87,7 @@ class HTTPProvider(ABC):
 
     @contextmanager
     def _rpc_observation(self, host: str, method: str) -> Iterator[RpcObservation]:
-        """
-        Report one round trip to a node in the cross-service RPC metrics, however the call ends.
-
-        An exception leaving the block is the failure; the status, when there is one, comes back on the observation.
-        """
+        """Report one round trip in the RPC metrics; an exception leaving the block is the failure."""
         observation = RpcObservation()
         started = time.monotonic()
         result = RESULT_FAIL
