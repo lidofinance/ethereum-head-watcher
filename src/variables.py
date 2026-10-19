@@ -12,6 +12,25 @@ def parse_enabled_handlers(value: str | None) -> list[str] | None:
     return handlers
 
 
+def parse_slots_range(value: str | None) -> str | None:
+    """
+    Parse the range of slots to replay, using ``None`` to mean "follow the head".
+
+    Unset and empty have to mean the same thing.
+    """
+    if value is None or not value.strip():
+        return None
+
+    start, separator, end = value.partition('-')
+    if not separator or not start.strip().isdigit() or not end.strip().isdigit():
+        raise ValueError(f'SLOTS_RANGE must look like "<start>-<end>", got {value!r}')
+
+    if int(start) > int(end):
+        raise ValueError(f'SLOTS_RANGE must start before it ends, got {value!r}')
+
+    return f'{int(start)}-{int(end)}'
+
+
 # Labels an alert may carry on top of the ones the code fills in itself.
 # Source of truth is the optional field set of `src.providers.alertmanager.typings.Labels`, which is
 # not imported here to keep this module free of dependencies on the rest of the package.
@@ -60,7 +79,8 @@ ADDITIONAL_ALERTMANAGER_LABELS = parse_additional_alertmanager_labels(os.getenv(
 
 DRY_RUN = os.getenv('DRY_RUN', 'false').lower() == 'true'
 
-SLOTS_RANGE = os.getenv('SLOTS_RANGE')
+# Range of slots to replay instead of following the head, as "<start>-<end>". Unset to follow head.
+SLOTS_RANGE = parse_slots_range(os.getenv('SLOTS_RANGE'))
 
 CYCLE_SLEEP_IN_SECONDS = int(os.getenv('CYCLE_SLEEP_IN_SECONDS', 1))
 

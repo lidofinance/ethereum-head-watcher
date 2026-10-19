@@ -94,8 +94,13 @@ class Watcher:
                 except NotOkResponse as e:
                     if e.status == 404:
                         pass
-                self.keys_updater.result()
-                self.validators_updater.result()
+                # A missed slot leaves both updaters unstarted: the head of that slot is a 404 and
+                # `_run` gives up before scheduling them. Waiting on them unconditionally turns the
+                # first missed slot of a range into an AttributeError.
+                if self.keys_updater is not None:
+                    self.keys_updater.result()
+                if self.validators_updater is not None:
+                    self.validators_updater.result()
         else:
             while True:
                 try:

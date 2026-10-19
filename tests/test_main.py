@@ -14,6 +14,7 @@ from src.variables import (
     SUPPORTED_ALERTMANAGER_LABELS,
     parse_additional_alertmanager_labels,
     parse_enabled_handlers,
+    parse_slots_range,
 )
 
 
@@ -33,6 +34,35 @@ def test_parse_enabled_handlers(value, expected):
 def test_parse_enabled_handlers_rejects_lists_without_names(value):
     with pytest.raises(ValueError, match='ENABLED_HANDLERS must contain at least one handler name'):
         parse_enabled_handlers(value)
+
+
+@pytest.mark.parametrize('value', [None, '', '   '])
+def test_slots_range_is_none_when_nothing_is_configured(value):
+    assert parse_slots_range(value) is None
+
+
+@pytest.mark.parametrize(
+    ('value', 'expected'),
+    [
+        ('100-200', '100-200'),
+        ('5-5', '5-5'),
+        (' 100 - 200 ', '100-200'),
+        ('0007-0008', '7-8'),
+    ],
+)
+def test_slots_range_is_parsed(value, expected):
+    assert parse_slots_range(value) == expected
+
+
+@pytest.mark.parametrize('value', ['100', 'abc', '100-', '-200', '100-200-300', '-', '1.5-2'])
+def test_slots_range_rejects_malformed_values(value):
+    with pytest.raises(ValueError, match='SLOTS_RANGE must look like'):
+        parse_slots_range(value)
+
+
+def test_slots_range_rejects_an_inverted_range():
+    with pytest.raises(ValueError, match='SLOTS_RANGE must start before it ends'):
+        parse_slots_range('200-100')
 
 
 @pytest.mark.parametrize('value', [None, '', '   ', '{}'])
