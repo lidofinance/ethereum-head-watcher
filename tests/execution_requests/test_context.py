@@ -65,6 +65,23 @@ def test_gloas_requests_come_from_the_head_block_itself(watcher: WatcherStub):
     assert ctx.el_block_number == 31
 
 
+def test_a_missed_slot_leaves_the_requests_with_the_slot_that_published_them(watcher: WatcherStub):
+    """
+    Resolution follows `parent_root` rather than counting a slot back, so a missed slot between the
+    parent and the head needs no handling of its own: with slot 33 empty, the requests applied at 34
+    were still published at 32.
+    """
+    consolidation = sample_consolidation()
+    head = create_gloas_head_with_parent_requests(watcher, consolidations=[consolidation], head_slot='34')
+
+    ctx = resolve_execution_requests(watcher, head)
+
+    assert ctx.source == ExecutionRequestsSource.PARENT_BLOCK
+    assert ctx.request_slot == GLOAS_PARENT_SLOT
+    assert ctx.state_slot == '34'
+    assert ctx.consolidations == [consolidation]
+
+
 def test_parent_block_is_reused_from_the_handled_heads(watcher: WatcherStub):
     head = create_gloas_head_with_parent_requests(watcher)
     watcher.handled_blocks = [watcher.consensus.get_block_details.return_value]

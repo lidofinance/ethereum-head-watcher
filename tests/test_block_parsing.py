@@ -44,6 +44,14 @@ PAYLOAD_BID = {
         },
         'signature': SIGNATURE,
     },
+    # The requests of the payload of the parent block, applied while this block is processed.
+    'parent_execution_requests': {
+        'deposits': [],
+        'withdrawals': [{'source_address': SOURCE_ADDRESS, 'validator_pubkey': SOURCE_PUBKEY, 'amount': '0'}],
+        'consolidations': [CONSOLIDATION],
+        'builder_deposits': [],  # EIP-8282, not modelled, has to be ignored
+        'builder_exits': [],  # EIP-8282, not modelled, has to be ignored
+    },
     'payload_attestations': [],  # not modelled, has to be ignored
 }
 
@@ -92,6 +100,13 @@ def test_block_with_payload_bid_is_parsed():
     assert body.signed_execution_payload_bid.message.parent_block_hash == PAYLOAD_BLOCK_HASH
     assert body.signed_execution_payload_bid.message.builder_index == '7'
     assert [e.message.validator_index for e in body.voluntary_exits] == ['42']
+
+    requests = body.parent_execution_requests
+    assert [c.target_pubkey for c in requests.consolidations] == [TARGET_PUBKEY]
+    assert [w.validator_pubkey for w in requests.withdrawals] == [SOURCE_PUBKEY]
+    # The builder requests of EIP-8282 concern ePBS builders, not our validators: dropping them must cost nothing
+    assert not hasattr(requests, 'builder_deposits')
+    assert not hasattr(requests, 'builder_exits')
 
 
 def test_payload_bid_with_unexpected_field_set_is_parsed():

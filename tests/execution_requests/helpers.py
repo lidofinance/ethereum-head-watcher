@@ -114,19 +114,21 @@ def create_gloas_head_with_parent_requests(
     watcher,
     withdrawals: list[WithdrawalRequest] = None,
     consolidations: list[ConsolidationRequest] = None,
+    head_slot: str = GLOAS_HEAD_SLOT,
 ) -> FullBlockInfo:
     """
     Head block of the Glamsterdam (EIP-7732) shape carrying the given requests of the payload of its
     parent, with the consensus stub wired to serve that parent block.
 
     The bid of the head is built on the payload of the parent, so those requests are applied while
-    the head is being processed.
+    the head is being processed. `head_slot` leaves the slots between the two empty, which is what a
+    missed slot looks like.
     """
     parent_payload_block_hash = random_hex(32)
 
     parent = create_sample_gloas_block(slot=GLOAS_PARENT_SLOT, payload_block_hash=parent_payload_block_hash)
     head = create_sample_gloas_block(
-        slot=GLOAS_HEAD_SLOT, parent_root=parent.root, parent_payload_block_hash=parent_payload_block_hash
+        slot=head_slot, parent_root=parent.root, parent_payload_block_hash=parent_payload_block_hash
     )
     head.message.body.parent_execution_requests = ExecutionRequests(
         deposits=[], withdrawals=withdrawals or [], consolidations=consolidations or []

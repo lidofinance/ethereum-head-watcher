@@ -25,8 +25,9 @@ def get_last_requested_validator_exit_indexes(
         return exits_info
 
     if el_block_number is None:
-        # Since Gloas (EIP-7732) the EL block number is not a part of the block body anymore: it
-        # comes with the payload envelope of the previous block, which is not read yet.
+        # Since Gloas (EIP-7732) the block carries no payload of its own, so `el_block_number` is
+        # resolved by `_applied_el_block_number` from the parent block hash of the payload bid.
+        # That lookup can fail, and then there is no EL block to make the contract calls against.
         logger.warning({'msg': 'No EL block number for the head block, skipping VEBO exit requests lookup'})
         return exits_info
 
