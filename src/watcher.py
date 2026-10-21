@@ -54,6 +54,7 @@ class Watcher:
         self.user_keys: dict[str, NamedKey] = {}
         self.indexed_validators_keys: dict[str, str] = {}
         self.chain_reorgs: dict[str, ChainReorgEvent] = {}
+        self._chain_reorgs_lock = threading.Lock()
         self.handled_blocks: list[FullBlockInfo] = []
         self.disable_unexpected_exit_alerts: list[str] = variables.DISABLE_UNEXPECTED_EXIT_ALERTS
         self._execution_requests: tuple[str, ExecutionRequestsContext] | None = None
@@ -185,9 +186,10 @@ class Watcher:
         current_head = self.consensus.get_block_header(
             slot, force_use_fallback_callback if slot == 'head' else lambda _: False
         )
-        if len(self.handled_blocks) > 0 and int(current_head.header.message.slot) == int(
-            self.handled_blocks[-1].header.message.slot
-        ):
+        # Blocks are told apart by root rather than by slot: a reorg replaces the block of a slot that has already been
+        # handled, and the replacement is the canonical one whose operations have to be checked. Matching against every
+        # handled block, not just the last one, keeps a reorg back to an earlier branch from being handled twice.
+        if any(handled.root == current_head.root for handled in self.handled_blocks):
             return None
         current_block = self.consensus.get_block_details(current_head.root)
         return FullBlockInfo(**asdict(current_head), **asdict(current_block))
@@ -201,11 +203,26 @@ class Watcher:
             for event in client.events():
                 logger.warning({'msg': f'Chain reorg event: {event.data}'})
                 event = ChainReorgEvent.from_response(**json.loads(event.data))
-                lock = threading.Lock()
-                with lock:
+                with self._chain_reorgs_lock:
                     self.chain_reorgs[event.slot] = event
         except Exception as e:  # pylint: disable=broad-except
             logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
+
+    def pending_chain_reorgs(self) -> list[ChainReorgEvent]:
+        """Reorg events the listener has seen and nobody has handled yet"""
+        with self._chain_reorgs_lock:
+            return [*self.chain_reorgs.values()]
+
+    def drop_chain_reorg(self, event: ChainReorgEvent) -> None:
+        """
+        Forget a reorg event that has been handled.
+
+        Drops the event itself rather than everything stored for its slot: the listener may have put a newer reorg of
+        the same slot in its place while this one was being handled, and that one still has to be handled.
+        """
+        with self._chain_reorgs_lock:
+            if self.chain_reorgs.get(event.slot) is event:
+                del self.chain_reorgs[event.slot]
 
     @cached_property
     def valid_withdrawal_addresses(self):

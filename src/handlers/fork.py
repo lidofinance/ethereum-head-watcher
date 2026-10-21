@@ -1,5 +1,3 @@
-import threading
-
 from unsync import unsync
 
 from src.alerts.common import CommonAlert
@@ -19,7 +17,7 @@ class ForkHandler(WatcherHandler):
 
         head_parent_is_alerted = False
 
-        chain_reorgs = [*watcher.chain_reorgs.values()]
+        chain_reorgs = watcher.pending_chain_reorgs()
 
         for chain_reorg in chain_reorgs:
             known_block = _known_block(chain_reorg.new_head_block)
@@ -28,9 +26,8 @@ class ForkHandler(WatcherHandler):
                 self._send_reorg_alert(watcher, chain_reorg)
                 if chain_reorg.new_head_block == head.header.message.parent_root:
                     head_parent_is_alerted = True
-            lock = threading.Lock()
-            with lock:
-                del watcher.chain_reorgs[chain_reorg.slot]
+            # Dropped only once the alert is out, so that a failed send leaves the event to retry
+            watcher.drop_chain_reorg(chain_reorg)
 
         if watcher.handled_blocks and not head_parent_is_alerted:
             known_parent = _known_block(head.header.message.parent_root)
