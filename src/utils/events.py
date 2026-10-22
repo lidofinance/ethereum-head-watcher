@@ -1,5 +1,5 @@
 import logging
-from typing import Iterator
+from typing import Any, Iterator, cast
 
 from eth_utils import event_abi_to_log_topic
 from web3 import Web3
@@ -27,7 +27,7 @@ def get_events_in_range(
         raise ValueError(f"{l_block=} > {r_block=}")
 
     events = [contract.events[name]() for name in event_names]
-    by_topic = {event_abi_to_log_topic(event.abi): event for event in events}
+    by_topic = {event_abi_to_log_topic(cast(dict[str, Any], event.abi)): event for event in events}
     topics = [[Web3.to_hex(topic) for topic in by_topic]]
 
     while True:
