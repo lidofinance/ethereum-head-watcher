@@ -62,7 +62,7 @@ def test_a_slot_range_is_processed(keys_file, dry_run, monkeypatch):
 
         watcher.run(f'{start}-{start + 2}')
 
-        assert [h.header.message.slot for h in watcher.handled_headers] == [str(s) for s in range(start, start + 3)]
+        assert [h.header.message.slot for h in watcher.handled_blocks] == [str(s) for s in range(start, start + 3)]
         assert watcher.keys_updater.done()
         assert watcher.validators_updater.done()
         assert set(watcher.user_keys) == {OUR_KEY, OUR_OTHER_KEY}

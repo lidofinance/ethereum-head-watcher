@@ -61,6 +61,30 @@ class BlockHeaderFullResponse(Nested, FromResponse):
 @dataclass
 class BlockExecutionPayload(FromResponse):
     block_number: str
+    block_hash: str = ''
+
+
+@dataclass
+class ExecutionPayloadBid(FromResponse):
+    """
+    Commitment to an execution payload the proposer puts into the block since Gloas (EIP-7732).
+
+    The field set is not settled in the specs yet, so every field here is optional: an unexpected
+    shape must reduce the amount of data we have, not break block parsing.
+    """
+
+    block_hash: str = ''
+    parent_block_hash: str = ''
+    parent_block_root: str = ''
+    builder_index: str = ''
+    slot: str = ''
+    value: str = ''
+
+
+@dataclass
+class SignedExecutionPayloadBid(Nested, FromResponse):
+    message: ExecutionPayloadBid
+    signature: str = ''
 
 
 @dataclass
@@ -106,11 +130,24 @@ class ExecutionRequests(Nested, FromResponse):
 
 @dataclass
 class BlockBody(Nested, FromResponse):
-    execution_payload: BlockExecutionPayload
     voluntary_exits: list[BlockVoluntaryExit]
     proposer_slashings: list
     attester_slashings: list
+    # Up to Fulu the block body carries the execution payload and the execution requests inline.
+    # Since Gloas (EIP-7732) it commits to a payload bid instead, while the payload itself is
+    # revealed by the builder in a separate envelope.
+    execution_payload: Optional[BlockExecutionPayload] = None
     execution_requests: Optional[ExecutionRequests] = None
+    signed_execution_payload_bid: Optional[SignedExecutionPayloadBid] = None
+    # Requests of the payload of the parent block, applied while this block is being processed.
+    # `process_parent_execution_payload` checks them against `execution_requests_root` of the bid of
+    # the parent, and has them empty when the payload of the parent was skipped.
+    parent_execution_requests: Optional[ExecutionRequests] = None
+
+    @property
+    def el_block_number(self) -> Optional[int]:
+        """Number of the EL block included in this block, None if the payload is not a part of it."""
+        return int(self.execution_payload.block_number) if self.execution_payload else None
 
 
 @dataclass
@@ -127,6 +164,9 @@ class BlockDetailsResponse(Nested, FromResponse):
     # https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2
     message: BlockMessage
     signature: str
+    # Name of the fork the block belongs to ("electra", "fulu", "gloas", ...). It is a part of the
+    # response envelope rather than of `data`, so the client fills it in explicitly.
+    version: str = ''
 
 
 @dataclass

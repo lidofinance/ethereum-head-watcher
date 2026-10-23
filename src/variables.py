@@ -38,6 +38,57 @@ def parse_enabled_handlers(value: str | None) -> list[str] | None:
     return handlers
 
 
+def parse_slots_range(value: str | None) -> str | None:
+    """
+    Parse the range of slots to replay, using ``None`` to mean "follow the head".
+
+    Unset and empty have to mean the same thing.
+    """
+    if value is None or not value.strip():
+        return None
+
+    start, separator, end = value.partition('-')
+    if not separator or not start.strip().isdigit() or not end.strip().isdigit():
+        raise ValueError(f'SLOTS_RANGE must look like "<start>-<end>", got {value!r}')
+
+    if int(start) > int(end):
+        raise ValueError(f'SLOTS_RANGE must start before it ends, got {value!r}')
+
+    return f'{int(start)}-{int(end)}'
+
+
+# Labels an alert may carry on top of the ones the code fills in itself.
+# Source of truth is the optional field set of `src.providers.alertmanager.typings.Labels`, which is
+# not imported here to keep this module free of dependencies on the rest of the package.
+SUPPORTED_ALERTMANAGER_LABELS = frozenset({'mentions', 'slack_mentions'})
+
+
+def parse_additional_alertmanager_labels(value: str | None) -> dict[str, str]:
+    """
+    Parse the extra labels put on alerts about our validators. Unset and empty have to mean the same thing.
+    """
+    if value is None or not value.strip():
+        return {}
+
+    try:
+        labels = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise ValueError(f'ADDITIONAL_ALERTMANAGER_LABELS must be a JSON object: {error}') from error
+
+    if not isinstance(labels, dict):
+        raise ValueError(f'ADDITIONAL_ALERTMANAGER_LABELS must be a JSON object, got {type(labels).__name__}')
+
+    if unsupported := sorted(set(labels) - SUPPORTED_ALERTMANAGER_LABELS):
+        # Unknown keys reach `Labels(**additional_labels)` and fail there, which happens only once an
+        # alert actually fires
+        raise ValueError(
+            f'Unsupported labels in ADDITIONAL_ALERTMANAGER_LABELS: {", ".join(unsupported)}. '
+            f'Supported labels: {", ".join(sorted(SUPPORTED_ALERTMANAGER_LABELS))}'
+        )
+
+    return labels
+
+
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
 # - Providers-
@@ -54,12 +105,13 @@ register_credential_urls(CONSENSUS_CLIENT_URI, EXECUTION_CLIENT_URI, KEYS_API_UR
 NETWORK_NAME = os.getenv('NETWORK_NAME', 'mainnet')
 
 # Additional labels for alerts for our validators. Must be in JSON string format.
-# For example - '{"a":"valueA","b":"valueB"}'
-ADDITIONAL_ALERTMANAGER_LABELS = json.loads(os.getenv('ADDITIONAL_ALERTMANAGER_LABELS', '{}'))
+# For example - '{"mentions":"@here"}'
+ADDITIONAL_ALERTMANAGER_LABELS = parse_additional_alertmanager_labels(os.getenv('ADDITIONAL_ALERTMANAGER_LABELS'))
 
 DRY_RUN = os.getenv('DRY_RUN', 'false').lower() == 'true'
 
-SLOTS_RANGE = os.getenv('SLOTS_RANGE')
+# Range of slots to replay instead of following the head, as "<start>-<end>". Unset to follow head.
+SLOTS_RANGE = parse_slots_range(os.getenv('SLOTS_RANGE'))
 
 CYCLE_SLEEP_IN_SECONDS = int(os.getenv('CYCLE_SLEEP_IN_SECONDS', 1))
 
