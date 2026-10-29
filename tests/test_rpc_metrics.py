@@ -18,7 +18,7 @@ from src.providers.keys_api.client import KeysAPIClient
 from src.utils.build import user_agent
 from src.web3py.extensions import FallbackProviderModule
 from src.web3py.middleware import metrics_collector
-from tests.node_fake import BeaconNodeFake
+from tests.node_fake import BeaconNodeFake, send_json
 
 NO_RETRIES = Retry(total=0)
 
@@ -37,12 +37,7 @@ def el_node():
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):  # pylint: disable=invalid-name
             request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-            body = json.dumps({'jsonrpc': '2.0', 'id': request['id'], 'result': '0x10'}).encode()
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            send_json(self, {'jsonrpc': '2.0', 'id': request['id'], 'result': '0x10'})
 
         def log_message(self, *args):
             pass

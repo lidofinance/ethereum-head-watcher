@@ -37,6 +37,15 @@ def voluntary_exit(index: str) -> dict:
     return {'message': {'validator_index': index}, 'signature': '0x' + 'ef' * 48}
 
 
+def send_json(handler: BaseHTTPRequestHandler, payload) -> None:
+    body = json.dumps(payload).encode()
+    handler.send_response(200)
+    handler.send_header('Content-Type', 'application/json')
+    handler.send_header('Content-Length', str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
 class BeaconNodeFake:
     """Serves the endpoints a cycle can touch and counts requests per endpoint. `validators` maps an index
     to a pubkey, which is what decides whether a slashing is ours."""
@@ -85,12 +94,7 @@ class BeaconNodeFake:
                     self.send_response(404)
                     self.end_headers()
                     return
-                body = json.dumps(payload).encode()
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Content-Length', str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                send_json(self, payload)
 
             def log_message(self, *args):
                 pass
