@@ -12,7 +12,7 @@ from src.variables import MAX_CYCLE_LIFETIME_IN_SECONDS
 logger = logging.getLogger()
 
 PULSE_PATH = '/pulse/'
-# Kubernetes probes read state and must never write it, so they get their own paths. `/pulse/`
+# Probes read state and must never write it, so they get their own paths. `/pulse/`
 # stays exactly as the Docker HEALTHCHECK uses it.
 LIVENESS_PATH = '/healthz'
 READINESS_PATH = '/readyz'
@@ -65,7 +65,7 @@ class PulseRequestHandler(SimpleHTTPRequestHandler):
             # would turn it into a restart loop.
             self._respond(HTTPStatus.OK, SERVING_BODY)
         elif self.path == READINESS_PATH:
-            # One-way gate: failing it later drops the pod from the Service and from Prometheus' targets,
+            # One-way gate: failing it later could drop the instance from the scrape targets,
             # turning a flat metric into an absent one.
             if is_ready():
                 self._respond(HTTPStatus.OK, ALIVE_BODY)

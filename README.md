@@ -34,8 +34,8 @@ Currently it supports:
 ## Configuration sources
 
 Every setting below is read from the environment, and — when it exists — from a JSON file whose values take precedence.
-The file is how deployments that hold credentials in a secret store deliver them: on Kubernetes the OpenBao agent writes
-`/vault/secrets/config`, and the application re-reads it when it changes, so a rotated node endpoint is picked up
+The file is how deployments that hold credentials in a secret store deliver them: a secret-store agent writes it (for
+example to `/vault/secrets/config`), and the application re-reads it when it changes, so a rotated node endpoint is picked up
 **without a restart**. That matters because a restart re-reads the whole validator set and every validator key — minutes
 during which nothing is watched.
 
@@ -228,8 +228,8 @@ The source of metrics:
 
 ### Blockchain RPC metrics
 
-Calls to a consensus or execution node are reported a second time in the shape every Lido service reports them, so one
-dashboard reads them all. These carry no `PROMETHEUS_PREFIX`:
+Calls to a consensus or execution node are also reported under common unprefixed names, so one dashboard can read them
+across services. These carry no `PROMETHEUS_PREFIX`:
 
 | Metric                       | Labels                                                                       |
 |------------------------------|------------------------------------------------------------------------------|
@@ -259,13 +259,13 @@ The healthcheck server serves three paths:
 | Path       | Reports                                                                                                                 | Used by                          |
 |------------|-------------------------------------------------------------------------------------------------------------------------|----------------------------------|
 | `/pulse/`  | last cycle is newer than `MAX_CYCLE_LIFETIME_IN_SECONDS`. A GET also *records* a cycle, so it cannot be used as a probe | Docker `HEALTHCHECK`             |
-| `/healthz` | this process is up and serving. Read-only                                                                               | Kubernetes liveness              |
-| `/readyz`  | the watcher has finished its first cycle. Read-only, one-way                                                            | Kubernetes startup and readiness |
+| `/healthz` | this process is up and serving. Read-only                                                                               | liveness probe                   |
+| `/readyz`  | the watcher has finished its first cycle. Read-only, one-way                                                            | startup and readiness probes     |
 
-Neither `/healthz` nor `/readyz` reports staleness. A liveness failure would restart the pod and cost a full re-read of
-the validator set and of every validator key; a readiness failure would take the pod out of Prometheus' targets, turning
-a flat metric into an absent one. A stuck watcher is an alert on the metrics (`HeadBlockIsNotChanging`,
-`EHWStuckBotProcessing`), not a kubelet decision.
+Neither `/healthz` nor `/readyz` reports staleness. A liveness failure would restart the process and cost a full re-read
+of the validator set and of every validator key; a readiness failure could take the instance out of the scrape targets,
+turning a flat metric into an absent one. A stuck watcher is an alert on the metrics (`HeadBlockIsNotChanging`,
+`EHWStuckBotProcessing`), not a restart.
 
 ## Release flow
 
