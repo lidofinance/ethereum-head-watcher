@@ -1,15 +1,23 @@
 """Cross-service RPC metrics: no label carries a credential or a per-request value; only node providers report."""
 
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse
+
 import pytest
 from prometheus_client import REGISTRY
 from urllib3 import Retry
+from web3 import Web3
 
 from src.metrics.prometheus import rpc
-from src.metrics.prometheus.rpc import LAYER_CL, normalize_provider, response_code_class
+from src.metrics.prometheus.rpc import LAYER_CL, LAYER_EL, normalize_provider, response_code_class
 from src.providers.alertmanager.client import AlertmanagerClient
 from src.providers.consensus.client import ConsensusClient
 from src.providers.keys_api.client import KeysAPIClient
 from src.utils.build import user_agent
+from src.web3py.extensions import FallbackProviderModule
+from src.web3py.middleware import metrics_collector
 from tests.node_fake import BeaconNodeFake
 
 NO_RETRIES = Retry(total=0)
@@ -20,6 +28,29 @@ def node():
     fake = BeaconNodeFake(chain_id=17000).start()
     yield fake
     fake.stop()
+
+
+@pytest.fixture
+def el_node():
+    """An execution node that answers every JSON-RPC call with 0x10."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):  # pylint: disable=invalid-name
+            request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            body = json.dumps({'jsonrpc': '2.0', 'id': request['id'], 'result': '0x10'}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f'http://127.0.0.1:{server.server_port}'
+    server.shutdown()
 
 
 @pytest.fixture(autouse=True)
@@ -101,6 +132,31 @@ def test_an_unreachable_endpoint_is_counted_without_a_response_code():
         ConsensusClient([unreachable]).get(ConsensusClient.API_GET_GENESIS, retry_strategy=NO_RETRIES)
 
     assert requests_total(**labels, batched='false', response_code='', result='fail') == before + 1
+
+
+def test_an_execution_call_that_fell_back_is_counted_on_each_endpoint_it_tried(el_node):
+    unreachable = 'http://127.0.0.1:1'
+    common = {'network': 'ethereum', 'layer': 'el', 'chain_id': rpc.chain_id(LAYER_EL)}
+    tried = {**common, 'provider': '127.0.0.1:1'}
+    answered = {**common, 'provider': normalize_provider(el_node)}
+    legacy = {
+        'endpoint': 'eth_blockNumber',
+        'code': '0',
+        'domain': urlparse(el_node).netloc,
+        'call_method': '',
+        'call_to': '',
+    }
+    before_tried = requests_total(**tried, batched='false', response_code='', result='fail')
+    before_answered = calls_total(**answered, method='eth_blockNumber', result='success', rpc_error_code='')
+    before_legacy = REGISTRY.get_sample_value('ethereum_head_watcher_el_requests_duration_count', legacy) or 0.0
+
+    w3 = Web3(FallbackProviderModule([unreachable, el_node]))
+    w3.middleware_onion.add(metrics_collector)
+    assert w3.eth.block_number == 16
+
+    assert requests_total(**tried, batched='false', response_code='', result='fail') == before_tried + 1
+    assert calls_total(**answered, method='eth_blockNumber', result='success', rpc_error_code='') == before_answered + 1
+    assert REGISTRY.get_sample_value('ethereum_head_watcher_el_requests_duration_count', legacy) == before_legacy + 1
 
 
 def test_the_chain_id_comes_from_the_consensus_spec(node):
