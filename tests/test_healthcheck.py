@@ -16,6 +16,7 @@ class HandlerStub(PulseRequestHandler):
     def __init__(self):  # pylint: disable=super-init-not-called
         self.statuses = []
         self.wfile = io.BytesIO()
+        self.path = healthcheck_server.PULSE_PATH
 
     def send_response(self, code, message=None):
         self.statuses.append(code)

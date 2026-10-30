@@ -30,8 +30,41 @@ jobs:
         run: |
           poetry install --no-interaction --with=dev
 
-      - name: Test with pytest
-        run: poetry run pytest tests
+      # Two steps rather than one run, so a provider being slow is distinguishable at a glance
+      # from the watcher deciding something wrong. Both are required.
+      - name: Test with pytest (no providers needed)
+        run: poetry run pytest tests -m "not integration"
+        env:
+          DRY_RUN: true
+
+      # GitHub masks a secret only where its whole value appears, and requests reports a failed call by its
+      # path alone ("with url: /v2/<key>/..."), so the path, the query and every long part of them are masked too.
+      - name: Mask the provider keys inside the endpoint URLs
+        shell: bash
+        env:
+          CL: ${{ secrets.CL_API_URL }}
+          EL: ${{ secrets.EXECUTION_API_URL }}
+          KAPI: ${{ secrets.KEYS_API_URL }}
+        run: |
+          for list in "$CL" "$EL" "$KAPI"; do
+            IFS=',' read -ra urls <<< "$list"
+            for url in "${urls[@]}"; do
+              rest="${url#*://}"
+              host="${rest%%[/?]*}"
+              [[ "$host" == *@* ]] && echo "::add-mask::${host%@*}"
+              tail="${rest:${#host}}"
+              tail="${tail#/}"
+              [ -z "$tail" ] && continue
+              echo "::add-mask::$tail"
+              IFS='/?&=' read -ra parts <<< "$tail"
+              for part in "${parts[@]}"; do
+                [ "${#part}" -ge 24 ] && echo "::add-mask::$part"
+              done
+            done
+          done
+
+      - name: Test with pytest (replays against live providers)
+        run: poetry run pytest tests -m integration
         env:
           CONSENSUS_CLIENT_URI: ${{ secrets.CL_API_URL }}
           EXECUTION_CLIENT_URI: ${{ secrets.EXECUTION_API_URL }}
