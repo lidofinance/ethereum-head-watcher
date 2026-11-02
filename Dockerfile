@@ -20,11 +20,11 @@ RUN poetry install --only main --no-root
 
 FROM python:3.11.4-slim-bookworm AS production
 
-# The shared build workflow passes these three; the legacy pipeline instead seds the committed
-# build-info.json, which is why both paths end at the same file.
-ARG BUILD_VERSION=REPLACE_WITH_VERSION
-ARG BUILD_BRANCH=REPLACE_WITH_BRANCH
-ARG BUILD_COMMIT=REPLACE_WITH_COMMIT
+# The k8s build passes these as build args; the legacy pipeline passes none and rewrites
+# build-info.json in the checkout instead, so the file is only overwritten when they are set.
+ARG BUILD_VERSION
+ARG BUILD_BRANCH
+ARG BUILD_COMMIT
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -39,8 +39,10 @@ COPY --from=builder $VENV_PATH $VENV_PATH
 WORKDIR /app
 COPY . .
 
-RUN printf '{"version": "%s", "branch": "%s", "commit": "%s"}\n' \
-      "$BUILD_VERSION" "$BUILD_BRANCH" "$BUILD_COMMIT" > build-info.json \
+RUN if [ -n "$BUILD_COMMIT" ]; then \
+      printf '{"version": "%s", "branch": "%s", "commit": "%s"}\n' \
+        "$BUILD_VERSION" "$BUILD_BRANCH" "$BUILD_COMMIT" > build-info.json; \
+    fi \
  && chown -R www-data /app/
 
 EXPOSE $PROMETHEUS_PORT

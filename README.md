@@ -248,9 +248,9 @@ The Keys API and the Alertmanager are not blockchain RPC and are not reported he
 
 ### Build info
 
-`ethereum_head_watcher_build_info` comes from `build-info.json` at the working directory. The image writes that file
-from the `BUILD_VERSION`, `BUILD_BRANCH` and `BUILD_COMMIT` build arguments; a checkout has the placeholder file the
-release pipeline substitutes into.
+`ethereum_head_watcher_build_info` comes from `build-info.json` at the working directory. When
+`BUILD_COMMIT` is set, the image writes that file from the `BUILD_VERSION`, `BUILD_BRANCH` and `BUILD_COMMIT` build
+arguments; otherwise it keeps the file from the checkout, which has the placeholder the release pipeline substitutes into.
 
 ### Healthcheck endpoints
 

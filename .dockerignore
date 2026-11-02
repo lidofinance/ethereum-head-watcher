@@ -1,5 +1,5 @@
 # Everything the runtime image has no use for. build-info.json and assets/ are deliberately absent:
-# the image writes the first from build args and reads the ABIs in the second at startup.
+# the first comes from the checkout or build args, and the ABIs in the second are read at startup.
 .git
 .github
 .gitignore
