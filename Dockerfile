@@ -1,4 +1,4 @@
-FROM python:3.11.4-slim-bookworm AS builder
+FROM python:3.11.18-slim-trixie AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -18,7 +18,7 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --only main --no-root
 
 
-FROM python:3.11.4-slim-bookworm AS production
+FROM python:3.11.18-slim-trixie AS production
 
 # The k8s build passes these as build args; the legacy pipeline passes none and rewrites
 # build-info.json in the checkout instead, so the file is only overwritten when they are set.
