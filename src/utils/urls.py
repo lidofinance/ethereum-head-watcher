@@ -4,6 +4,14 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 URL_IN_TEXT = re.compile(r'https?://[^\s\'"]+')
+# A credential named in an error or a response body, whatever endpoint it belongs to: a JSON or repr field,
+# a form or query pair, an Authorization header, a bare bearer token.
+_NAMED_SECRET = re.compile(
+    r'(?i)(\b(?:api[_-]?key|apikey|access[_-]?token|auth[_-]?token|client[_-]?secret|secret|password|passwd)\b'
+    r'["\']?\s*[:=]\s*["\']?)[^\s"\'&,;}]+'
+)
+_AUTHORIZATION = re.compile(r'(?i)(\bauthorization\b["\']?\s*[:=]\s*["\']?)(?:(?:bearer|basic|token)\s+)?[^\s"\',;}]+')
+_BEARER = re.compile(r'(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+')
 
 _LOCK = threading.Lock()
 # Registered substring -> what it is replaced with. Readers take `_redaction` in a single load, writers
@@ -17,7 +25,9 @@ def mask_url(url: str) -> str:
     parsed = urlparse(url)
     if not parsed.netloc:
         return url
-    return f'{parsed.scheme}://{parsed.netloc}'
+    # `user:password@` is part of netloc
+    host = parsed.netloc.rpartition('@')[2]
+    return f'{parsed.scheme}://{host}'
 
 
 def mask_urls_in(text: str) -> str:
@@ -78,6 +88,13 @@ def redact_registered_parts(text: str) -> str:
     return pattern.sub(lambda match: replacements[match.group()], text)
 
 
+def redact_named_secrets(text: str) -> str:
+    """Redaction by shape, for a credential this process was never configured with."""
+    text = _AUTHORIZATION.sub(lambda match: f'{match.group(1)}****', text)
+    text = _BEARER.sub('Bearer ****', text)
+    return _NAMED_SECRET.sub(lambda match: f'{match.group(1)}****', text)
+
+
 def redact_text(text: str) -> str:
     """Value redaction first, so a URL whose path became `/****` still collapses to scheme and host."""
-    return mask_urls_in(redact_registered_parts(text))
+    return mask_urls_in(redact_named_secrets(redact_registered_parts(text)))

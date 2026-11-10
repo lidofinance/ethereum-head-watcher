@@ -52,3 +52,8 @@ def test_text_without_urls_is_untouched():
     text = 'Block 0xabc123 not found at slot 12345'
 
     assert mask_urls_in(text) == text
+
+
+def test_userinfo_is_dropped_from_a_url_nobody_registered():
+    assert mask_url('https://user:SECRETPASSWORD@provider.org/v1') == 'https://provider.org'
+    assert 'SECRETPASSWORD' not in mask_urls_in('failed on https://user:SECRETPASSWORD@provider.org:8545 (timeout)')

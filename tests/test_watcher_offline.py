@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from src import variables
+from src import watcher as watcher_module
 from src.handlers.exit import ExitsHandler
 from src.handlers.fork import ForkHandler
 from src.handlers.slashing import SlashingHandler
@@ -144,5 +145,30 @@ def test_the_reorg_alert_fires_for_an_unknown_parent(caplog, keys_file, dry_run,
         watcher.run(f'{start + 3}-{start + 3}')
 
         assert 'unhandled' in caplog.text.lower() or 'reorg' in caplog.text.lower()
+    finally:
+        node.stop()
+
+
+def test_a_head_waits_for_the_validator_index_and_is_handled_once_it_loads(caplog, keys_file, dry_run, monkeypatch):
+    # An empty index is what a failed load leaves behind. Handled then, the head would lose the slashing of our
+    # validator, and its pulse would open readiness.
+    slot = current_slot() - 2
+    node = BeaconNodeFake(
+        head_slot=slot, validators={}, bodies={slot: {'attester_slashings': [attester_slashing(['100'])]}}
+    ).start()
+    pulses = []
+    monkeypatch.setattr(watcher_module, 'pulse', lambda: pulses.append(slot))
+    try:
+        caplog.set_level(logging.INFO)
+        watcher = build_watcher(node, monkeypatch)
+
+        assert watcher.run_cycle(str(slot)) is False
+        assert not watcher.handled_blocks
+        assert not pulses
+
+        node.validators = VALIDATORS
+        assert watcher.run_cycle(str(slot)) is True
+        assert pulses == [slot]
+        assert 'Our validators were slashed' in caplog.text
     finally:
         node.stop()

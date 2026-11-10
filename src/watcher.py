@@ -71,6 +71,15 @@ class Watcher:
         if self.validators_updater is None or self.validators_updater.done():
             self.validators_updater = self._update_validators()
 
+        if not self._keys_loaded():
+            # A head handled before the first load would miss every event of our validators, and the first pulse opens
+            # readiness. The head stays unhandled, so the next cycle retries it.
+            self.keys_updater.result()
+            self.validators_updater.result()
+            if not self._keys_loaded():
+                logger.warning({'msg': f'Keys are not loaded, head [{current_head.header.message.slot}] is not handled'})
+                return False
+
         logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
 
         # ATTENTION! While we handle current head, new head could be happened
@@ -112,6 +121,10 @@ class Watcher:
                 except Exception as e:  # pylint: disable=broad-except
                     logger.error({'msg': 'Error while handling head', 'exception': str(e)})
                 time.sleep(CYCLE_SLEEP_IN_SECONDS)
+
+    def _keys_loaded(self) -> bool:
+        """Whether both our keys and the validator index have loaded at least once"""
+        return bool(self.user_keys) and bool(self.indexed_validators_keys)
 
     def execution_requests(self, head: FullBlockInfo) -> ExecutionRequestsContext:
         """Execution requests applied to the state while `head` was being processed, resolved once per head"""
