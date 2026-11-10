@@ -53,6 +53,7 @@ class Watcher:
         self.chain_reorg_event_listener: threading.Thread | None = None
         self.user_keys: dict[str, NamedKey] = {}
         self.indexed_validators_keys: dict[str, str] = {}
+        self._validators_index_slot: int | None = None
         self.chain_reorgs: dict[str, ChainReorgEvent] = {}
         self._chain_reorgs_lock = threading.Lock()
         self.handled_blocks: list[FullBlockInfo] = []
@@ -154,7 +155,8 @@ class Watcher:
         now = time.time()
         diff = now - self.genesis_time
         slot = int(diff / SECONDS_PER_SLOT)
-        if self.indexed_validators_keys and slot % SLOTS_PER_EPOCH != 0:
+        # A head that is not handled is retried every cycle, so one boundary slot can call this a dozen times
+        if self.indexed_validators_keys and (slot % SLOTS_PER_EPOCH != 0 or slot == self._validators_index_slot):
             return
         logger.info({'msg': 'Updating indexed validators keys'})
         try:
@@ -167,6 +169,7 @@ class Watcher:
             return
 
         logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
+        self._validators_index_slot = slot
         VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
 
     @unsync

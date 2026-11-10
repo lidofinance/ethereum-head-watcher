@@ -2,6 +2,8 @@
 Keys come from a file (`KEYS_SOURCE=file`), which takes the execution layer out of the picture too."""
 
 import logging
+import time
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -170,5 +172,21 @@ def test_a_head_waits_for_the_validator_index_and_is_handled_once_it_loads(caplo
         assert watcher.run_cycle(str(slot)) is True
         assert pulses == [slot]
         assert 'Our validators were slashed' in caplog.text
+    finally:
+        node.stop()
+
+
+def test_the_validator_index_is_read_once_per_epoch_boundary(keys_file, monkeypatch):
+    # While a head waits for the keys, the cycle runs every second and reschedules the updaters
+    node = BeaconNodeFake(validators=VALIDATORS).start()
+    try:
+        watcher = build_watcher(node, monkeypatch)
+        boundary = watcher.genesis_time + (current_slot() // 32 + 1) * 32 * 12
+        monkeypatch.setattr(watcher_module, 'time', SimpleNamespace(time=lambda: boundary + 1, sleep=time.sleep))
+
+        for _ in range(3):
+            watcher._update_validators().result()  # pylint: disable=protected-access
+
+        assert node.requests['states/{state}/validators'] == 1
     finally:
         node.stop()
