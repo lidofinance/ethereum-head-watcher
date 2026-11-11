@@ -23,7 +23,8 @@ SERVING_BODY = b'{"metrics": "ok", "reason": "serving"}\n'
 COLD_BODY = b'{"metrics": "fail", "reason": "no cycle completed yet"}\n'
 
 _last_pulse = datetime.now()
-# Unlike _last_pulse, starts cold: readiness waits for the first completed cycle, which reads every validator key.
+# Unlike _last_pulse, starts cold: readiness waits for the first handled head, and the watcher handles none
+# before our keys and the validator index have loaded.
 _first_pulse_registered = False
 
 
@@ -42,7 +43,7 @@ def register_pulse() -> None:
 
 
 def is_ready() -> bool:
-    """Whether the watcher has completed a cycle at least once"""
+    """Whether the watcher has handled a head at least once"""
     return _first_pulse_registered
 
 

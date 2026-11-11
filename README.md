@@ -59,6 +59,10 @@ what covers the failure texts `requests` and `urllib3` produce, which name the r
 scheme in them to match a URL on. The registry is extended on every rotation and never shrinks, so a key rotated out
 is still redacted from an exception text logged later.
 
+Two more rules need no configuration: the userinfo of any URL is dropped along with its path, and a credential named
+in an error or a response body (`api_key`, `password`, `client_secret` and the like, an `Authorization` header, a
+`Bearer` token) is replaced with `****`.
+
 ## Application Env variables
 
 ---
@@ -260,7 +264,7 @@ The healthcheck server serves three paths:
 |------------|-------------------------------------------------------------------------------------------------------------------------|----------------------------------|
 | `/pulse/`  | last cycle is newer than `MAX_CYCLE_LIFETIME_IN_SECONDS`. A GET also *records* a cycle, so it cannot be used as a probe | Docker `HEALTHCHECK`             |
 | `/healthz` | this process is up and serving. Read-only                                                                               | liveness probe                   |
-| `/readyz`  | the watcher has finished its first cycle. Read-only, one-way                                                            | startup and readiness probes     |
+| `/readyz`  | the watcher has handled its first head, which it does only once the keys and the validator index have loaded. Read-only, one-way | startup and readiness probes     |
 
 Neither `/healthz` nor `/readyz` reports staleness. A liveness failure would restart the process and cost a full re-read
 of the validator set and of every validator key; a readiness failure could take the instance out of the scrape targets,

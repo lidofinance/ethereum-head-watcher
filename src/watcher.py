@@ -53,6 +53,7 @@ class Watcher:
         self.chain_reorg_event_listener: threading.Thread | None = None
         self.user_keys: dict[str, NamedKey] = {}
         self.indexed_validators_keys: dict[str, str] = {}
+        self._validators_index_slot: int | None = None
         self.chain_reorgs: dict[str, ChainReorgEvent] = {}
         self._chain_reorgs_lock = threading.Lock()
         self.handled_blocks: list[FullBlockInfo] = []
@@ -70,6 +71,15 @@ class Watcher:
             self.keys_updater = self._update_user_keys(current_head)
         if self.validators_updater is None or self.validators_updater.done():
             self.validators_updater = self._update_validators()
+
+        if not self._keys_loaded():
+            # A head handled before the first load would miss every event of our validators, and the first pulse opens
+            # readiness. The head stays unhandled, so the next cycle retries it.
+            self.keys_updater.result()
+            self.validators_updater.result()
+            if not self._keys_loaded():
+                logger.warning({'msg': f'Keys are not loaded, head [{current_head.header.message.slot}] is not handled'})
+                return False
 
         logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
 
@@ -113,6 +123,10 @@ class Watcher:
                     logger.error({'msg': 'Error while handling head', 'exception': str(e)})
                 time.sleep(CYCLE_SLEEP_IN_SECONDS)
 
+    def _keys_loaded(self) -> bool:
+        """Whether both our keys and the validator index have loaded at least once"""
+        return bool(self.user_keys) and bool(self.indexed_validators_keys)
+
     def execution_requests(self, head: FullBlockInfo) -> ExecutionRequestsContext:
         """Execution requests applied to the state while `head` was being processed, resolved once per head"""
         if self._execution_requests is None or self._execution_requests[0] != head.root:
@@ -141,7 +155,8 @@ class Watcher:
         now = time.time()
         diff = now - self.genesis_time
         slot = int(diff / SECONDS_PER_SLOT)
-        if self.indexed_validators_keys and slot % SLOTS_PER_EPOCH != 0:
+        # A head that is not handled is retried every cycle, so one boundary slot can call this a dozen times
+        if self.indexed_validators_keys and (slot % SLOTS_PER_EPOCH != 0 or slot == self._validators_index_slot):
             return
         logger.info({'msg': 'Updating indexed validators keys'})
         try:
@@ -154,6 +169,7 @@ class Watcher:
             return
 
         logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
+        self._validators_index_slot = slot
         VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
 
     @unsync
