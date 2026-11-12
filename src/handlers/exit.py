@@ -12,7 +12,7 @@ from src.alerts.common import CommonAlert
 from src.handlers.handler import WatcherHandler
 from src.keys_source.base_source import SourceType
 from src.metrics.prometheus.duration_meter import duration_meter
-from src.providers.consensus.typings import BlockDetailsResponse, FullBlockInfo
+from src.providers.consensus.typings import FullBlockInfo
 from src.typings import BlockNumber
 from src.utils.events import get_events_in_range
 from src.utils.exit import ValidatorExitsInfo, get_last_requested_validator_exit_indexes
@@ -24,6 +24,8 @@ logger = logging.getLogger()
 Owner = Literal['user', 'other', 'unknown']
 
 BATCH_TUPLE_TYPE = '(bytes[],bytes)[]'
+
+CONSOLIDATIONS_REORG_DEPTH_BLOCKS = 64
 
 
 @dataclass
@@ -49,15 +51,28 @@ class ConsolidationBatchItem:
     target_pubkey: str
 
 
+def _decode_batch(batch_data: bytes) -> set[ConsolidationBatchItem]:
+    (batch,) = decode([BATCH_TUPLE_TYPE], batch_data)
+    return {
+        ConsolidationBatchItem(
+            source_pubkeys=tuple(bytes_to_hex_str(pubkey) for pubkey in sources),
+            target_pubkey=bytes_to_hex_str(target),
+        )
+        for sources, target in batch
+    }
+
+
 class ExitsHandler(WatcherHandler):
     last_total_vebo_requests_processed = 0
     last_requested_exit_indexes: dict[int, set[int]]
-    last_requested_consolidations: dict[int, set[ConsolidationBatchItem]]
+    last_requested_consolidations: dict[bytes, tuple[int, set[ConsolidationBatchItem]]]
+    last_consolidations_synced_block: int
 
     def __init__(self):
         super().__init__()
         self.last_requested_exit_indexes = {}
         self.last_requested_consolidations = {}
+        self.last_consolidations_synced_block = -1
 
     @unsync
     @duration_meter()
@@ -100,15 +115,18 @@ class ExitsHandler(WatcherHandler):
         unknown_exits = [s for s in exits if s.owner == 'unknown']
         if user_exits:
             if variables.KEYS_SOURCE == SourceType.KEYS_API.value:
-                self._update_last_requested_exit_indexes(watcher, block)
-                self._update_last_consolidations(watcher, block)
+                # Since Gloas (EIP-7732) the head block has no payload of its own, so the latest EL
+                # block applied to the state is the one revealed for the parent block
+                el_block_number = watcher.execution_requests(block).el_block_number
+                self._update_last_requested_exit_indexes(watcher, el_block_number)
+                self._update_last_consolidations(watcher, el_block_number)
 
             all_expected = set().union(*self.last_requested_exit_indexes.values())
             all_consolidation_pubkeys = set().union(
                 *(
                     {item.target_pubkey, *item.source_pubkeys}
-                    for batch_items in self.last_requested_consolidations.values()
-                    for item in batch_items
+                    for _, items in self.last_requested_consolidations.values()
+                    for item in items
                 )
             )
 
@@ -201,7 +219,7 @@ class ExitsHandler(WatcherHandler):
             self.send_alert(watcher, alert.build_body(summary, description, ADDITIONAL_ALERTMANAGER_LABELS))
 
     @duration_meter()
-    def _update_last_requested_exit_indexes(self, watcher, block: BlockDetailsResponse) -> None:
+    def _update_last_requested_exit_indexes(self, watcher, el_block_number: Optional[int]) -> None:
         """Update local cache with last validator indexes requested to exit by VEBO"""
 
         # pylint: disable=duplicate-code
@@ -210,13 +228,13 @@ class ExitsHandler(WatcherHandler):
             last_requested_exit_indexes=self.last_requested_exit_indexes,
         )
 
-        updated_exits_info = get_last_requested_validator_exit_indexes(watcher, block, exits_info)
+        updated_exits_info = get_last_requested_validator_exit_indexes(watcher, el_block_number, exits_info)
 
         self.last_total_vebo_requests_processed = updated_exits_info.last_total_requests_processed
         self.last_requested_exit_indexes = updated_exits_info.last_requested_exit_indexes
 
     @duration_meter()
-    def _update_last_consolidations(self, watcher, block: BlockDetailsResponse) -> None:
+    def _update_last_consolidations(self, watcher, el_block_number: Optional[int]) -> None:
         """Update local cache with information about last validator consolidations in ConsolidationBus"""
         if not watcher.keys_source.modules_operators_dict:
             return
@@ -224,44 +242,55 @@ class ExitsHandler(WatcherHandler):
         if not watcher.execution.lido_contracts.consolidation_bus:
             return
 
-        current_block_number = int(block.message.body.execution_payload.block_number)
+        if el_block_number is None:
+            # Since Gloas (EIP-7732) the block carries no payload of its own, so `el_block_number`
+            # is resolved by `_applied_el_block_number` from the parent block hash of the payload
+            # bid. That lookup can fail, and then there is no EL block to call the contracts at.
+            logger.warning({'msg': 'No EL block number for the head block, skipping ConsolidationBus lookup'})
+            return
+
+        if el_block_number <= self.last_consolidations_synced_block:
+            return
 
         logger.info({'msg': 'Getting last validator consolidations from ConsolidationBus'})
 
         lookup_window = Web3.to_int(
             watcher.execution.lido_contracts.oracle_daemon_config.functions.get(
                 'EXIT_EVENTS_LOOKBACK_WINDOW_IN_SLOTS'
-            ).call(block_identifier=current_block_number)
+            ).call(block_identifier=el_block_number)
         )
 
-        last_cached_block = -1
-        if self.last_requested_consolidations:
-            last_cached_block = max(self.last_requested_consolidations)
+        window_start = el_block_number - lookup_window
+        l_block = max(self.last_consolidations_synced_block + 1 - CONSOLIDATIONS_REORG_DEPTH_BLOCKS, window_start, 0)
 
-        l_block = max(last_cached_block + 1, current_block_number - lookup_window)
+        self.last_requested_consolidations = {
+            batch_hash: entry for batch_hash, entry in self.last_requested_consolidations.items() if entry[0] < l_block
+        }
 
         events = get_events_in_range(
-            watcher.execution.lido_contracts.consolidation_bus.events.RequestsAdded,
+            watcher.execution.lido_contracts.consolidation_bus,
+            ['RequestsAdded', 'BatchesRemoved'],
             l_block=BlockNumber(l_block),
-            r_block=BlockNumber(current_block_number),
+            r_block=BlockNumber(el_block_number),
         )
 
         for event in events:
-            if event['blockNumber'] not in self.last_requested_consolidations:
-                self.last_requested_consolidations[event['blockNumber']] = set()
-
-            consolidation_group = decode([BATCH_TUPLE_TYPE], event['args']['batchData'])[0]
-
-            for batch in consolidation_group:
-                source_pubkeys = tuple(bytes_to_hex_str(pubkey) for pubkey in batch[0])
-                target_pubkey = bytes_to_hex_str(batch[1])
-                self.last_requested_consolidations[event['blockNumber']].add(
-                    ConsolidationBatchItem(
-                        source_pubkeys=source_pubkeys,
-                        target_pubkey=target_pubkey,
+            args = event['args']
+            match event['event']:
+                case 'RequestsAdded':
+                    self.last_requested_consolidations[Web3.keccak(args['batchData'])] = (
+                        event['blockNumber'],
+                        _decode_batch(args['batchData']),
                     )
-                )
+                case 'BatchesRemoved':
+                    for batch_hash in args['batchHashes']:
+                        self.last_requested_consolidations.pop(batch_hash, None)
+                case _:
+                    raise ValueError(f"Unexpected ConsolidationBus event {event['event']}")
 
-        for cached_block in list(self.last_requested_consolidations.keys()):
-            if cached_block < current_block_number - lookup_window:
-                del self.last_requested_consolidations[cached_block]
+        self.last_requested_consolidations = {
+            batch_hash: entry
+            for batch_hash, entry in self.last_requested_consolidations.items()
+            if entry[0] >= window_start
+        }
+        self.last_consolidations_synced_block = el_block_number

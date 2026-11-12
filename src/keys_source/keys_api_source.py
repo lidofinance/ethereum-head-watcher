@@ -34,7 +34,6 @@ class KeysApiSource(BaseSource):
         current_nonce = sum(module['nonce'] for module in modules)
         if self.keys_api_nonce == current_nonce:
             return None
-        self.keys_api_nonce = current_nonce
 
         logger.info({'msg': 'Updating User keys'})
         modules_operators_stream = self.keys_api.get_operators_stream()
@@ -47,6 +46,8 @@ class KeysApiSource(BaseSource):
             json_stream.requests.load(fetched_lido_keys_stream)['data'], module_operators_name
         )
 
+        # Saved only after a full load: a failed one has to be retried, not skipped as unchanged
+        self.keys_api_nonce = current_nonce
         self.keys_api_status = current_keys_status
 
         return user_keys

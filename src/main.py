@@ -1,3 +1,5 @@
+import signal
+
 from prometheus_client import start_http_server
 from web3.middleware import simple_cache_middleware
 
@@ -13,8 +15,16 @@ from src.keys_source.file_source import FileSource
 from src.keys_source.keys_api_source import KeysApiSource
 from src.metrics.healthcheck_server import start_pulse_server
 from src.metrics.logging import logging
-from src.metrics.prometheus.basic import BUILD_INFO
-from src.utils.build import get_build_info
+from src.metrics.prometheus.basic import (
+    BUILD_INFO,
+    SECRETS_FILE_MTIME,
+    SECRETS_RELOADS,
+    Status,
+)
+from src.metrics.prometheus.rpc import LAYER_CL, LAYER_EL, set_chain_id
+from src.secrets import SecretsWatcher, read_secrets_file_mtime
+from src.utils.build import get_build_info, user_agent
+from src.utils.urls import register_credential_urls
 from src.watcher import Watcher
 from src.web3py.extensions import FallbackProviderModule, LidoContracts
 from src.web3py.middleware import metrics_collector
@@ -52,12 +62,118 @@ def build_handlers(enabled_handlers: list[str] | None = None) -> list[WatcherHan
     return handlers
 
 
+# The settings a rotation can be applied to while the watcher runs. Anything else in the file is
+# read at startup and only at startup.
+LIVE_APPLIED_SETTINGS = ('CONSENSUS_CLIENT_URI', 'EXECUTION_CLIENT_URI', 'KEYS_API_URI', 'ALERTMANAGER_URI')
+
+
+def el_request_headers() -> dict[str, str]:
+    """web3 drops its whole default header set the moment `headers` is given, so Content-Type is repeated here."""
+    return {'Content-Type': 'application/json', 'User-Agent': user_agent()}
+
+
+def resolve_chain_ids(watcher: Watcher) -> None:
+    """Fill in the `chain_id` label of the RPC metrics once; a layer that does not answer stays `unknown`."""
+    try:
+        set_chain_id(LAYER_CL, watcher.consensus.get_deposit_chain_id())
+    except Exception as error:  # pylint: disable=broad-except
+        logger.warning({'msg': 'Can not resolve the consensus layer chain id', 'exception': str(error)})
+
+    if watcher.execution is None:
+        return
+    try:
+        provider: FallbackProviderModule = watcher.execution.provider  # type: ignore[assignment]
+        set_chain_id(LAYER_EL, provider.check_providers_consistency())
+    except Exception as error:  # pylint: disable=broad-except
+        logger.warning({'msg': 'Can not resolve the execution layer chain id', 'exception': str(error)})
+
+
+def unapplied_changes(values: dict[str, str], in_force: dict[str, str]) -> list[str]:
+    """Keys the file changed that no live apply reaches; without this such a rotation looks like none at all."""
+    return sorted(
+        key for key, value in values.items() if key not in LIVE_APPLIED_SETTINGS and in_force.get(key) != value
+    )
+
+
+def apply_rotated_secrets(values: dict[str, str], watcher: Watcher, in_force: dict[str, str]) -> list[str]:
+    """Swap in endpoints from a rotated secrets file; a restart would re-read every validator and key."""
+    changed = []
+
+    # Before anything is applied or logged: the rotated-in key has to be redactable from this point on, and the
+    # rotated-out one stays registered because a stale exception text still carries it.
+    register_credential_urls(*(_split(values.get(name)) for name in LIVE_APPLIED_SETTINGS))
+
+    consensus_uri = _split(values.get('CONSENSUS_CLIENT_URI'))
+    if consensus_uri and consensus_uri != watcher.consensus.hosts:
+        watcher.consensus.hosts = consensus_uri
+        changed.append('CONSENSUS_CLIENT_URI')
+
+    alertmanager_uri = _split(values.get('ALERTMANAGER_URI'))
+    if alertmanager_uri and alertmanager_uri != watcher.alertmanager.hosts:
+        watcher.alertmanager.hosts = alertmanager_uri
+        changed.append('ALERTMANAGER_URI')
+
+    keys_api = getattr(watcher.keys_source, 'keys_api', None)
+    keys_api_uri = _split(values.get('KEYS_API_URI'))
+    if keys_api is not None and keys_api_uri and keys_api_uri != keys_api.hosts:
+        keys_api.hosts = keys_api_uri
+        changed.append('KEYS_API_URI')
+
+    execution_uri = _split(values.get('EXECUTION_CLIENT_URI'))
+    if watcher.execution is not None and execution_uri and execution_uri != variables.EXECUTION_CLIENT_URI:
+        # web3 6.x: `Web3.provider` has no setter, the manager's does; middlewares and contracts survive the swap.
+        watcher.execution.manager.provider = FallbackProviderModule(
+            execution_uri, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT, 'headers': el_request_headers()}
+        )
+        variables.EXECUTION_CLIENT_URI = execution_uri
+        changed.append('EXECUTION_CLIENT_URI')
+
+    if changed:
+        logger.info({'msg': f'Applied rotated secrets: {", ".join(changed)}'})
+        SECRETS_RELOADS.labels(Status.SUCCESS.value).inc()
+
+    if not_applied := unapplied_changes(values, in_force):
+        logger.warning(
+            {
+                'msg': f'Rotated settings a restart is needed for: {", ".join(not_applied)}',
+                'applied_live': ', '.join(LIVE_APPLIED_SETTINGS),
+            }
+        )
+        SECRETS_RELOADS.labels(Status.NOT_APPLIED.value).inc()
+
+    in_force.clear()
+    in_force.update(values)
+    SECRETS_FILE_MTIME.set((read_secrets_file_mtime(variables.SECRETS_FILE_PATH) or 0) / 1e9)
+    return changed
+
+
+def _split(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [entry for entry in (part.strip() for part in value.split(',')) if entry]
+
+
+def install_signal_handlers():
+    """Stop on SIGTERM and SIGHUP the way Ctrl-C does: as PID 1 the process has no default action for them."""
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.default_int_handler)
+
+
 def main():
     handlers = build_handlers(variables.parse_enabled_handlers(variables.ENABLED_HANDLERS))
 
     BUILD_INFO.info(get_build_info())
 
     logger.info({'msg': 'Ethereum head watcher startup.'})
+
+    if variables.SECRETS_FILE_LOADED:
+        logger.info({'msg': f'Configuration: {variables.SECRETS_FILE_PATH} over the environment'})
+    else:
+        logger.info(
+            {'msg': f'Configuration: the environment (no secrets file at {variables.SECRETS_FILE_PATH})'}
+        )
+
+    logger.info({'msg': 'Effective configuration', 'config': variables.effective_config()})
 
     logger.info({'msg': f'Start healthcheck server for Docker container on port {variables.HEALTHCHECK_SERVER_PORT}'})
     start_pulse_server()
@@ -69,7 +185,8 @@ def main():
         keys_source = KeysApiSource()
         web3 = Web3(
             FallbackProviderModule(
-                variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT}
+                variables.EXECUTION_CLIENT_URI,
+                request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT, 'headers': el_request_headers()},
             )
         )
         web3.attach_modules(
@@ -89,7 +206,26 @@ def main():
     if variables.DRY_RUN:
         logger.warning({'msg': 'Dry run mode enabled! No alerts will be sent.'})
 
-    Watcher(handlers, keys_source, web3).run()
+    watcher = Watcher(handlers, keys_source, web3)
+    resolve_chain_ids(watcher)
+
+    in_force = variables.secrets_in_force()
+    SECRETS_FILE_MTIME.set((read_secrets_file_mtime(variables.SECRETS_FILE_PATH) or 0) / 1e9)
+
+    SecretsWatcher(
+        variables.SECRETS_FILE_PATH,
+        on_change=lambda values: apply_rotated_secrets(values, watcher, in_force),
+        interval=variables.SECRETS_POLL_INTERVAL_IN_SECONDS,
+        on_error=lambda: SECRETS_RELOADS.labels(Status.FAILURE.value).inc(),
+    ).start()
+
+    install_signal_handlers()
+
+    try:
+        watcher.run()
+    except KeyboardInterrupt:
+        # One line, so a shutdown on purpose is distinguishable from being killed.
+        logger.info({'msg': 'Shutting down on a termination signal'})
 
 
 if __name__ == "__main__":

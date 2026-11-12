@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from src import variables
@@ -10,10 +12,17 @@ from src.web3py.extensions import FallbackProviderModule, LidoContracts
 from src.web3py.typings import Web3
 
 
+# The default EL timeout is tuned for head processing. Replaying historical ranges means eth_getLogs over thousands of
+# blocks, which a provider can take much longer to answer.
+TEST_REPLAY_EL_REQUEST_TIMEOUT = float(os.getenv('TEST_REPLAY_EL_REQUEST_TIMEOUT', 60))
+
+
 @pytest.fixture
 def watcher(request, monkeypatch):
     web3 = Web3(
-        FallbackProviderModule(variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': variables.EL_REQUEST_TIMEOUT})
+        FallbackProviderModule(
+            variables.EXECUTION_CLIENT_URI, request_kwargs={'timeout': TEST_REPLAY_EL_REQUEST_TIMEOUT}
+        )
     )
     web3.attach_modules(
         {

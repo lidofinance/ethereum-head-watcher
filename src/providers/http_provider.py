@@ -1,7 +1,10 @@
 import logging
+import time
 from abc import ABC
+from contextlib import contextmanager
+from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Callable, Optional, Sequence, Tuple
+from typing import Callable, Iterator, Optional, Sequence, Tuple
 from urllib.parse import urljoin, urlparse
 
 from prometheus_client import Histogram
@@ -9,9 +12,19 @@ from requests import Response, Session
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
+from src.metrics.prometheus.rpc import RESULT_FAIL, RESULT_SUCCESS, observe_rpc_request
 from src.typings import InfinityType
+from src.utils.build import user_agent
+from src.utils.urls import mask_urls_in
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RpcObservation:
+    """The part of a round trip that is only known once the response is in hand."""
+
+    status: int | None = None
 
 
 class NoHostsProvided(Exception):
@@ -42,6 +55,9 @@ class HTTPProvider(ABC):
     HTTP_REQUEST_RETRY_COUNT: int
     HTTP_REQUEST_SLEEP_BEFORE_RETRY_IN_SECONDS: float
     HTTP_REQUEST_RETRY_STATUS_FORCELIST = [418, 429, 500, 502, 503, 504]
+    # Set by the subclasses that talk to a node. The Keys API and the Alertmanager are not blockchain
+    # RPC endpoints, so they stay out of the cross-service RPC metrics.
+    RPC_LAYER: str | None = None
 
     def __init__(self, hosts: list[str]):
         if not hosts:
@@ -64,9 +80,30 @@ class HTTPProvider(ABC):
     def _prepare_session(self, custom_retry_strategy: Retry | None) -> Session:
         adapter = HTTPAdapter(max_retries=custom_retry_strategy or self.default_retry_strategy)
         session = Session()
+        session.headers['User-Agent'] = user_agent()
         session.mount("https://", adapter)
         session.mount("http://", adapter)
         return session
+
+    @contextmanager
+    def _rpc_observation(self, host: str, method: str) -> Iterator[RpcObservation]:
+        """Report one round trip in the RPC metrics; an exception leaving the block is the failure."""
+        observation = RpcObservation()
+        started = time.monotonic()
+        result = RESULT_FAIL
+        try:
+            yield observation
+            result = RESULT_SUCCESS
+        finally:
+            if self.RPC_LAYER is not None:
+                observe_rpc_request(
+                    layer=self.RPC_LAYER,
+                    provider_url=host,
+                    method=method,
+                    duration=time.monotonic() - started,
+                    status=observation.status,
+                    result=result,
+                )
 
     def get(
         self,
@@ -87,7 +124,7 @@ class HTTPProvider(ABC):
         """
         errors: list[Exception] = []
 
-        for host in self.hosts:
+        for index, host in enumerate(self.hosts):
             try:
                 result: tuple[dict | list, dict] = self._get_without_fallbacks(
                     host, endpoint, path_params, query_params, timeout, retry_strategy
@@ -109,9 +146,9 @@ class HTTPProvider(ABC):
 
                 logger.warning(
                     {
-                        'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
-                        'error': str(e),
-                        'provider': urlparse(host).netloc,
+                        'msg': f'[{self.__class__.__name__}] Provider {index + 1} of {len(self.hosts)} '
+                        'responded with error',
+                        'error': mask_urls_in(str(e)),
                     }
                 )
 
@@ -134,7 +171,7 @@ class HTTPProvider(ABC):
         """
         errors: list[Exception] = []
 
-        for host in self.hosts:
+        for index, host in enumerate(self.hosts):
             try:
                 return self._get_stream_without_fallbacks(
                     host, endpoint, path_params, query_params, timeout, retry_strategy, headers
@@ -148,9 +185,9 @@ class HTTPProvider(ABC):
 
                 logger.warning(
                     {
-                        'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
-                        'error': str(e),
-                        'provider': urlparse(host).netloc,
+                        'msg': f'[{self.__class__.__name__}] Provider {index + 1} of {len(self.hosts)} '
+                        'responded with error',
+                        'error': mask_urls_in(str(e)),
                     }
                 )
 
@@ -176,7 +213,7 @@ class HTTPProvider(ABC):
         """
         errors: list[Exception] = []
 
-        for host in self.hosts:
+        for index, host in enumerate(self.hosts):
             try:
                 return self._post_without_fallbacks(
                     host, endpoint, should_parse_json_response, path_params, query_body, timeout, retry_strategy
@@ -190,9 +227,9 @@ class HTTPProvider(ABC):
 
                 logger.warning(
                     {
-                        'msg': f'[{self.__class__.__name__}] Host [{urlparse(host).netloc}] responded with error',
-                        'error': str(e),
-                        'provider': urlparse(host).netloc,
+                        'msg': f'[{self.__class__.__name__}] Provider {index + 1} of {len(self.hosts)} '
+                        'responded with error',
+                        'error': mask_urls_in(str(e)),
                     }
                 )
 
@@ -215,7 +252,7 @@ class HTTPProvider(ABC):
         """
         complete_endpoint = endpoint.format(*path_params) if path_params else endpoint
 
-        with self.PROMETHEUS_HISTOGRAM.time() as t:
+        with self.PROMETHEUS_HISTOGRAM.time() as t, self._rpc_observation(host, endpoint) as observed:
             try:
                 response = self._prepare_session(retry_strategy).get(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
@@ -225,7 +262,7 @@ class HTTPProvider(ABC):
                     headers=headers,
                 )
             except Exception as error:
-                logger.debug({'msg': str(error)})
+                logger.debug({'msg': mask_urls_in(str(error))})
                 t.labels(
                     endpoint=endpoint,
                     code=0,
@@ -233,6 +270,7 @@ class HTTPProvider(ABC):
                 )
                 raise error
 
+            observed.status = response.status_code
             t.labels(
                 endpoint=endpoint,
                 code=response.status_code,
@@ -240,7 +278,7 @@ class HTTPProvider(ABC):
             )
 
             if response.status_code != HTTPStatus.OK:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
 
@@ -261,7 +299,7 @@ class HTTPProvider(ABC):
         """
         complete_endpoint = endpoint.format(*path_params) if path_params else endpoint
 
-        with self.PROMETHEUS_HISTOGRAM.time() as t:
+        with self.PROMETHEUS_HISTOGRAM.time() as t, self._rpc_observation(host, endpoint) as observed:
             try:
                 response = self._prepare_session(retry_strategy).get(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
@@ -269,7 +307,7 @@ class HTTPProvider(ABC):
                     timeout=None if isinstance(timeout, InfinityType) else timeout or self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
-                logger.debug({'msg': str(error)})
+                logger.debug({'msg': mask_urls_in(str(error))})
                 t.labels(
                     endpoint=endpoint,
                     code=0,
@@ -277,6 +315,7 @@ class HTTPProvider(ABC):
                 )
                 raise error
 
+            observed.status = response.status_code
             t.labels(
                 endpoint=endpoint,
                 code=response.status_code,
@@ -284,14 +323,14 @@ class HTTPProvider(ABC):
             )
 
             if response.status_code != HTTPStatus.OK:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
 
             try:
                 json_response = response.json()
             except Exception as error:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise error
 
@@ -320,7 +359,7 @@ class HTTPProvider(ABC):
         """
         complete_endpoint = endpoint.format(*path_params) if path_params else endpoint
 
-        with self.PROMETHEUS_HISTOGRAM.time() as t:
+        with self.PROMETHEUS_HISTOGRAM.time() as t, self._rpc_observation(host, endpoint) as observed:
             try:
                 response = self._prepare_session(retry_strategy).post(
                     self._urljoin(host, complete_endpoint if path_params else endpoint),
@@ -328,7 +367,7 @@ class HTTPProvider(ABC):
                     timeout=None if isinstance(timeout, InfinityType) else timeout or self.HTTP_REQUEST_TIMEOUT,
                 )
             except Exception as error:
-                logger.debug({'msg': str(error)})
+                logger.debug({'msg': mask_urls_in(str(error))})
                 t.labels(
                     endpoint=endpoint,
                     code=0,
@@ -336,6 +375,7 @@ class HTTPProvider(ABC):
                 )
                 raise error
 
+            observed.status = response.status_code
             t.labels(
                 endpoint=endpoint,
                 code=response.status_code,
@@ -343,7 +383,7 @@ class HTTPProvider(ABC):
             )
 
             if response.status_code != HTTPStatus.OK:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise NotOkResponse(response_fail_msg, status=response.status_code, text=response.text)
 
@@ -353,7 +393,7 @@ class HTTPProvider(ABC):
             try:
                 json_response = response.json()
             except Exception as error:
-                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] with text: "{str(response.text)}" returned.'
+                response_fail_msg = f'Response from {complete_endpoint} [{response.status_code}] returned.'
                 logger.debug({'msg': response_fail_msg})
                 raise error
 

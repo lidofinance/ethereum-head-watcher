@@ -14,6 +14,7 @@ from src import variables
 from src.constants import SECONDS_PER_SLOT, SLOTS_PER_EPOCH
 from src.handlers.handler import WatcherHandler
 from src.keys_source.base_source import BaseSource, NamedKey
+from src.metrics.healthcheck_server import pulse
 from src.metrics.prometheus.duration_meter import duration_meter
 from src.metrics.prometheus.watcher import (
     KEYS_SOURCE_SLOT_NUMBER,
@@ -22,19 +23,19 @@ from src.metrics.prometheus.watcher import (
 )
 from src.providers.alertmanager.client import AlertmanagerClient
 from src.providers.consensus.client import ConsensusClient
-from src.providers.consensus.typings import (
-    BlockHeaderResponseData,
-    ChainReorgEvent,
-    FullBlockInfo,
-)
+from src.providers.consensus.typings import ChainReorgEvent, FullBlockInfo
 from src.providers.http_provider import NotOkResponse
 from src.utils.decorators import thread_as_daemon
+from src.utils.execution_requests import (
+    ExecutionRequestsContext,
+    resolve_execution_requests,
+)
 from src.variables import CYCLE_SLEEP_IN_SECONDS, SLOTS_RANGE
 from src.web3py.typings import Web3
 
 logger = logging.getLogger()
 
-KEEP_MAX_HANDLED_HEADERS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
+KEEP_MAX_HANDLED_BLOCKS_COUNT = 96  # Keep only the last 96 slots (3 epochs) for chain reorgs check
 
 
 class Watcher:
@@ -52,64 +53,96 @@ class Watcher:
         self.chain_reorg_event_listener: threading.Thread | None = None
         self.user_keys: dict[str, NamedKey] = {}
         self.indexed_validators_keys: dict[str, str] = {}
+        self._validators_index_slot: int | None = None
         self.chain_reorgs: dict[str, ChainReorgEvent] = {}
-        self.handled_headers: list[BlockHeaderResponseData] = []
+        self._chain_reorgs_lock = threading.Lock()
+        self.handled_blocks: list[FullBlockInfo] = []
         self.disable_unexpected_exit_alerts: list[str] = variables.DISABLE_UNEXPECTED_EXIT_ALERTS
+        self._execution_requests: tuple[str, ExecutionRequestsContext] | None = None
+
+    def run_cycle(self, slot_to_handle: str = 'head') -> bool:
+        """One pass: read the head, handle it if it moved, return whether it did. No sleep, so a test can call it."""
+        current_head = self._get_header_full_info(slot_to_handle)
+        if not current_head:
+            logger.debug({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
+            return False
+
+        if self.keys_updater is None or self.keys_updater.done():
+            self.keys_updater = self._update_user_keys(current_head)
+        if self.validators_updater is None or self.validators_updater.done():
+            self.validators_updater = self._update_validators()
+
+        if not self._keys_loaded():
+            # A head handled before the first load would miss every event of our validators, and the first pulse opens
+            # readiness. The head stays unhandled, so the next cycle retries it.
+            self.keys_updater.result()
+            self.validators_updater.result()
+            if not self._keys_loaded():
+                logger.warning({'msg': f'Keys are not loaded, head [{current_head.header.message.slot}] is not handled'})
+                return False
+
+        logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
+
+        # ATTENTION! While we handle current head, new head could be happened
+        # We should keep eye on handler execution time
+        self._handle_head(current_head)
+
+        SLOT_NUMBER.set(current_head.header.message.slot)
+        # Only a handled head counts as progress, so that an error loop can not keep the container alive: the head cycle
+        # swallows its exceptions and would retry forever
+        pulse()
+        logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
+        return True
 
     def run(self, slots_range: Optional[str] = SLOTS_RANGE):
-        def _run(slot_to_handle='head'):
-            current_head = self._get_header_full_info(slot_to_handle)
-            if not current_head:
-                logger.debug({'msg': f'No new head, waiting {CYCLE_SLEEP_IN_SECONDS} seconds'})
-                time.sleep(CYCLE_SLEEP_IN_SECONDS)
-                return
-
-            if self.keys_updater is None or self.keys_updater.done():
-                self.keys_updater = self._update_user_keys(current_head)
-            if self.validators_updater is None or self.validators_updater.done():
-                self.validators_updater = self._update_validators()
-
-            logger.info({'msg': f'New head [{current_head.header.message.slot}]'})
-
-            # ATTENTION! While we handle current head, new head could be happened
-            # We should keep eye on handler execution time
-            self._handle_head(current_head)
-
-            SLOT_NUMBER.set(current_head.header.message.slot)
-            logger.info({'msg': f'Head [{current_head.header.message.slot}] is handled'})
-            time.sleep(CYCLE_SLEEP_IN_SECONDS)
-
         logger.info({'msg': f'Watcher started. Handlers: {[handler.__class__.__name__ for handler in self.handlers]}'})
 
         if slots_range is not None:
             start, end = slots_range.split('-')
             for slot in range(int(start), int(end) + 1):
                 try:
-                    _run(str(slot))
+                    self.run_cycle(str(slot))
                 except NotOkResponse as e:
                     if e.status == 404:
                         pass
-                self.keys_updater.result()
-                self.validators_updater.result()
+                # A missed slot is a 404 before `run_cycle` schedules the updaters; waiting on them
+                # unconditionally turns the first missed slot of a range into an AttributeError.
+                if self.keys_updater is not None:
+                    self.keys_updater.result()
+                if self.validators_updater is not None:
+                    self.validators_updater.result()
+                time.sleep(CYCLE_SLEEP_IN_SECONDS)
         else:
             while True:
                 try:
                     # Run event listener task very first time or re-run after error
                     if self.chain_reorg_event_listener is None or not self.chain_reorg_event_listener.is_alive():
                         self.chain_reorg_event_listener = self.listen_chain_reorg_event()
-                    _run()
+                    self.run_cycle()
                 except Exception as e:  # pylint: disable=broad-except
                     logger.error({'msg': 'Error while handling head', 'exception': str(e)})
-                    time.sleep(CYCLE_SLEEP_IN_SECONDS)
+                time.sleep(CYCLE_SLEEP_IN_SECONDS)
+
+    def _keys_loaded(self) -> bool:
+        """Whether both our keys and the validator index have loaded at least once"""
+        return bool(self.user_keys) and bool(self.indexed_validators_keys)
+
+    def execution_requests(self, head: FullBlockInfo) -> ExecutionRequestsContext:
+        """Execution requests applied to the state while `head` was being processed, resolved once per head"""
+        if self._execution_requests is None or self._execution_requests[0] != head.root:
+            self._execution_requests = (head.root, resolve_execution_requests(self, head))
+        return self._execution_requests[1]
 
     @duration_meter()
     def _handle_head(self, head: FullBlockInfo):
+        # Resolve before the handlers start: they run in parallel and would race for it otherwise
+        self.execution_requests(head)
         tasks = [h.handle(self, head) for h in self.handlers]
         for t in tasks:
             t.result()
-        self.handled_headers.append(head)
-        if len(self.handled_headers) > KEEP_MAX_HANDLED_HEADERS_COUNT:
-            self.handled_headers.pop(0)
+        self.handled_blocks.append(head)
+        if len(self.handled_blocks) > KEEP_MAX_HANDLED_BLOCKS_COUNT:
+            self.handled_blocks.pop(0)
 
     @unsync
     @duration_meter()
@@ -122,7 +155,8 @@ class Watcher:
         now = time.time()
         diff = now - self.genesis_time
         slot = int(diff / SECONDS_PER_SLOT)
-        if self.indexed_validators_keys and slot % SLOTS_PER_EPOCH != 0:
+        # A head that is not handled is retried every cycle, so one boundary slot can call this a dozen times
+        if self.indexed_validators_keys and (slot % SLOTS_PER_EPOCH != 0 or slot == self._validators_index_slot):
             return
         logger.info({'msg': 'Updating indexed validators keys'})
         try:
@@ -135,11 +169,12 @@ class Watcher:
             return
 
         logger.info({'msg': f'Indexed validators keys updated: [{len(self.indexed_validators_keys)}]'})
+        self._validators_index_slot = slot
         VALIDATORS_INDEX_SLOT_NUMBER.set(slot)
 
     @unsync
     @duration_meter()
-    def _update_user_keys(self, header: BlockHeaderResponseData) -> None:
+    def _update_user_keys(self, block: FullBlockInfo) -> None:
         """Return dict with `publickey` as key and `NamedKey` as value"""
         try:
             new_keys = self.keys_source.update_keys()
@@ -149,7 +184,7 @@ class Watcher:
         if new_keys:
             self.user_keys = new_keys
             logger.warning({'msg': f'User keys updated: [{len(self.user_keys)}]'})
-        KEYS_SOURCE_SLOT_NUMBER.set(int(header.header.message.slot))
+        KEYS_SOURCE_SLOT_NUMBER.set(int(block.header.message.slot))
 
     @duration_meter()
     def _get_header_full_info(self, slot=None) -> FullBlockInfo | None:
@@ -157,7 +192,7 @@ class Watcher:
             """Callback that will be called if we can't get valid head block from beacon node"""
             data, _ = result
             diff = time.time() - ((int(data['header']['message']['slot']) * SECONDS_PER_SLOT) + self.genesis_time)
-            if len(self.handled_headers) > 0 and diff > SECONDS_PER_SLOT * 4:
+            if len(self.handled_blocks) > 0 and diff > SECONDS_PER_SLOT * 4:
                 # head didn't change for more than 4 slots (1/8 of epoch)
                 return True
             return False
@@ -167,9 +202,10 @@ class Watcher:
         current_head = self.consensus.get_block_header(
             slot, force_use_fallback_callback if slot == 'head' else lambda _: False
         )
-        if len(self.handled_headers) > 0 and int(current_head.header.message.slot) == int(
-            self.handled_headers[-1].header.message.slot
-        ):
+        # Blocks are told apart by root rather than by slot: a reorg replaces the block of a slot that has already been
+        # handled, and the replacement is the canonical one whose operations have to be checked. Matching against every
+        # handled block, not just the last one, keeps a reorg back to an earlier branch from being handled twice.
+        if any(handled.root == current_head.root for handled in self.handled_blocks):
             return None
         current_block = self.consensus.get_block_details(current_head.root)
         return FullBlockInfo(**asdict(current_head), **asdict(current_block))
@@ -183,11 +219,26 @@ class Watcher:
             for event in client.events():
                 logger.warning({'msg': f'Chain reorg event: {event.data}'})
                 event = ChainReorgEvent.from_response(**json.loads(event.data))
-                lock = threading.Lock()
-                with lock:
+                with self._chain_reorgs_lock:
                     self.chain_reorgs[event.slot] = event
         except Exception as e:  # pylint: disable=broad-except
             logger.error({'msg': 'Error while listening chain reorg events', 'exception': str(e)})
+
+    def pending_chain_reorgs(self) -> list[ChainReorgEvent]:
+        """Reorg events the listener has seen and nobody has handled yet"""
+        with self._chain_reorgs_lock:
+            return [*self.chain_reorgs.values()]
+
+    def drop_chain_reorg(self, event: ChainReorgEvent) -> None:
+        """
+        Forget a reorg event that has been handled.
+
+        Drops the event itself rather than everything stored for its slot: the listener may have put a newer reorg of
+        the same slot in its place while this one was being handled, and that one still has to be handled.
+        """
+        with self._chain_reorgs_lock:
+            if self.chain_reorgs.get(event.slot) is event:
+                del self.chain_reorgs[event.slot]
 
     @cached_property
     def valid_withdrawal_addresses(self):

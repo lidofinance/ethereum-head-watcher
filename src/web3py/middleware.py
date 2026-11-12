@@ -90,7 +90,8 @@ def metrics_collector(
                 call_method=call_method,
                 call_to=call_to,
                 code=code,
-                domain=domain,
+                # The endpoint that answered: a fallback provider moves `endpoint_uri` to it
+                domain=urlparse(getattr(w3.provider, "endpoint_uri", '') or '').netloc or domain,
             )
 
             return response
