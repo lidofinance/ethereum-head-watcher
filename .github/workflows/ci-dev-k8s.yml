@@ -2,8 +2,6 @@ name: Build and push ethereum-head-watcher to dev
 
 run-name: Build and push ethereum-head-watcher:dev to dev
 
-# Builds the mutable `dev` image tag through the shared reusable build workflow.
-# Runs alongside ci-dev.yml; both delivery paths are active for now.
 on:
   workflow_dispatch:
   push:
@@ -19,12 +17,10 @@ permissions:
 
 jobs:
   build-and-push:
-    uses: lidofinance/actions/.github/workflows/k8s-build-push-harbor.yml@c7b5b6c5d8013046347d728d748fa741eb214e28
+    # @main until the DevOps rollout settles, then a reviewed commit SHA.
+    uses: lidofinance/actions/.github/workflows/k8s-build-push-harbor.yml@main
     with:
-      tag: dev
-      registry: registry.dev.k8s-dev.org
-      registry_username: ${{ vars.REGISTRY_USERNAME }}
-      image: team-vroom/ethereum-head-watcher
-      environment: harbor_dev_release
-    secrets:
-      registry_token: ${{ secrets.HARBOR_DEV_TOKEN }}
+      target: dev
+      harbor_project: team-vroom
+      image: ethereum-head-watcher
+    secrets: inherit
