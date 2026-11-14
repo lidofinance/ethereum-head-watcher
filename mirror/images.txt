@@ -1,0 +1,9 @@
+# Third-party images this application's chart runs on staging, copied into the team's staging
+# Harbor project by .github/workflows/mirror-staging-images.yml. One line per image: the source
+# pinned by digest, then the repository and tag in the project, under this application's prefix
+# so another application's copy of the same image never moves this tag.
+#
+# The digest has to match the chart's; bump both together.
+docker.io/library/postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777          head-watcher/library/postgres:16-alpine
+docker.io/lidofinance/lido-keys-api@sha256:c73f406b7b5fac9dd0175236ae148594de3819ffecaf8503da087a77cd9c5d45 head-watcher/lidofinance/lido-keys-api:5.0.0
+docker.io/prom/alertmanager@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba         head-watcher/prom/alertmanager:v0.28.1
