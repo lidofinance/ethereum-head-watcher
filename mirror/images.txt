@@ -6,4 +6,4 @@
 # The digest has to match the chart's; bump both together.
 docker.io/library/postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777          head-watcher/library/postgres:16-alpine
 docker.io/lidofinance/lido-keys-api@sha256:c73f406b7b5fac9dd0175236ae148594de3819ffecaf8503da087a77cd9c5d45 head-watcher/lidofinance/lido-keys-api:5.0.0
-docker.io/prom/alertmanager@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba         head-watcher/prom/alertmanager:v0.28.1
+docker.io/prom/alertmanager@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c         head-watcher/prom/alertmanager:v0.35.0
