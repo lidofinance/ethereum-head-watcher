@@ -1,3 +1,35 @@
+# [0.9.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.8.0...0.9.0) (2026-11-15)
+
+
+### Bug Fixes
+
+* cast the event ABI to a plain dict for mypy ([c18fb60](https://github.com/lidofinance/ethereum-head-watcher/commit/c18fb6051f1ded19be6d7326cc4d1368fa2c019e))
+* do not crash on an empty ADDITIONAL_ALERTMANAGER_LABELS ([83554fb](https://github.com/lidofinance/ethereum-head-watcher/commit/83554fb128ca80ae2676201b4f22679089ec8b42))
+* do not crash when replaying a range of slots ([7d54a8c](https://github.com/lidofinance/ethereum-head-watcher/commit/7d54a8c6ee959a9dd41024ba07d545f2ffe4fc18))
+* do not lose blocks and reorg events after a chain reorg ([9a5eb7d](https://github.com/lidofinance/ethereum-head-watcher/commit/9a5eb7d0ffd632a16c0b90cc819a8632848c09ca))
+* fetch events by contract and apply consolidation removals only when finalized ([22986ab](https://github.com/lidofinance/ethereum-head-watcher/commit/22986ab6a23f8e6e7fe62cf0ed1743dea00b134f))
+* incorrect execution payload endpoint ([5eee66c](https://github.com/lidofinance/ethereum-head-watcher/commit/5eee66c9a9d4f19a72cd9bd1ebcc348819ca4a08))
+* make the Docker healthcheck detect a stuck watcher ([eed0f9e](https://github.com/lidofinance/ethereum-head-watcher/commit/eed0f9e6b6df724c688b241d7725db2fb219b88f))
+* re-read last 64 blocks instead of tracking finalized block for consolidations ([ee8cb51](https://github.com/lidofinance/ethereum-head-watcher/commit/ee8cb51229293170edf95846772f15a9af0800b6))
+* track consolidation batches by hash and re-read recent blocks ([a255493](https://github.com/lidofinance/ethereum-head-watcher/commit/a255493bce545c78e118c6d89361e55a8fdae256))
+* **VROOM-545:** mask provider keys in CI logs by path, not only by whole URL ([5da6e9c](https://github.com/lidofinance/ethereum-head-watcher/commit/5da6e9c7b7bbff062e9ca53ded23ab57d2843984)), closes [#141](https://github.com/lidofinance/ethereum-head-watcher/issues/141)
+* **VROOM-676:** attribute execution-layer RPC metrics to the endpoint that answered ([d266f5f](https://github.com/lidofinance/ethereum-head-watcher/commit/d266f5f4b9f3c2182314729f3c1248d834600b38))
+* **VROOM-676:** handle no head before keys load, mask userinfo and named secrets ([b15a3e8](https://github.com/lidofinance/ethereum-head-watcher/commit/b15a3e8f295a883b82cb8a91aae1ed1b3c47bd97))
+* **VROOM-676:** keep checkout build-info.json when no build args are passed ([5e093dc](https://github.com/lidofinance/ethereum-head-watcher/commit/5e093dc2c046b589e01436a4a9a9de2574db6ffe))
+* **VROOM-676:** read the validator index once per epoch boundary while a head waits ([3d3a8ba](https://github.com/lidofinance/ethereum-head-watcher/commit/3d3a8ba305317bd7bd1f43b33ad2a279c89a124e))
+* **VROOM-676:** satisfy mypy on event topic lookup ([d57374f](https://github.com/lidofinance/ethereum-head-watcher/commit/d57374f3013c3641d26488dcd84361e850460550))
+
+
+### Features
+
+* read Gloas execution requests from the parent envelope ([e3f5a61](https://github.com/lidofinance/ethereum-head-watcher/commit/e3f5a613b086395a1c60d75f59aaea4f1f153626))
+* read the Gloas execution requests from the head block itself ([9630784](https://github.com/lidofinance/ethereum-head-watcher/commit/963078416a1192fb69cea61cd08573818e99e37b))
+* tolerate Gloas (EIP-7732) block shape ([1c24d5f](https://github.com/lidofinance/ethereum-head-watcher/commit/1c24d5ffb604fc6dac18442fbea30df1ab151339))
+* **VROOM-545:** run the watcher on Kubernetes again ([99f40f9](https://github.com/lidofinance/ethereum-head-watcher/commit/99f40f970b1973a01fc02d43a2bbc81d39a1bd22)), closes [#141](https://github.com/lidofinance/ethereum-head-watcher/issues/141) [#149](https://github.com/lidofinance/ethereum-head-watcher/issues/149) [#141](https://github.com/lidofinance/ethereum-head-watcher/issues/141) [#141](https://github.com/lidofinance/ethereum-head-watcher/issues/141)
+* **VROOM-676:** log redaction, build-info, slim image, RPC metrics ([4c35ac9](https://github.com/lidofinance/ethereum-head-watcher/commit/4c35ac931bc6873da3f852f72c1d543d601c3f10))
+
+
+
 # [0.8.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0.7.0...0.8.0) (2026-09-18)
 
 
@@ -163,48 +195,6 @@
 ### Features
 
 * custom validators list ([fb81bcb](https://github.com/lidofinance/ethereum-head-watcher/commit/fb81bcb7f1255ac5ecd37dc07b275cf31a5445f5))
-
-
-
-# [0.1.0](https://github.com/lidofinance/ethereum-head-watcher/compare/0b049a1e0307414919d37e831425faf285542b84...0.1.0) (2023-08-17)
-
-
-### Bug Fixes
-
-* add logs ([3f41892](https://github.com/lidofinance/ethereum-head-watcher/commit/3f41892394e97c84ca4a8499a29b83d2fd56cbc2))
-* alerting ([#14](https://github.com/lidofinance/ethereum-head-watcher/issues/14)) ([ad506d2](https://github.com/lidofinance/ethereum-head-watcher/commit/ad506d21f6e885357998272736e53a22bd18d621))
-* alerts ([#10](https://github.com/lidofinance/ethereum-head-watcher/issues/10)) ([2352e9e](https://github.com/lidofinance/ethereum-head-watcher/commit/2352e9ea36dc36d95ea4cb584d46a26060d3f41e))
-* black ([6bf610f](https://github.com/lidofinance/ethereum-head-watcher/commit/6bf610fee43c6ddda070f31ee41873af4bb970ab))
-* configs. multi-run ([7d240ef](https://github.com/lidofinance/ethereum-head-watcher/commit/7d240efd02debd10f9636e1895e1d250254061e2))
-* configs. multi-run ([890e00d](https://github.com/lidofinance/ethereum-head-watcher/commit/890e00d685fdff3f6a87c5db023a92c9057f1b44))
-* dict ([ea2571d](https://github.com/lidofinance/ethereum-head-watcher/commit/ea2571d7a8e5bbb2022bac889f1e6b191374e38b))
-* dockerfile ([058cafe](https://github.com/lidofinance/ethereum-head-watcher/commit/058cafe1747f87ff2d62ee835a276e6f1b1e505a))
-* errors ([f53c768](https://github.com/lidofinance/ethereum-head-watcher/commit/f53c7687c572d93fd44f51842b7bd01b1d3f3065))
-* errors ([48589d3](https://github.com/lidofinance/ethereum-head-watcher/commit/48589d3528a3012002ad816e1e7de143dc85fd6c))
-* HEALTHCHECK ([f11bb83](https://github.com/lidofinance/ethereum-head-watcher/commit/f11bb83ef13afe0fc6631931cf01aeee4a53dfff))
-* isort ([25e2a67](https://github.com/lidofinance/ethereum-head-watcher/commit/25e2a672ca18e0ced6d694e7df6d51579ac61c08))
-* labels ([b8678cc](https://github.com/lidofinance/ethereum-head-watcher/commit/b8678cc8441fa25da107d8f1cd97b701d6873c6c))
-* mypy ([75f3e5d](https://github.com/lidofinance/ethereum-head-watcher/commit/75f3e5dd9edff993715c87e48657db45896b8c47))
-* optimize ([1818512](https://github.com/lidofinance/ethereum-head-watcher/commit/18185129285e4bfc66b1cc6c5f854d89aeddecc3))
-* parse validators ([#11](https://github.com/lidofinance/ethereum-head-watcher/issues/11)) ([cbe51e7](https://github.com/lidofinance/ethereum-head-watcher/commit/cbe51e7bfe6086cb4806987326151e1419fe0c53))
-* remove comments ([19b0c7b](https://github.com/lidofinance/ethereum-head-watcher/commit/19b0c7b9546a237b1c4f37bf3127408cdf058534))
-* review ([b934ba3](https://github.com/lidofinance/ethereum-head-watcher/commit/b934ba3f1d6a31362c4489400cdbe6bc4d86f3b8))
-* review ([9276e88](https://github.com/lidofinance/ethereum-head-watcher/commit/9276e8864dfb3b61c46da39946f39a834952dc06))
-* stable versions ([3b3468c](https://github.com/lidofinance/ethereum-head-watcher/commit/3b3468c03231926a8c70ce55f9b93b1fc08ee4cb))
-* var ([ff14fcf](https://github.com/lidofinance/ethereum-head-watcher/commit/ff14fcf6b135ab00ce42ddb71d5f0ee54d98757b))
-* workflow ([#13](https://github.com/lidofinance/ethereum-head-watcher/issues/13)) ([2ff5366](https://github.com/lidofinance/ethereum-head-watcher/commit/2ff5366866ce90fe5e697daad6999df4973b914e))
-
-
-### Features
-
-* additional labels ([e959d6f](https://github.com/lidofinance/ethereum-head-watcher/commit/e959d6fdfdd542f9b2b9c474aa265a0bffca2369))
-* fork detection ([#6](https://github.com/lidofinance/ethereum-head-watcher/issues/6)) ([2d9ff46](https://github.com/lidofinance/ethereum-head-watcher/commit/2d9ff4604606a8c26de910a67a33cba64404c7b1))
-* handle unexpected exits ([0732934](https://github.com/lidofinance/ethereum-head-watcher/commit/0732934f1eb9eea03a89f4042a1cbc60834522a4))
-* health metrics alerts ([522464f](https://github.com/lidofinance/ethereum-head-watcher/commit/522464f4402091b244a24e5903db17a5cbc432ec))
-* optimization ([40bbe32](https://github.com/lidofinance/ethereum-head-watcher/commit/40bbe32500d8fb6be31e78d13bf26cc00f8d218c))
-* tests and polish ([#12](https://github.com/lidofinance/ethereum-head-watcher/issues/12)) ([5524e2c](https://github.com/lidofinance/ethereum-head-watcher/commit/5524e2c91dd8dd666033e91af3deedc5f1914e60))
-* the very first version ([0b049a1](https://github.com/lidofinance/ethereum-head-watcher/commit/0b049a1e0307414919d37e831425faf285542b84))
-* unknown index ([71967b0](https://github.com/lidofinance/ethereum-head-watcher/commit/71967b0305a94d93a72e4e09466cddb22b2071f0))
 
 
 
