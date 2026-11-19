@@ -1,9 +1,11 @@
-# Third-party images this application's chart runs on staging, copied into the team's staging
+# Third-party images this application's charts run on staging, copied into the team's staging
 # Harbor project by .github/workflows/mirror-staging-images.yml. One line per image: the source
-# pinned by digest, then the repository and tag in the project, under this application's prefix
-# so another application's copy of the same image never moves this tag.
+# pinned by digest, then the repository and tag in the project. Sources are Docker Hardened Images.
+#
+# Lines under shared/ are images several applications run (the shared Keys API and its Postgres).
+# Keep them identical in every repository that lists them, so any of them can refresh the copy.
+# The rest sit under this application's prefix, so another application's copy never moves them.
 #
 # The digest has to match the chart's; bump both together.
-docker.io/library/postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777          head-watcher/library/postgres:16-alpine
-docker.io/lidofinance/lido-keys-api@sha256:c73f406b7b5fac9dd0175236ae148594de3819ffecaf8503da087a77cd9c5d45 head-watcher/lidofinance/lido-keys-api:5.0.0
-docker.io/prom/alertmanager@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c         head-watcher/prom/alertmanager:v0.35.0
+dhi.io/postgres@sha256:a7e446f813623e776304e925f65586e2ee035c127447b15a771df671bc4254a9     shared/dhi/postgres:16.16-alpine3.24
+dhi.io/alertmanager@sha256:45868377e49ac045b17b828d3894114a95ef44e18a061c8c1357857bcb28d9a2 head-watcher/dhi/alertmanager:0.35.0-alpine3.24
